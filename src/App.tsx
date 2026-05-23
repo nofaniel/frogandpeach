@@ -176,9 +176,15 @@ function App() {
   }, [])
 
   async function boot() {
-    const current = await api<Session>('/api/auth/me', {}, false)
-    setSession(current)
-    if (current.authenticated) await refreshAll()
+    setError('')
+    try {
+      const current = await api<Session>('/api/auth/me', {}, false)
+      setSession(current)
+      if (current.authenticated) await refreshAll()
+    } catch (caught) {
+      setSession({ authenticated: false, userName: null })
+      setError(caught instanceof Error ? caught.message : 'Unable to reach API. Run `npm run dev:worker` for full local development.')
+    }
   }
 
   async function refreshAll() {
@@ -656,6 +662,9 @@ async function api<T>(path: string, options: { method?: string; body?: unknown }
   })
 
   if (!response.ok) {
+    if (response.status === 404 && path.startsWith('/api/')) {
+      throw new Error('API not found in Vite-only mode. Use `npm run dev:worker` and open http://localhost:8788.')
+    }
     if (!requireOk && response.status === 401) return { authenticated: false, userName: null } as T
     const payload = (await response.json().catch(() => ({}))) as { error?: string }
     throw new Error(payload.error || `Request failed: ${response.status}`)

@@ -12,7 +12,6 @@
     "test": "node node_modules/vitest/vitest.mjs run",
     "test:watch": "node node_modules/vitest/vitest.mjs",
     "hash-password": "node scripts/generate-password-hash.mjs",
-    "import:legacy": "node node_modules/tsx/dist/cli.mjs scripts/import-legacy-data.ts",
     "cf:migrate:local": "node node_modules/wrangler/bin/wrangler.js d1 migrations apply frog-peach-db --local",
     "cf:migrate:remote": "node node_modules/wrangler/bin/wrangler.js d1 migrations apply frog-peach-db --remote",
     "cf:deploy": "npm run build && node node_modules/wrangler/bin/wrangler.js pages deploy dist"
@@ -31,7 +30,6 @@
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "tsx": "^4.20.6",
     "vitest": "^4.0.14",
     "wrangler": "^4.48.0"
   }
