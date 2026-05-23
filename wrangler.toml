@@ -1,0 +1,9 @@
+name = "frog-peach-home-hub"
+compatibility_date = "2026-05-23"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "frog-peach-db"
+database_id = "replace-with-cloudflare-d1-id"
+preview_database_id = "frog-peach-db"
