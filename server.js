@@ -8,6 +8,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 
+const APP_LOCATION = {
+  name: process.env.LOCATION_NAME || 'Newquay',
+  region: process.env.LOCATION_REGION || 'Cornwall',
+  latitude: Number(process.env.LOCATION_LATITUDE ?? 50.4155),
+  longitude: Number(process.env.LOCATION_LONGITUDE ?? -5.0815),
+  timezone: process.env.LOCATION_TIMEZONE || 'Europe/London',
+  tideLocationName: process.env.TIDE_LOCATION_NAME || 'Newquay Harbour',
+};
+
 // ── Data file paths ───────────────────────────────────────────────────────────
 const FILES = {
   lists: path.join(DATA_DIR, 'lists.json'),
@@ -27,6 +36,10 @@ const now = () => new Date().toISOString();
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/api/config', (_req, res) => {
+  res.json({ location: APP_LOCATION });
+});
 
 // ── LISTS ─────────────────────────────────────────────────────────────────────
 app.get('/api/lists', (req, res) => res.json(readData(FILES.lists)));
@@ -123,21 +136,18 @@ app.delete('/api/pages/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── TIDES — harmonic prediction for Newquay, Cornwall ────────────────────────
+// ── TIDES — harmonic prediction for configured location ───────────────────────
 // No external API, no key, no sign-up. Computes from tidal harmonic constituents.
-// Accuracy: ±20–30 min. Constituents calibrated to Newquay Harbour using NTSLF data.
+// Accuracy depends on the supplied constituent calibration.
 //
 // Method: h(t) = Z0 + Σ Aₙ · cos(ωₙ·t + φₙ)
 //   t   = hours since J2000 epoch (2000-01-01 12:00 UTC)
-//   φₙ  = V₀ₙ(J2000) − gₙ   (equilibrium argument minus Newquay phase lag)
-//
-// Newquay tidal ranges (from Admiralty Tide Tables):
-//   MHWS 5.1 m · MLWS 0.6 m · MHWN 3.8 m · MLWN 1.9 m
+//   φₙ  = V₀ₙ(J2000) − gₙ   (equilibrium argument minus local phase lag)
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 
-// Harmonic constituents for Newquay: [amplitude(m), speed(°/h), phase@J2000(°)]
-const NEWQUAY_CONSTITUENTS = [
+// Harmonic constituents: [amplitude(m), speed(°/h), phase@J2000(°)]
+const DEFAULT_TIDE_CONSTITUENTS = [
   [1.60, 28.9841042, 309.3],  // M2  — principal lunar semidiurnal
   [0.65, 30.0000000, 160.0],  // S2  — principal solar semidiurnal
   [0.32, 28.4397295, 199.3],  // N2  — larger lunar elliptic semidiurnal
@@ -145,12 +155,27 @@ const NEWQUAY_CONSTITUENTS = [
   [0.05, 15.0410686,  70.5],  // K1  — lunar diurnal
   [0.03, 13.9430356, 193.8],  // O1  — lunar diurnal
 ];
-const NEWQUAY_Z0 = 2.90; // Mean Sea Level above Chart Datum (m)
+
+function parseConstituents(raw) {
+  if (!raw) return DEFAULT_TIDE_CONSTITUENTS;
+  try {
+    const parsed = JSON.parse(raw);
+    const valid = Array.isArray(parsed) && parsed.every(
+      c => Array.isArray(c) && c.length === 3 && c.every(n => typeof n === 'number' && Number.isFinite(n))
+    );
+    return valid ? parsed : DEFAULT_TIDE_CONSTITUENTS;
+  } catch {
+    return DEFAULT_TIDE_CONSTITUENTS;
+  }
+}
+
+const TIDE_CONSTITUENTS = parseConstituents(process.env.TIDE_CONSTITUENTS_JSON);
+const TIDE_Z0 = Number(process.env.TIDE_Z0 ?? 2.90); // Mean Sea Level above Chart Datum (m)
 
 function tidalHeight(msTime) {
   const t = (msTime - J2000_MS) / 3_600_000; // hours from J2000
-  let h = NEWQUAY_Z0;
-  for (const [amp, speed, phase] of NEWQUAY_CONSTITUENTS) {
+  let h = Number.isFinite(TIDE_Z0) ? TIDE_Z0 : 2.90;
+  for (const [amp, speed, phase] of TIDE_CONSTITUENTS) {
     h += amp * Math.cos((speed * t + phase) * (Math.PI / 180));
   }
   return h;
@@ -175,10 +200,43 @@ function predictTides(fromMs, hours = 36) {
   return events;
 }
 
-app.get('/api/tides', (req, res) => {
-  const events = predictTides(Date.now(), 36);
-  res.json(events.slice(0, 6)); // next 6 tide events
+app.get('/api/tides', async (req, res) => {
+  // Tier 1: Admiralty UKHO — accurate real tide tables (needs API key + station ID in .env)
+  try {
+    const admiraltyEvents = await fetchAdmiraltyTides();
+    if (admiraltyEvents && admiraltyEvents.length > 0) {
+      return res.json(admiraltyEvents);
+    }
+  } catch (err) {
+    console.warn('[tides] Admiralty fetch failed, falling back to harmonic:', String(err.message || err));
+  }
+  // Tier 2: Local harmonic prediction — 7 days, no external dependency
+  res.json(predictTides(Date.now(), 7 * 24));
 });
+
+// ── TIDES — Admiralty UKHO (optional upgrade, needs ADMIRALTY_KEY + TIDE_STATION_ID) ──────
+// Sign up free at https://admiraltyapi.portal.azure-api.net/
+// Returns real high/low water times for the configured station for the next 7 days.
+// Without these env vars the server falls back to local harmonic prediction.
+async function fetchAdmiraltyTides() {
+  const key     = process.env.ADMIRALTY_KEY;
+  const station = process.env.TIDE_STATION_ID;
+  if (!key || !station) return null;
+
+  const url = `https://admiraltyapi.azure-api.net/uktidalapi/api/V1/Stations/${encodeURIComponent(station)}/TidalEvents?duration=7`;
+  const res = await fetch(url, {
+    headers: { 'Ocp-Apim-Subscription-Key': key },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`Admiralty API ${res.status}`);
+  const data = await res.json();
+  // Normalise to { EventType, DateTime, Height } — same shape as harmonic output
+  return data.map(e => ({
+    EventType: e.EventType,                                           // 'HighWater' | 'LowWater'
+    DateTime:  e.DateTime,
+    Height:    typeof e.Height === 'number' ? +e.Height.toFixed(2) : null,
+  }));
+}
 
 // ── NETWORK INFO ──────────────────────────────────────────────────────────────
 app.get('/api/network', (req, res) => {

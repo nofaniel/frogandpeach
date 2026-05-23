@@ -27,18 +27,52 @@ const WMO = {
   99: { label: 'Thunderstorm',    icon: '⛈️' },
 };
 
+const DEFAULT_LOCATION = {
+  name: 'Newquay',
+  region: 'Cornwall',
+  latitude: 50.4155,
+  longitude: -5.0815,
+  timezone: 'Europe/London',
+  tideLocationName: 'Newquay Harbour',
+};
+
+let appLocation = { ...DEFAULT_LOCATION };
+
 function wmo(code) {
   return WMO[code] || { label: 'Unknown', icon: '🌡️' };
 }
 
 // ── Weather (Open-Meteo — no API key needed) ─────────────────────────────────
+async function loadConfig() {
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    if (data && data.location) {
+      appLocation = { ...DEFAULT_LOCATION, ...data.location };
+    }
+  } catch {
+    appLocation = { ...DEFAULT_LOCATION };
+  }
+
+  const weatherLocation = document.getElementById('weather-location');
+  if (weatherLocation) {
+    weatherLocation.textContent = `${appLocation.name}, ${appLocation.region}`;
+  }
+
+  const tidesLocation = document.getElementById('tides-location');
+  if (tidesLocation) {
+    tidesLocation.textContent = appLocation.tideLocationName;
+  }
+}
+
 async function loadWeather() {
   const url = 'https://api.open-meteo.com/v1/forecast' +
-    '?latitude=50.4155&longitude=-5.0815' +
+    `?latitude=${encodeURIComponent(appLocation.latitude)}` +
+    `&longitude=${encodeURIComponent(appLocation.longitude)}` +
     '&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,precipitation' +
     '&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,weather_code' +
     '&wind_speed_unit=mph' +
-    '&timezone=Europe/London' +
+    `&timezone=${encodeURIComponent(appLocation.timezone)}` +
     '&forecast_days=1';
 
   try {
@@ -71,6 +105,12 @@ function formatTideTime(isoStr) {
   return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 }
 
+function tidesDayKey(isoStr, tz) {
+  return new Date(isoStr).toLocaleDateString('en-GB', {
+    weekday: 'long', day: 'numeric', month: 'long', timeZone: tz,
+  });
+}
+
 async function loadTides() {
   const grid = document.getElementById('tides-grid');
   try {
@@ -78,24 +118,62 @@ async function loadTides() {
     const data = await res.json();
 
     if (!Array.isArray(data) || data.length === 0) {
-      grid.innerHTML = `<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem">No tide data available.</div>`;
+      grid.innerHTML = `<div class="tides-empty">No tide data available.</div>`;
       return;
     }
 
-    const events = data.slice(0, 4);
+    const tz       = appLocation.timezone || 'Europe/London';
+    const todayKey = tidesDayKey(new Date().toISOString(), tz);
 
-    grid.innerHTML = events.map(e => {
-      const isHigh = e.EventType === 'HighWater';
-      return `
-        <div class="tide-item">
-          <div class="tide-type ${isHigh ? 'high' : 'low'}">${isHigh ? '▲ High' : '▼ Low'}</div>
-          <div class="tide-time">${formatTideTime(e.DateTime)}</div>
-          <div class="tide-height">${e.Height != null ? e.Height.toFixed(1) + ' m' : ''}</div>
-        </div>`;
-    }).join('');
+    // Group events by local calendar day
+    const groups = new Map();
+    for (const e of data) {
+      const key = tidesDayKey(e.DateTime, tz);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(e);
+    }
+
+    let html = '';
+    let firstDay = true;
+
+    for (const [day, events] of groups) {
+      const isToday = day === todayKey;
+
+      if (isToday) {
+        // ── Today: full-size tide cards ──────────────────────────────────────
+        html += `<div class="tides-day-label">Today</div>`;
+        html += `<div class="tides-today">` + events.map(e => {
+          const isHigh = e.EventType === 'HighWater';
+          return `
+            <div class="tide-item">
+              <div class="tide-type ${isHigh ? 'high' : 'low'}">${isHigh ? '▲ High' : '▼ Low'}</div>
+              <div class="tide-time">${formatTideTime(e.DateTime)}</div>
+              <div class="tide-height">${e.Height != null ? e.Height.toFixed(1) + ' m' : ''}</div>
+            </div>`;
+        }).join('') + `</div>`;
+        firstDay = false;
+      } else {
+        // ── Following days: compact chip row ─────────────────────────────────
+        if (firstDay) {
+          // No "today" events yet (e.g. all already past midnight) — render as today
+          html += `<div class="tides-day-label">Today</div>`;
+        } else {
+          html += `<div class="tide-future-day">
+            <div class="tide-future-label">${day}</div>
+            <div class="tide-future-events">${events.map(e => {
+              const isHigh = e.EventType === 'HighWater';
+              return `<span class="tide-chip ${isHigh ? 'high' : 'low'}">${isHigh ? '▲' : '▼'} ${formatTideTime(e.DateTime)}${e.Height != null ? ` <small>${e.Height.toFixed(1)} m</small>` : ''}</span>`;
+            }).join('')}</div>
+          </div>`;
+        }
+        firstDay = false;
+      }
+    }
+
+    grid.innerHTML = html;
 
   } catch {
-    grid.innerHTML = `<div style="grid-column:1/-1;color:var(--text-muted);font-size:0.85rem">Could not load tides.</div>`;
+    grid.innerHTML = `<div class="tides-empty">Could not load tides.</div>`;
   }
 }
 
@@ -152,7 +230,9 @@ function escHtml(str) {
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
-loadWeather();
-loadTides();
-loadRecentNotes();
-loadRecentLists();
+async function initDashboard() {
+  await loadConfig();
+  await Promise.all([loadWeather(), loadTides(), loadRecentNotes(), loadRecentLists()]);
+}
+
+initDashboard();

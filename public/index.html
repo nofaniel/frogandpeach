@@ -10,53 +10,64 @@
   <title>Flat Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Playfair+Display:ital,wght@0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
   <style>
     /* ── Dashboard-specific styles ── */
     .greeting {
-      font-size: 1.35rem;
+      font-size: 1.7rem;
       font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.2;
+      letter-spacing: -0.01em;
+      line-height: 1.15;
+      font-family: 'Playfair Display', Georgia, serif;
     }
     .greeting-sub {
-      font-size: 0.88rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
-      margin-top: 2px;
+      margin-top: 5px;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
     }
     .greeting-header {
-      padding: 20px 20px 4px;
+      padding: 22px 20px 6px;
       max-width: 600px;
       margin: 0 auto;
     }
 
     /* Weather card */
     .weather-card {
-      background: linear-gradient(135deg, #4A7C59 0%, #2D5A3D 100%);
+      background: linear-gradient(140deg, #4A7C59 0%, #2D5A3D 100%);
       color: #fff;
       border-radius: var(--radius);
       padding: 22px 22px 18px;
       margin-bottom: 14px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 4px 20px rgba(74,124,89,0.35);
+      box-shadow: 0 6px 28px rgba(45,90,61,0.38), 0 2px 8px rgba(45,90,61,0.2);
     }
     .weather-card::before {
       content: '';
       position: absolute;
-      top: -30px; right: -30px;
-      width: 130px; height: 130px;
-      background: rgba(255,255,255,0.06);
+      top: -50px; right: -50px;
+      width: 180px; height: 180px;
+      background: rgba(255,255,255,0.07);
+      border-radius: 50%;
+    }
+    .weather-card::after {
+      content: '';
+      position: absolute;
+      bottom: -30px; left: 30px;
+      width: 100px; height: 100px;
+      background: rgba(255,255,255,0.04);
       border-radius: 50%;
     }
     .weather-location {
-      font-size: 0.75rem;
-      font-weight: 700;
+      font-size: 0.73rem;
+      font-weight: 600;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      opacity: 0.75;
-      margin-bottom: 8px;
+      opacity: 0.7;
+      margin-bottom: 10px;
     }
     .weather-main {
       display: flex;
@@ -89,10 +100,19 @@
     .weather-meta span { display: flex; align-items: center; gap: 4px; }
 
     /* Tides card */
-    .tides-grid {
+    .tides-day-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .tides-today {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
+      margin-bottom: 14px;
     }
     .tide-item {
       background: var(--surface-2);
@@ -103,15 +123,47 @@
       gap: 2px;
     }
     .tide-type {
-      font-size: 0.72rem;
-      font-weight: 700;
+      font-size: 0.68rem;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
     .tide-type.high { color: var(--primary-dark); }
     .tide-type.low  { color: var(--text-muted); }
-    .tide-time { font-size: 1.15rem; font-weight: 700; }
+    .tide-time   { font-size: 1.15rem; font-weight: 700; }
     .tide-height { font-size: 0.82rem; color: var(--text-muted); }
+
+    /* Following-days compact rows */
+    .tide-future-day {
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .tide-future-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+    .tide-future-events {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tide-chip {
+      font-size: 0.82rem;
+      font-weight: 600;
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+    }
+    .tide-chip small { font-size: 0.74rem; color: var(--text-muted); font-weight: 400; }
+    .tide-chip.high  { color: var(--primary-dark); }
+    .tide-chip.low   { color: var(--text-muted); }
+    .tides-empty     { color: var(--text-muted); font-size: 0.85rem; }
 
     /* Recent sections */
     .recent-note {
@@ -149,22 +201,15 @@
     }
 
     /* Skeleton loader */
-    .skeleton {
-      background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.4s infinite;
-      border-radius: 6px;
-      height: 14px;
-    }
     @keyframes shimmer {
       0%   { background-position: 200% 0; }
       100% { background-position: -200% 0; }
     }
 
     .weather-skeleton {
-      background: linear-gradient(90deg, rgba(255,255,255,0.12) 25%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.12) 75%);
+      background: linear-gradient(90deg, rgba(255,255,255,0.1) 25%, rgba(255,255,255,0.18) 50%, rgba(255,255,255,0.1) 75%);
       background-size: 200% 100%;
-      animation: shimmer 1.4s infinite;
+      animation: shimmer 1.5s infinite;
       border-radius: 6px;
       height: 14px;
     }
@@ -182,7 +227,7 @@
 
     <!-- Weather Card -->
     <div class="weather-card" id="weather-card">
-      <div class="weather-location">Newquay, Cornwall</div>
+      <div class="weather-location" id="weather-location">Newquay, Cornwall</div>
       <div class="weather-main">
         <div class="weather-icon" id="w-icon">…</div>
         <div>
@@ -200,15 +245,18 @@
       <div class="card-header">
         <div>
           <div class="card-label">Tides · predicted</div>
-          <h2>Newquay Harbour</h2>
+          <h2 id="tides-location">Newquay Harbour</h2>
         </div>
         <span style="font-size:1.4rem">🌊</span>
       </div>
-      <div class="tides-grid" id="tides-grid">
-        <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
-        <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
-        <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
-        <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
+      <div id="tides-grid">
+        <div class="tides-day-label"><div class="skeleton" style="width:40px"></div></div>
+        <div class="tides-today">
+          <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
+          <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
+          <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
+          <div class="tide-item"><div class="skeleton" style="width:60%;margin-bottom:6px"></div><div class="skeleton" style="width:80%"></div></div>
+        </div>
       </div>
     </div>
 

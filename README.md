@@ -1,11 +1,11 @@
 # Flat Hub
 
-Flat Hub is a small Express-based home dashboard for a flat in Newquay, Cornwall. It brings together weather, tide predictions, shopping lists, notes, partner pages, and local network info in one lightweight app.
+Flat Hub is a small Express-based home dashboard for a fixed location. It brings together weather, tide predictions, shopping lists, notes, partner pages, and local network info in one lightweight app.
 
 ## Features
 
 - Weather card using Open-Meteo, no API key required
-- Local tide predictions for Newquay Harbour
+- Local tide predictions with configurable location labels
 - JSON-backed notes and lists
 - Simple partner page builder and viewer
 - Network info endpoint for finding the app on your LAN
@@ -22,7 +22,7 @@ Flat Hub is a small Express-based home dashboard for a flat in Newquay, Cornwall
 npm install
 ```
 
-2. Create a local environment file if you want to change the port:
+2. Create a local environment file if you want to change the port or location:
 
 ```bash
 copy .env.example .env
@@ -39,6 +39,12 @@ Open `http://localhost:3000` in your browser.
 ## Environment
 
 - `PORT` - server port, defaults to `3000`
+- `LOCATION_NAME` / `LOCATION_REGION` - labels shown on the dashboard
+- `LOCATION_LATITUDE` / `LOCATION_LONGITUDE` - weather coordinates
+- `LOCATION_TIMEZONE` - timezone sent to Open-Meteo (e.g. `Europe/London`)
+- `TIDE_LOCATION_NAME` - tide card location label
+- `TIDE_Z0` - mean sea level above chart datum (metres)
+- `TIDE_CONSTITUENTS_JSON` - optional harmonic constituent array
 
 ## Data
 

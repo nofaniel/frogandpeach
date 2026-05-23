@@ -1,11 +1,12 @@
 {
   "name": "flat-hub",
   "version": "1.0.0",
-  "description": "Home hub for Newquay flat — weather, tides, lists, notes & partner pages",
+  "description": "Home hub for a fixed location — weather, tides, lists, notes & partner pages",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "dev:watch": "node --watch server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
