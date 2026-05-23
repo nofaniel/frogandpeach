@@ -1,0 +1,244 @@
+/* ── Botanical Floral Theme ─────────────────────────────────────────────────── */
+/* Used for partner page views and the page builder UI                           */
+
+.botanical-page {
+  min-height: 100dvh;
+  background: #FDFAF5;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  font-family: 'Playfair Display', 'Georgia', serif;
+}
+
+/* ── Corner SVG decorations ─────────────────────────────────────────────────── */
+.botanical-corner {
+  position: absolute;
+  width: 190px;
+  height: 190px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.botanical-corner--tl { top: 0; left: 0; }
+.botanical-corner--br { bottom: 0; right: 0; transform: rotate(180deg); }
+.botanical-corner--tr { top: 0; right: 0; transform: scaleX(-1); }
+.botanical-corner--bl { bottom: 0; left: 0; transform: scaleY(-1); }
+
+/* ── Page content ───────────────────────────────────────────────────────────── */
+.botanical-content {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px 36px 100px;
+  text-align: center;
+  gap: 20px;
+}
+
+.botanical-emoji {
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: 4px;
+  filter: drop-shadow(0 2px 8px rgba(184,125,143,0.3));
+}
+
+.botanical-occasion {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #B87D8F;
+  background: #F5E8EC;
+  padding: 5px 14px;
+  border-radius: 100px;
+}
+
+.botanical-title {
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  font-weight: 700;
+  color: #2D5A3D;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+/* ── Botanical divider ──────────────────────────────────────────────────────── */
+.botanical-divider {
+  width: 100%;
+  max-width: 280px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+}
+
+.botanical-divider::before,
+.botanical-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #B87D8F 50%, transparent);
+}
+
+.botanical-divider-icon { font-size: 1rem; color: #B87D8F; }
+
+/* ── Message ────────────────────────────────────────────────────────────────── */
+.botanical-message {
+  font-size: clamp(1rem, 4vw, 1.2rem);
+  color: #3D3028;
+  line-height: 1.75;
+  font-style: italic;
+  max-width: 440px;
+  white-space: pre-wrap;
+}
+
+/* ── Date stamp ─────────────────────────────────────────────────────────────── */
+.botanical-date {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  color: #A09080;
+  margin-top: 12px;
+}
+
+/* ── Back button on page view ───────────────────────────────────────────────── */
+.botanical-back {
+  position: fixed;
+  top: env(safe-area-inset-top, 12px);
+  left: 16px;
+  z-index: 10;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid #E5DED4;
+  border-radius: 100px;
+  padding: 8px 16px 8px 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4A7C59;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  transition: transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.botanical-back:active { transform: scale(0.95); }
+
+/* ── Share / copy button ────────────────────────────────────────────────────── */
+.botanical-share {
+  position: fixed;
+  top: env(safe-area-inset-top, 12px);
+  right: 16px;
+  z-index: 10;
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid #E5DED4;
+  border-radius: 100px;
+  padding: 8px 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4A7C59;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  transition: transform 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.botanical-share:active { transform: scale(0.95); }
+
+/* ── Page builder form ──────────────────────────────────────────────────────── */
+.page-builder-preview {
+  background: #FDFAF5;
+  border: 2px dashed #D4C9C0;
+  border-radius: 18px;
+  padding: 32px 24px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-family: 'Playfair Display', serif;
+}
+
+.page-builder-preview .preview-emoji { font-size: 2.5rem; margin-bottom: 8px; }
+.page-builder-preview .preview-title { font-size: 1.5rem; color: #2D5A3D; font-weight: 700; }
+.page-builder-preview .preview-message { font-style: italic; color: #3D3028; font-size: 0.95rem; margin-top: 8px; }
+
+/* ── Emoji picker ───────────────────────────────────────────────────────────── */
+.emoji-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.emoji-option {
+  font-size: 1.6rem;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  background: var(--surface);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.emoji-option.selected {
+  border-color: var(--primary);
+  background: #E6F4EA;
+  transform: scale(1.1);
+}
+
+/* ── Gallery cards ──────────────────────────────────────────────────────────── */
+.page-card {
+  background: linear-gradient(135deg, #FDFAF5 0%, #F5EDEA 100%);
+  border: 1.5px solid #E8DDD4;
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.page-card:active { transform: scale(0.97); }
+
+.page-card::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 80px;
+  height: 80px;
+  background: radial-gradient(circle, rgba(184,125,143,0.15) 0%, transparent 70%);
+  border-radius: 50%;
+}
+
+.page-card-emoji { font-size: 2rem; margin-bottom: 6px; }
+.page-card-title { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; color: #2D5A3D; }
+.page-card-occasion { font-size: 0.75rem; color: #B87D8F; margin-top: 2px; }
+.page-card-date { font-size: 0.72rem; color: var(--text-muted); margin-top: 8px; }
+
+.page-card-delete {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 4px;
+  -webkit-tap-highlight-color: transparent;
+}

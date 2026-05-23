@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#4A7C59">
+  <title>Notes — Flat Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .notes-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .note-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      cursor: pointer;
+      transition: transform 0.12s, box-shadow 0.12s;
+      min-height: 110px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .note-card:active { transform: scale(0.97); }
+
+    /* Stagger card accent colours */
+    .note-card:nth-child(4n+1) { border-top: 3px solid var(--primary-light); }
+    .note-card:nth-child(4n+2) { border-top: 3px solid var(--rose); }
+    .note-card:nth-child(4n+3) { border-top: 3px solid var(--accent); }
+    .note-card:nth-child(4n+4) { border-top: 3px solid #A0B4C8; }
+
+    .note-card-title {
+      font-weight: 700;
+      font-size: 0.92rem;
+      margin-bottom: 6px;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .note-card-preview {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      flex: 1;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      line-height: 1.5;
+    }
+
+    .note-card-date {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-top: 10px;
+    }
+
+    .note-card-del {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: none; border: none;
+      color: var(--border);
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 4px;
+      -webkit-tap-highlight-color: transparent;
+      transition: color 0.15s;
+    }
+    .note-card-del:hover, .note-card-del:active { color: #C0392B; }
+
+    /* Note editor modal */
+    .note-editor textarea {
+      min-height: 200px;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    .note-editor-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="page-header">
+    <span class="header-icon">📝</span>
+    <h1>Notes</h1>
+  </header>
+
+  <div class="content">
+    <div class="notes-grid" id="notes-grid"></div>
+    <div class="empty-state" id="empty-state" style="display:none">
+      <div class="empty-icon">📝</div>
+      <h3>No notes yet</h3>
+      <p>Tap + to write your first note</p>
+    </div>
+  </div>
+
+  <!-- FAB -->
+  <button class="fab" id="fab" title="New note" aria-label="New note">+</button>
+
+  <!-- Note editor modal -->
+  <div class="modal-backdrop" id="note-modal">
+    <div class="modal note-editor">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="modal-title">New Note</div>
+      <div class="form-group">
+        <label for="note-title-input">Title</label>
+        <input type="text" id="note-title-input" placeholder="Give it a title...">
+      </div>
+      <div class="form-group">
+        <label for="note-content-input">Note</label>
+        <textarea id="note-content-input" placeholder="Write anything..."></textarea>
+      </div>
+      <div class="note-editor-actions">
+        <button class="btn btn-secondary" id="cancel-note" style="flex:1">Cancel</button>
+        <button class="btn btn-danger" id="delete-note" style="display:none">Delete</button>
+        <button class="btn btn-primary" id="save-note" style="flex:1">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Bottom Nav -->
+  <nav class="bottom-nav">
+    <a class="nav-item" href="/index.html"><span class="nav-icon">🏠</span>Home</a>
+    <a class="nav-item" href="/lists.html"><span class="nav-icon">🛒</span>Lists</a>
+    <a class="nav-item active" href="/notes.html"><span class="nav-icon">📝</span>Notes</a>
+    <a class="nav-item" href="/pages.html"><span class="nav-icon">🌸</span>Pages</a>
+    <a class="nav-item" href="/network.html"><span class="nav-icon">📡</span>Network</a>
+  </nav>
+
+  <script src="/js/notes.js"></script>
+</body>
+</html>
