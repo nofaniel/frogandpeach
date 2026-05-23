@@ -1,0 +1,21 @@
+<li class="item <%= item.checked ? 'checked' : '' %>" id="item-<%= item.id %>">
+  <form method="post"
+        action="/lists/<%= listId %>/items/<%= item.id %>/toggle"
+        hx-post="/lists/<%= listId %>/items/<%= item.id %>/toggle"
+        hx-target="#item-<%= item.id %>"
+        hx-swap="outerHTML"
+        class="toggle-form">
+    <button type="submit" class="check" aria-label="toggle">
+      <%= item.checked ? '✓' : '○' %>
+    </button>
+    <span class="item-text"><%= item.text %></span>
+  </form>
+  <form method="post"
+        action="/lists/<%= listId %>/items/<%= item.id %>/delete"
+        hx-post="/lists/<%= listId %>/items/<%= item.id %>/delete"
+        hx-target="#item-<%= item.id %>"
+        hx-swap="outerHTML"
+        class="inline">
+    <button class="link danger" type="submit" aria-label="delete">✕</button>
+  </form>
+</li>

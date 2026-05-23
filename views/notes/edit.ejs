@@ -1,0 +1,25 @@
+<%- include('../partials/header') %>
+
+<h1><%= note.id ? 'Edit note' : 'New note' %></h1>
+
+<form method="post" action="<%= note.id ? '/notes/' + note.id : '/notes' %>" class="form">
+  <label>Title
+    <input name="title" value="<%= note.title %>" required>
+  </label>
+  <label>Tags (comma-separated)
+    <input name="tags" value="<%= note.tags %>" placeholder="home, ideas">
+  </label>
+  <label>Body (Markdown)
+    <textarea name="body_md" rows="14"><%= note.body_md %></textarea>
+  </label>
+  <div class="row">
+    <button type="submit">Save</button>
+    <% if (note.id) { %>
+      <a class="link" href="/notes/<%= note.id %>">Cancel</a>
+    <% } else { %>
+      <a class="link" href="/notes">Cancel</a>
+    <% } %>
+  </div>
+</form>
+
+<%- include('../partials/footer') %>

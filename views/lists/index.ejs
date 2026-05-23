@@ -1,0 +1,24 @@
+<%- include('../partials/header') %>
+
+<h1>Shopping lists</h1>
+
+<form method="post" action="/lists" class="row">
+  <input name="name" placeholder="New list name" required>
+  <button type="submit">Add list</button>
+</form>
+
+<ul class="plain spaced">
+  <% lists.forEach(l => { %>
+    <li>
+      <a href="/lists/<%= l.id %>" class="list-link">
+        <strong><%= l.name %></strong>
+        <span class="muted"><%= l.unchecked %> / <%= l.total %></span>
+      </a>
+      <form method="post" action="/lists/<%= l.id %>/delete" class="inline" onsubmit="return confirm('Delete this list?')">
+        <button class="link danger" type="submit">delete</button>
+      </form>
+    </li>
+  <% }) %>
+</ul>
+
+<%- include('../partials/footer') %>

@@ -1,0 +1,55 @@
+<%- include('partials/header') %>
+
+<h1>Network</h1>
+
+<section class="grid">
+  <article class="card">
+    <h2>This server</h2>
+    <p class="muted">Hostname: <code><%= hostname %></code></p>
+    <ul class="plain">
+      <% lanIps.forEach(a => { %>
+        <li><code><%= a.ip %></code> <span class="muted">on <%= a.iface %></span></li>
+      <% }) %>
+    </ul>
+    <p class="muted">Hub URL: <code>http://<%= (lanIps[0]?.ip) || 'localhost' %>:<%= process.env.PORT || 8080 %></code></p>
+  </article>
+
+  <article class="card">
+    <h2>Router</h2>
+    <p>IP: <a href="<%= cfg.router_admin_url || ('http://' + cfg.router_ip) %>"><code><%= cfg.router_ip || '—' %></code></a></p>
+    <p>DHCP range: <code><%= cfg.dhcp_range || '—' %></code></p>
+    <% if (cfg.isp) { %><p>ISP: <%= cfg.isp %></p><% } %>
+  </article>
+
+  <article class="card">
+    <h2>Wi-Fi</h2>
+    <% if (wifi.ssid) { %>
+      <p>SSID: <code><%= wifi.ssid %></code></p>
+      <div id="wifi-qr" data-ssid="<%= wifi.ssid %>" data-pass="<%= wifi.password %>" data-sec="<%= wifi.security %>"></div>
+      <p class="muted">Scan with phone camera to join.</p>
+    <% } else { %>
+      <p class="muted">Set <code>WIFI_SSID</code> / <code>WIFI_PASSWORD</code> in <code>.env</code> to show a QR code here.</p>
+    <% } %>
+  </article>
+
+  <article class="card">
+    <h2>Devices</h2>
+    <ul class="plain">
+      <% (cfg.static_devices || []).forEach(d => { %>
+        <li><strong><%= d.name %></strong> · <code><%= d.ip %></code><% if (d.notes) { %> <span class="muted">— <%= d.notes %></span><% } %></li>
+      <% }) %>
+    </ul>
+  </article>
+
+  <article class="card">
+    <h2>Local services</h2>
+    <ul class="plain">
+      <% (cfg.ports || []).forEach(p => { %>
+        <li><strong><%= p.name %></strong> · <code>:<%= p.port %></code></li>
+      <% }) %>
+    </ul>
+  </article>
+</section>
+
+<script src="/static/qrcode.min.js" defer></script>
+<%- include('partials/footer') %>

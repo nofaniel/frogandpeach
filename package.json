@@ -1,0 +1,25 @@
+{
+  "name": "flat-hub",
+  "version": "0.1.0",
+  "description": "Locally hosted hub for the flat — weather, tides, lists, notes, cute pages.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "dev": "node --experimental-sqlite --watch server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/formbody": "^7.4.0",
+    "@fastify/static": "^7.0.4",
+    "@fastify/view": "^9.1.0",
+    "dompurify": "^3.1.7",
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "fastify": "^4.28.1",
+    "jsdom": "^25.0.1",
+    "marked": "^14.1.3"
+  }
+}

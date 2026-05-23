@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+
+<header class="page-head">
+  <h1>Notes</h1>
+  <a class="btn" href="/notes/new">+ New</a>
+</header>
+
+<form class="row" method="get" action="/notes">
+  <input name="q" value="<%= q %>" placeholder="Search title, body, tags…">
+  <button type="submit">Search</button>
+</form>
+
+<% if (allTags.length) { %>
+  <p class="tags-row">
+    <a class="tag <%= !tag ? 'active' : '' %>" href="/notes">all</a>
+    <% allTags.forEach(t => { %>
+      <a class="tag <%= tag === t ? 'active' : '' %>" href="/notes?tag=<%= encodeURIComponent(t) %>">#<%= t %></a>
+    <% }) %>
+  </p>
+<% } %>
+
+<ul class="plain spaced">
+  <% notes.forEach(n => { %>
+    <li>
+      <a href="/notes/<%= n.id %>"><strong><%= n.title %></strong></a>
+      <span class="muted"><%= new Date(n.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) %></span>
+      <% if (n.tags) { %><span class="muted">· <%= n.tags.split(',').map(t => '#'+t).join(' ') %></span><% } %>
+    </li>
+  <% }) %>
+</ul>
+
+<%- include('../partials/footer') %>

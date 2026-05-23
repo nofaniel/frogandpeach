@@ -1,0 +1,22 @@
+<%- include('../partials/header') %>
+
+<header class="page-head">
+  <a class="link" href="/notes">← Notes</a>
+  <h1><%= note.title %></h1>
+  <div class="row">
+    <a class="btn" href="/notes/<%= note.id %>/edit">Edit</a>
+    <form method="post" action="/notes/<%= note.id %>/delete" onsubmit="return confirm('Delete?')" class="inline">
+      <button class="link danger" type="submit">Delete</button>
+    </form>
+  </div>
+</header>
+
+<% if (tags.length) { %>
+  <p class="tags-row">
+    <% tags.forEach(t => { %><a class="tag" href="/notes?tag=<%= encodeURIComponent(t) %>">#<%= t %></a><% }) %>
+  </p>
+<% } %>
+
+<article class="prose"><%- html %></article>
+
+<%- include('../partials/footer') %>

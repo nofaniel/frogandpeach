@@ -1,0 +1,20 @@
+<%- include('../partials/header') %>
+
+<header class="page-head">
+  <h1>Pages</h1>
+  <a class="btn" href="/pages/new">+ New page</a>
+</header>
+
+<p class="muted">Custom pages live at <code>/p/&lt;slug&gt;</code> — share that URL on the LAN.</p>
+
+<ul class="plain spaced">
+  <% pages.forEach(p => { %>
+    <li>
+      <a href="/p/<%= p.slug %>"><strong><%= p.title %></strong></a>
+      <span class="muted">/p/<%= p.slug %></span>
+      · <a class="link" href="/pages/<%= p.slug %>/edit">edit</a>
+    </li>
+  <% }) %>
+</ul>
+
+<%- include('../partials/footer') %>

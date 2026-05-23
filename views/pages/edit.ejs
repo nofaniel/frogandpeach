@@ -1,0 +1,28 @@
+<%- include('../partials/header') %>
+
+<h1><%= isNew ? 'New page' : 'Edit page' %></h1>
+
+<form method="post" action="<%= isNew ? '/pages' : '/pages/' + page.slug %>" class="form">
+  <label>Title
+    <input name="title" value="<%= page.title %>" required>
+  </label>
+  <% if (isNew) { %>
+    <label>Slug (URL: /p/slug)
+      <input name="slug" value="<%= page.slug %>" placeholder="welcome-home" pattern="[a-z0-9-]+">
+    </label>
+  <% } %>
+  <label>Body (Markdown — images, links, headings all work)
+    <textarea name="body_md" rows="18"><%= page.body_md %></textarea>
+  </label>
+  <div class="row">
+    <button type="submit">Save</button>
+    <a class="link" href="<%= isNew ? '/pages' : '/p/' + page.slug %>">Cancel</a>
+    <% if (!isNew) { %>
+      <form method="post" action="/pages/<%= page.slug %>/delete" onsubmit="return confirm('Delete this page?')" class="inline">
+        <button class="link danger" type="submit">Delete</button>
+      </form>
+    <% } %>
+  </div>
+</form>
+
+<%- include('../partials/footer') %>

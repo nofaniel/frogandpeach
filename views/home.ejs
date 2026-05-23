@@ -1,0 +1,74 @@
+<%- include('partials/header') %>
+
+<section class="grid">
+  <article class="card weather">
+    <header class="card-head">
+      <h2>Newquay</h2>
+      <% if (weatherStale) { %><span class="badge stale" title="<%= weatherErr || '' %>">stale</span><% } %>
+    </header>
+    <% if (current) { %>
+      <div class="big">
+        <span class="icon"><%= current.icon %></span>
+        <span class="temp"><%= Math.round(current.temp) %>°</span>
+      </div>
+      <p class="muted"><%= current.desc %> · feels <%= Math.round(current.feels) %>° · wind <%= Math.round(current.wind) %> km/h · <%= current.humidity %>% RH</p>
+      <% if (today) { %>
+        <p class="muted">Today <%= Math.round(today.min) %>° / <%= Math.round(today.max) %>° · rain <%= today.precip %>%</p>
+        <p class="muted">☀️ <%= new Date(today.sunrise).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) %>
+          · 🌙 <%= new Date(today.sunset).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) %></p>
+      <% } %>
+    <% } else { %>
+      <p class="muted">No weather data available.</p>
+    <% } %>
+  </article>
+
+  <article class="card tides">
+    <header class="card-head">
+      <h2>Tides</h2>
+      <% if (tidesStale) { %><span class="badge stale" title="<%= tidesErr || '' %>">stale</span><% } %>
+    </header>
+    <% if (tides.length === 0) { %>
+      <p class="muted">No tide data yet. <% if (!process.env.ADMIRALTY_KEY) { %>Add an Admiralty API key in <code>.env</code> for reliable data.<% } %></p>
+    <% } else { %>
+      <ul class="tide-list">
+        <% tides.forEach(t => { %>
+          <li>
+            <span class="tide-type <%= t.type.toLowerCase() %>"><%= t.type === 'High' ? '⬆' : '⬇' %> <%= t.type %></span>
+            <span class="tide-time"><%= t.when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) %></span>
+            <% if (t.height) { %><span class="tide-height"><%= t.height.toFixed(1) %> m</span><% } %>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </article>
+
+  <article class="card">
+    <header class="card-head"><h2>Lists</h2><a class="link" href="/lists">All →</a></header>
+    <% if (activeLists.length === 0) { %>
+      <p class="muted">Nothing to buy. <a href="/lists">Add items →</a></p>
+    <% } else { %>
+      <ul class="plain">
+        <% activeLists.forEach(l => { %>
+          <li><a href="/lists/<%= l.id %>"><%= l.name %></a> <span class="muted">— <%= l.unchecked %> left</span></li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </article>
+
+  <article class="card">
+    <header class="card-head"><h2>Recent notes</h2><a class="link" href="/notes">All →</a></header>
+    <% if (recentNotes.length === 0) { %>
+      <p class="muted">No notes yet. <a href="/notes/new">Write one →</a></p>
+    <% } else { %>
+      <ul class="plain">
+        <% recentNotes.forEach(n => { %>
+          <li><a href="/notes/<%= n.id %>"><%= n.title %></a>
+            <span class="muted"><%= new Date(n.updated_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) %></span>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </article>
+</section>
+
+<%- include('partials/footer') %>

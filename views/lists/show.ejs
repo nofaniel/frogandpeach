@@ -1,0 +1,23 @@
+<%- include('../partials/header') %>
+
+<header class="page-head">
+  <a class="link" href="/lists">← Lists</a>
+  <h1><%= list.name %></h1>
+</header>
+
+<form method="post" action="/lists/<%= list.id %>/items" class="row sticky">
+  <input name="text" placeholder="Add item…" autocomplete="off" required autofocus>
+  <button type="submit">+</button>
+</form>
+
+<ul class="items" id="items">
+  <% items.forEach(item => { %>
+    <%- include('_item', { item, listId: list.id }) %>
+  <% }) %>
+</ul>
+
+<form method="post" action="/lists/<%= list.id %>/clear" class="mt">
+  <button class="link" type="submit">Clear checked</button>
+</form>
+
+<%- include('../partials/footer') %>
