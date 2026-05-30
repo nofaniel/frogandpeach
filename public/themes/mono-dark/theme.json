@@ -1,0 +1,23 @@
+{
+  "id": "mono-dark",
+  "name": "Mono Dark",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "frog-peach",
+  "tokens": {
+    "color": {
+      "bg": "#111312",
+      "surface": "#1a1d1c",
+      "surface2": "#242927",
+      "ink": "#f4f1e8",
+      "muted": "#b8b3a7",
+      "line": "#3b4240",
+      "accent": "#f0c36d",
+      "accent2": "#91d0c4",
+      "danger": "#ff9b94"
+    }
+  },
+  "layout": {
+    "bodyBackground": "#111312"
+  }
+}

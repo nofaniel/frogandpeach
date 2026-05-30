@@ -9,6 +9,22 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // No-FOUC: repaint the last-applied theme snapshot before React mounts.
+      (function () {
+        try {
+          var snapshot = JSON.parse(localStorage.getItem('fp-theme-snapshot') || 'null')
+          if (!snapshot) return
+          var root = document.documentElement
+          Object.keys(snapshot.cssVars || {}).forEach(function (name) {
+            root.style.setProperty(name, snapshot.cssVars[name])
+          })
+          Object.keys(snapshot.dataAttrs || {}).forEach(function (name) {
+            root.setAttribute(name, snapshot.dataAttrs[name])
+          })
+        } catch (e) {}
+      })()
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

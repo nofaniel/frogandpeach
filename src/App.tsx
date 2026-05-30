@@ -1,8 +1,9 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useTheme } from './theme/ThemeProvider'
 
-type Tab = 'home' | 'lists' | 'notes' | 'pages'
+type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network'
 
 type Module = {
   id: string
@@ -110,11 +111,10 @@ type Settings = {
   latitude: string
   longitude: string
   timezone: string
-  colourTheme: string
-  styleTheme: string
+  themeId: string
 }
 
-type Appearance = Pick<Settings, 'colourTheme' | 'styleTheme'>
+type Appearance = Pick<Settings, 'themeId'>
 
 type WeatherSummary = {
   location: string
@@ -187,11 +187,12 @@ type Toast = {
   kind: 'info' | 'warn'
 }
 
-const tabs: Array<{ id: Tab; label: string }> = [
-  { id: 'home', label: 'Home' },
-  { id: 'lists', label: 'Lists' },
-  { id: 'notes', label: 'Notes' },
-  { id: 'pages', label: 'Pages' },
+const tabs: Array<{ id: Tab; label: string; icon: string }> = [
+  { id: 'home', label: 'Home', icon: '🏠' },
+  { id: 'lists', label: 'Lists', icon: '🛒' },
+  { id: 'notes', label: 'Notes', icon: '📝' },
+  { id: 'pages', label: 'Pages', icon: '🌺' },
+  { id: 'network', label: 'Network', icon: '📡' },
 ]
 
 const emptySettings: Settings = {
@@ -206,8 +207,7 @@ const emptySettings: Settings = {
   latitude: '50.4155',
   longitude: '-5.0737',
   timezone: 'Europe/London',
-  colourTheme: 'frog-peach',
-  styleTheme: 'classic',
+  themeId: 'base',
 }
 
 function App() {
@@ -229,7 +229,7 @@ function App() {
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([])
   const [customPages, setCustomPages] = useState<PageLink[]>([])
   const [pageManifestWarnings, setPageManifestWarnings] = useState<Array<{ path: string; message: string }>>([])
-  const [appearance, setAppearance] = useState<Appearance>({ colourTheme: 'frog-peach', styleTheme: 'classic' })
+  const { setTheme } = useTheme()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -314,8 +314,8 @@ function App() {
       setPages(pageData)
       setPageLinks(linkData)
       setModules(homeData.modules)
-      setAppearance(appearanceData)
       setSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
+      void setTheme(appearanceData.themeId)
       if (window.location.pathname.startsWith('/page/')) {
         const slug = window.location.pathname.replace(/^\/page\//, '')
         setViewedPage(await api<Page>(`/api/pages/${slug}`))
@@ -505,10 +505,10 @@ function App() {
 
   async function saveAppearance(next: Appearance) {
     await run(async () => {
+      void setTheme(next.themeId)
       const updated = await api<Appearance>('/api/appearance', { method: 'PUT', body: next })
-      setAppearance(updated)
       setSettings((current) => ({ ...current, ...updated }))
-      await refreshAll()
+      void setTheme(updated.themeId)
     })
   }
 
@@ -568,6 +568,7 @@ function App() {
   const adminUnlockExpiresAt = session?.adminUnlockedUntil ? Date.parse(session.adminUnlockedUntil) : NaN
   const adminUnlockRemainingMs = Number.isFinite(adminUnlockExpiresAt) ? Math.max(0, adminUnlockExpiresAt - now) : 0
   const adminUnlockLabel = session?.adminUnlockedUntil ? `Admin ${formatDuration(adminUnlockRemainingMs)} left` : null
+  const displayName = session?.displayName || session?.userName || 'there'
 
   if (session === null) {
     return <main className="loading-screen">Opening Frog & Peach...</main>
@@ -604,11 +605,11 @@ function App() {
   }
 
   return (
-    <main className="app-shell" data-theme={appearance.colourTheme} data-style={appearance.styleTheme}>
+    <main className="app-shell">
       <header className="top-strip">
         <div>
-          <p className="kicker">Modular home page tool</p>
-          <h1>Frog & Peach</h1>
+          <h1>{greetingForNow()}, {displayName} <span aria-hidden="true">🌿</span></h1>
+          <p>{formatFullDateTime(now)}</p>
         </div>
         <div className="top-actions">
           {home?.deployment.origin && <span>{home.deployment.origin}</span>}
@@ -626,7 +627,8 @@ function App() {
       <nav className="tab-bar" aria-label="Sections">
         {tabs.map((tab) => (
           <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
-            {tab.label}
+            <span aria-hidden="true">{tab.icon}</span>
+            <span>{tab.label}</span>
           </button>
         ))}
       </nav>
@@ -682,8 +684,10 @@ function App() {
       )}
 
       {!viewedPage && !adminOpen && activeTab === 'home' && home && (
-        <section className="dashboard-grid">
-          {dashboardModules.map((module) => renderModule(module, home, setActiveTab))}
+        <section className="dashboard-grid home-dashboard">
+          {dashboardModules
+            .filter((module) => module.id === 'weather' || module.id === 'tides')
+            .map((module) => renderModule(module, home, setActiveTab))}
         </section>
       )}
 
@@ -820,6 +824,12 @@ function App() {
           ))}
         </section>
       )}
+
+      {!viewedPage && !adminOpen && activeTab === 'network' && home && (
+        <section className="workspace-grid">
+          {renderModule({ id: 'network', title: 'Network', description: '', category: 'system', installed: true, enabled: true, position: 0, size: 'full' }, home, setActiveTab)}
+        </section>
+      )}
       <ToastTray toasts={toasts} onDismiss={dismissToast} />
     </main>
   )
@@ -830,28 +840,21 @@ function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) =
   if (module.id === 'weather') {
     return (
       <article className={`${className} weather-panel`} key={module.id}>
-        <div className="panel-heading">
+        <div className="weather-orb" aria-hidden="true" />
+        <div className="weather-place">{(home.weather?.location ?? 'Newquay, Cornwall').toUpperCase()}</div>
+        <div className="weather-current">
+          <div className="weather-icon" aria-hidden="true">{weatherIcon(home.weather?.current.label)}</div>
           <div>
-            <p className="kicker">Weather</p>
-            <h2>{weatherMark(home.weather?.current.label)} {home.weather?.current.label ?? 'Unavailable'}</h2>
-            <p>{home.weather?.location}</p>
+            <strong className="big-number">{formatTemperature(home.weather?.current.temperature)}</strong>
+            <p>{home.weather?.current.label ?? 'Weather unavailable'}</p>
           </div>
-          <strong className="big-number">{formatTemperature(home.weather?.current.temperature)}</strong>
         </div>
         <div className="metric-row">
+          {home.weather?.daily[0] && <span>↑ {formatTemperature(home.weather.daily[0].max)} ↓ {formatTemperature(home.weather.daily[0].min)}</span>}
+          <span>💨 {formatNumber(home.weather?.current.windSpeed)} mph</span>
+          <span>💧 {formatNumber(home.weather?.daily[0]?.precipitationChance)}%</span>
+          <span>☂️ {formatNumber(home.weather?.current.precipitation)}% rain</span>
           <span>Feels {formatTemperature(home.weather?.current.feelsLike)}</span>
-          <span>Wind {formatNumber(home.weather?.current.windSpeed)} km/h</span>
-          <span>Gusts {formatNumber(home.weather?.current.windGusts)} km/h</span>
-          <span>Rain {formatNumber(home.weather?.current.precipitation)} mm</span>
-        </div>
-        <div className="day-grid">
-          {home.weather?.daily.map((day) => (
-            <div key={day.date}>
-              <span>{formatDay(day.date)}</span>
-              <strong>{day.label}</strong>
-              <small>{formatTemperature(day.min)} / {formatTemperature(day.max)} | {formatNumber(day.precipitationChance)}% rain</small>
-            </div>
-          ))}
         </div>
       </article>
     )
@@ -861,21 +864,20 @@ function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) =
       <article className={`${className} tide-panel`} key={module.id}>
         <div className="panel-heading">
           <div>
-            <p className="kicker">Tides</p>
-            <h2>Newquay trend</h2>
+            <p className="kicker">Tides · Predicted</p>
+            <h2>Newquay Harbour</h2>
           </div>
-          <span className="pill">modelled</span>
+          <span className="tide-mark" aria-hidden="true">🌊</span>
         </div>
         <div className="tide-track">
-          {(home.tides?.events ?? []).slice(0, 6).map((event) => (
+          {(home.tides?.events ?? []).slice(0, 4).map((event) => (
             <div key={event.id} className={`tide-card ${event.type}`}>
-              <span>{event.type}</span>
-              <strong>{formatDateTime(event.time)}</strong>
+              <span>{event.type === 'high' ? '▲ High' : '▼ Low'}</span>
+              <strong>{formatTime(event.time)}</strong>
               <small>{event.height === null ? 'No height' : `${event.height} m`}</small>
             </div>
           ))}
         </div>
-        <p className="small-note">{home.tides?.note}</p>
       </article>
     )
   }
@@ -980,6 +982,8 @@ function AdminPanel({
   onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
   onClearCache: (key?: string) => void
 }) {
+  const { themes, themeId } = useTheme()
+  const selectedTheme = themes.find((theme) => theme.id === themeId)
   const [pendingUninstall, setPendingUninstall] = useState<Module | null>(null)
   const [activityFilter, setActivityFilter] = useState({ entityType: '', search: '' })
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
@@ -1135,24 +1139,22 @@ function AdminPanel({
       <article className="panel">
         <p className="kicker">Appearance</p>
         <h2>Theme</h2>
-        <div className="two-col">
-          <label>Colour theme
-            <select value={settings.colourTheme} onChange={(event) => onAppearanceChange({ colourTheme: event.target.value, styleTheme: settings.styleTheme })}>
-              <option value="frog-peach">Frog & Peach</option>
-              <option value="coastal">Coastal</option>
-              <option value="botanical">Botanical</option>
-              <option value="mono-dark">Mono dark</option>
-            </select>
-          </label>
-          <label>Style theme
-            <select value={settings.styleTheme} onChange={(event) => onAppearanceChange({ colourTheme: settings.colourTheme, styleTheme: event.target.value })}>
-              <option value="classic">Classic</option>
-              <option value="compact">Compact</option>
-              <option value="soft">Soft</option>
-              <option value="high-contrast">High contrast</option>
-            </select>
-          </label>
-        </div>
+        <label>Active theme
+          <select value={themeId} onChange={(event) => onAppearanceChange({ themeId: event.target.value })}>
+            {themes.length === 0 && <option value={themeId}>{themeId}</option>}
+            {themes.map((theme) => (
+              <option key={theme.id} value={theme.id}>{theme.name}</option>
+            ))}
+          </select>
+        </label>
+        {selectedTheme && (
+          <p className="small-note">
+            {selectedTheme.author !== 'Unknown' ? `By ${selectedTheme.author} · ` : ''}v{selectedTheme.version}
+          </p>
+        )}
+        <p className="small-note">
+          Themes control colour, type, density, and layout. Drop a new theme folder into <code>themes/</code> to add your own — see <a href="/docs/theming.md">docs/theming.md</a>.
+        </p>
       </article>
 
       <form className="panel form-panel" onSubmit={onSaveSettings}>
@@ -1382,7 +1384,7 @@ function labelForListType(value: string, listTypes: ListType[]) {
 }
 
 function formatTemperature(value: number | null | undefined) {
-  return value === null || value === undefined ? '--' : `${Math.round(value)} deg`
+  return value === null || value === undefined ? '--' : `${Math.round(value)}°`
 }
 
 function formatNumber(value: number | null | undefined) {
@@ -1393,16 +1395,29 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short' }).format(new Date(value))
 }
 
-function formatDay(value: string) {
-  return new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(new Date(value))
-}
-
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function formatFullDateTime(value: number) {
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'long',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
+}
+
+function greetingForNow() {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
 }
 
 function formatDuration(milliseconds: number) {
@@ -1417,13 +1432,13 @@ function formatDuration(milliseconds: number) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
-function weatherMark(label: string | undefined) {
-  if (!label) return 'Weather'
-  const value = label.toLowerCase()
-  if (value.includes('rain') || value.includes('drizzle')) return 'Rain'
-  if (value.includes('clear')) return 'Clear'
-  if (value.includes('cloud')) return 'Cloud'
-  return 'Weather'
+function weatherIcon(label: string | undefined) {
+  const value = label?.toLowerCase() ?? ''
+  if (value.includes('rain') || value.includes('drizzle')) return '🌧️'
+  if (value.includes('clear') || value.includes('sun')) return '☀️'
+  if (value.includes('cloud')) return '🌥️'
+  if (value.includes('snow')) return '❄️'
+  return '🌤️'
 }
 
 function firstLine(value: string) {

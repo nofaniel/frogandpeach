@@ -1,0 +1,36 @@
+{
+  "id": "frog-peach",
+  "name": "Frog & Peach",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "base",
+  "stylesheet": "theme.css",
+  "tokens": {
+    "color": {
+      "bg": "#f3eee4",
+      "surface": "#fffaf0",
+      "surface2": "#f8ecd8",
+      "ink": "#17211f",
+      "muted": "#6d675c",
+      "line": "#cfc5b7",
+      "accent": "#bc4f39",
+      "accent2": "#2f6f65",
+      "danger": "#9d3f3a"
+    },
+    "font": {
+      "body": "Georgia, \"Times New Roman\", serif",
+      "heading": "Georgia, \"Times New Roman\", serif",
+      "mono": "\"Courier New\", monospace"
+    },
+    "radius": { "sm": "6px", "md": "8px", "lg": "14px" },
+    "shadow": { "panel": "0 18px 55px rgba(23, 33, 31, 0.12)" }
+  },
+  "layout": {
+    "navigation": "top",
+    "density": "comfortable",
+    "surface": "card",
+    "dashboardColumns": 2,
+    "shellWidth": "1120px",
+    "bodyBackground": "linear-gradient(90deg, rgba(23, 33, 31, 0.045) 1px, transparent 1px) 0 0 / 42px 42px, radial-gradient(circle at 12% 8%, rgba(188, 79, 57, 0.16), transparent 30%), radial-gradient(circle at 88% 4%, rgba(47, 111, 101, 0.16), transparent 28%), #f3eee4"
+  }
+}

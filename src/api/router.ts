@@ -25,6 +25,7 @@ import {
   listCacheEntries,
   listActivity,
   listCustomPageManifest,
+  listThemeManifest,
   listLists,
   listNotes,
   listPageLinks,
@@ -59,6 +60,7 @@ export async function handleApi(context: ApiContext): Promise<Response> {
     if (resource === 'modules') return await routeModules(context, parts.slice(1))
     if (resource === 'users') return await routeUsers(context, parts.slice(1))
     if (resource === 'appearance') return await routeAppearance(context)
+    if (resource === 'themes') return await routeThemes(context)
     if (resource === 'activity') return await routeActivity(context)
     if (resource === 'cache') return await routeCache(context, parts.slice(1))
     if (resource === 'page-manifest') return await routePageManifest(context)
@@ -121,10 +123,15 @@ async function routeAppearance(context: ApiContext) {
   if (context.request.method === 'GET') return json(await getAppearance(context.env))
   const session = await requireAdminUnlock(context.request, context.env)
   if (context.request.method === 'PUT') {
-    const appearance = await updateAppearance(context.env, await readJson(context.request))
+    const appearance = await updateAppearance(context.env, await readJson(context.request), context.request)
     await recordActivity(context, session, 'updated', 'appearance', 'global', 'Updated appearance settings', { ...appearance })
     return json(appearance)
   }
+  return methodNotAllowed()
+}
+
+async function routeThemes(context: ApiContext) {
+  if (context.request.method === 'GET') return json(await listThemeManifest(context.request))
   return methodNotAllowed()
 }
 

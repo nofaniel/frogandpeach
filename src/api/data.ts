@@ -15,11 +15,10 @@ export type Settings = {
   latitude: string
   longitude: string
   timezone: string
-  colourTheme: string
-  styleTheme: string
+  themeId: string
 }
 
-export type Appearance = Pick<Settings, 'colourTheme' | 'styleTheme'>
+export type Appearance = Pick<Settings, 'themeId'>
 
 export type CustomPageManifestEntry = {
   id: string
@@ -58,14 +57,13 @@ const settingDefaults: Settings = {
   latitude: '50.4155',
   longitude: '-5.0737',
   timezone: 'Europe/London',
-  colourTheme: 'frog-peach',
-  styleTheme: 'classic',
+  themeId: 'base',
 }
 
 const settingKeys = Object.keys(settingDefaults) as Array<keyof Settings>
-const publicSettingKeys: Array<keyof Settings> = ['binDay', 'flatNotes', 'locationName', 'locationRegion', 'latitude', 'longitude', 'timezone', 'colourTheme', 'styleTheme']
-const colourThemes = ['frog-peach', 'coastal', 'botanical', 'mono-dark']
-const styleThemes = ['classic', 'compact', 'soft', 'high-contrast']
+const publicSettingKeys: Array<keyof Settings> = ['binDay', 'flatNotes', 'locationName', 'locationRegion', 'latitude', 'longitude', 'timezone', 'themeId']
+// Legacy appearance keys retained only so existing databases migrate their look.
+const LEGACY_THEME_KEY = 'colourTheme'
 
 export async function getDashboard(env: Env, request: Request) {
   const [weather, tides, notes, lists, pages, settings, modules, appearance] = await Promise.all([
@@ -105,14 +103,20 @@ async function optionalData<T>(label: string, producer: () => Promise<T>): Promi
 export async function getSettings(env: Env): Promise<Settings> {
   const rows = await env.DB.prepare('SELECT key, value FROM settings').all<DbRow>()
   const settings = { ...settingDefaults }
+  let themeIdStored = false
+  let legacyTheme = ''
 
   for (const row of rows.results ?? []) {
-    const key = rowString(row, 'key') as keyof Settings
-    if (settingKeys.includes(key)) settings[key] = rowString(row, 'value')
+    const key = rowString(row, 'key')
+    if (key === LEGACY_THEME_KEY) legacyTheme = rowString(row, 'value')
+    if (key === 'themeId') themeIdStored = true
+    if (settingKeys.includes(key as keyof Settings)) settings[key as keyof Settings] = rowString(row, 'value')
   }
 
-  settings.colourTheme = normaliseColourTheme(settings.colourTheme)
-  settings.styleTheme = normaliseStyleTheme(settings.styleTheme)
+  // Migrate pre-theme-system databases: fall back to the old colour theme name,
+  // which now matches a bundled theme folder (frog-peach/coastal/botanical/mono-dark).
+  if (!themeIdStored && legacyTheme) settings.themeId = legacyTheme
+  settings.themeId = normaliseThemeId(settings.themeId)
   return settings
 }
 
@@ -125,7 +129,7 @@ export async function updateSettings(env: Env, patch: Partial<Settings>) {
   const statement = env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
   for (const key of settingKeys) {
     if (Object.hasOwn(patch, key)) {
-      const value = key === 'colourTheme' ? normaliseColourTheme(String(patch[key] ?? '')) : key === 'styleTheme' ? normaliseStyleTheme(String(patch[key] ?? '')) : String(patch[key] ?? '')
+      const value = key === 'themeId' ? normaliseThemeId(String(patch[key] ?? '')) : String(patch[key] ?? '')
       await statement.bind(key, value).run()
     }
   }
@@ -134,15 +138,14 @@ export async function updateSettings(env: Env, patch: Partial<Settings>) {
 
 export async function getAppearance(env: Env): Promise<Appearance> {
   const settings = await getSettings(env)
-  return { colourTheme: settings.colourTheme, styleTheme: settings.styleTheme }
+  return { themeId: settings.themeId }
 }
 
-export async function updateAppearance(env: Env, patch: Partial<Appearance>) {
+export async function updateAppearance(env: Env, patch: Partial<Appearance>, request?: Request) {
   const next: Partial<Appearance> = {}
-  if (patch.colourTheme !== undefined) next.colourTheme = normaliseColourTheme(patch.colourTheme)
-  if (patch.styleTheme !== undefined) next.styleTheme = normaliseStyleTheme(patch.styleTheme)
+  if (patch.themeId !== undefined) next.themeId = await validateThemeId(patch.themeId, request)
   const settings = await updateSettings(env, next)
-  return { colourTheme: settings.colourTheme, styleTheme: settings.styleTheme }
+  return { themeId: settings.themeId }
 }
 
 export async function listActivity(env: Env, limit = 24): Promise<ActivityEntry[]> {
@@ -748,12 +751,53 @@ function normaliseHref(href: string) {
   return `/custom-pages/${href.replace(/^\/+/, '')}`
 }
 
-export function normaliseColourTheme(value: string) {
-  return colourThemes.includes(value) ? value : 'frog-peach'
+export function normaliseThemeId(value: string) {
+  const slug = String(value ?? '').trim().toLowerCase()
+  return /^[a-z0-9][a-z0-9-]*$/.test(slug) ? slug : 'base'
 }
 
-export function normaliseStyleTheme(value: string) {
-  return styleThemes.includes(value) ? value : 'classic'
+export type ThemeManifestEntry = {
+  id: string
+  name: string
+  author: string
+  version: string
+}
+
+export async function listThemeManifest(request?: Request): Promise<ThemeManifestEntry[]> {
+  if (!request) return []
+  try {
+    const manifestUrl = new URL('/themes/manifest.json', request.url)
+    const response = await fetch(manifestUrl, { headers: { cookie: request.headers.get('cookie') ?? '' } })
+    if (!response.ok) return []
+    return parseThemeManifestEntries(await response.json())
+  } catch {
+    return []
+  }
+}
+
+function parseThemeManifestEntries(payload: unknown): ThemeManifestEntry[] {
+  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { themes?: unknown }).themes)) return []
+  const entries: ThemeManifestEntry[] = []
+  for (const theme of (payload as { themes: Array<Record<string, unknown>> }).themes) {
+    if (!theme || typeof theme !== 'object' || !theme.id) continue
+    entries.push({
+      id: String(theme.id),
+      name: String(theme.name ?? theme.id),
+      author: String(theme.author ?? 'Unknown'),
+      version: String(theme.version ?? '0.0.0'),
+    })
+  }
+  return entries
+}
+
+// Validate a requested theme id against the generated manifest when a request is
+// available; an unknown id (or no manifest) falls back to the neutral base theme.
+async function validateThemeId(value: string, request?: Request): Promise<string> {
+  const id = normaliseThemeId(value)
+  if (id === 'base') return id
+  const manifest = await listThemeManifest(request)
+  if (manifest.length === 0) return id
+  return manifest.some((theme) => theme.id === id) ? id : 'base'
 }
 
 function parseJsonObject(value: string) {

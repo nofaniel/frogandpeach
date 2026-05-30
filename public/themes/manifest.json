@@ -1,0 +1,36 @@
+{
+  "generatedAt": "",
+  "themes": [
+    {
+      "id": "base",
+      "name": "Base",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "botanical",
+      "name": "Botanical",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "coastal",
+      "name": "Coastal",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "frog-peach",
+      "name": "Frog & Peach",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "mono-dark",
+      "name": "Mono Dark",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    }
+  ],
+  "warnings": []
+}

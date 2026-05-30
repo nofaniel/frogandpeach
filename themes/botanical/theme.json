@@ -1,0 +1,23 @@
+{
+  "id": "botanical",
+  "name": "Botanical",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "frog-peach",
+  "tokens": {
+    "color": {
+      "bg": "#edf1e5",
+      "surface": "#fffdf4",
+      "surface2": "#eaf2df",
+      "ink": "#17251a",
+      "muted": "#5f6b57",
+      "line": "#c0ceb4",
+      "accent": "#3f6f37",
+      "accent2": "#bd6b4e",
+      "danger": "#9d3f3a"
+    }
+  },
+  "layout": {
+    "bodyBackground": "#edf1e5"
+  }
+}

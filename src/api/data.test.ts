@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { normaliseColourTheme, normaliseStyleTheme, parseCustomPageManifest, parseCustomPageManifestReport } from './data'
+import { normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport } from './data'
 
 describe('settings validation', () => {
-  it('normalises supported appearance settings', () => {
-    expect(normaliseColourTheme('coastal')).toBe('coastal')
-    expect(normaliseColourTheme('unknown')).toBe('frog-peach')
-    expect(normaliseStyleTheme('high-contrast')).toBe('high-contrast')
-    expect(normaliseStyleTheme('giant')).toBe('classic')
+  it('accepts slug-shaped theme ids and falls back to base otherwise', () => {
+    expect(normaliseThemeId('coastal')).toBe('coastal')
+    expect(normaliseThemeId('Mono-Dark')).toBe('mono-dark')
+    expect(normaliseThemeId('')).toBe('base')
+    expect(normaliseThemeId('../etc/passwd')).toBe('base')
+    expect(normaliseThemeId('has spaces')).toBe('base')
   })
 })
 
