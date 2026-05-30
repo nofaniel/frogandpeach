@@ -820,10 +820,19 @@ function firstLine(value: string) {
 
 function getDeploymentInfo(request: Request) {
   const url = new URL(request.url)
+  const isLocalHost = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '0.0.0.0'
+  const isCloudflarePages = url.hostname.endsWith('.pages.dev')
+  const mode = isLocalHost ? 'local-worker' : (isCloudflarePages ? 'cloudflare-pages' : 'worker-runtime')
+  const note = isLocalHost
+    ? 'Local worker runtime is active. API routes and D1-backed features are available.'
+    : (isCloudflarePages
+      ? 'Cloudflare Pages Functions runtime is active. D1-backed features are online.'
+      : 'Worker runtime is active. API routes and data-backed features are available.')
   return {
     origin: url.origin,
     host: url.host,
-    cloudflareReady: true,
-    note: 'The full app needs Cloudflare Pages Functions with D1, or a local worker runtime. Static router hosting can only serve copied custom pages.',
+    mode,
+    ready: true,
+    note,
   }
 }

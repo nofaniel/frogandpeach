@@ -159,6 +159,8 @@ type HomeData = {
   deployment: {
     origin: string
     host: string
+    mode: string
+    ready: boolean
     note: string
   }
 }
@@ -612,7 +614,11 @@ function App() {
           <p>{formatFullDateTime(now)}</p>
         </div>
         <div className="top-actions">
-          {home?.deployment.origin && <span>{home.deployment.origin}</span>}
+          {home?.deployment.origin && (
+            <a className="origin-link" href={home.deployment.origin} target="_blank" rel="noreferrer">
+              {home.deployment.origin}
+            </a>
+          )}
           {adminUnlockLabel && (
             <span className={adminUnlockRemainingMs <= 120000 ? 'unlock-status warning' : 'unlock-status'}>
               {adminUnlockLabel}
@@ -827,7 +833,7 @@ function App() {
 
       {!viewedPage && !adminOpen && activeTab === 'network' && home && (
         <section className="workspace-grid">
-          {renderModule({ id: 'network', title: 'Network', description: '', category: 'system', installed: true, enabled: true, position: 0, size: 'full' }, home, setActiveTab)}
+          {renderModule({ id: 'network', title: 'Network', description: '', category: 'system', installed: true, enabled: true, position: 0, size: 'full' }, home, setActiveTab, settings)}
         </section>
       )}
       <ToastTray toasts={toasts} onDismiss={dismissToast} />
@@ -835,7 +841,7 @@ function App() {
   )
 }
 
-function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) => void) {
+function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) => void, settings?: Settings) {
   const className = `panel module-${module.size}`
   if (module.id === 'weather') {
     return (
@@ -930,11 +936,42 @@ function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) =
     )
   }
   if (module.id === 'network') {
+    const routerUrl = normaliseExternalUrl(settings?.routerUrl)
+    const adminUrl = normaliseExternalUrl(settings?.adminUrl)
     return (
-      <article className={className} key={module.id}>
-        <p className="kicker">Deployment</p>
-        <h2>{home.deployment.host}</h2>
+      <article className={`${className} network-panel`} key={module.id}>
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Deployment</p>
+            <h2>{home.deployment.host}</h2>
+          </div>
+          <span className={home.deployment.ready ? 'status-badge ok' : 'status-badge warn'}>
+            {home.deployment.ready ? 'Connected' : 'Needs setup'}
+          </span>
+        </div>
         <p>{home.deployment.note}</p>
+        <div className="stack-list">
+          <a className="plain-row" href={home.deployment.origin} target="_blank" rel="noreferrer">
+            <strong>Open current host</strong>
+            <span>{home.deployment.origin}</span>
+          </a>
+          {routerUrl && (
+            <a className="plain-row" href={routerUrl} target="_blank" rel="noreferrer">
+              <strong>Router</strong>
+              <span>{routerUrl}</span>
+            </a>
+          )}
+          {adminUrl && (
+            <a className="plain-row" href={adminUrl} target="_blank" rel="noreferrer">
+              <strong>Admin panel</strong>
+              <span>{adminUrl}</span>
+            </a>
+          )}
+          <a className="plain-row" href="/docs/cloudflare-hosting.md">
+            <strong>Cloudflare hosting guide</strong>
+            <span>Functions + D1 setup and deploy steps</span>
+          </a>
+        </div>
       </article>
     )
   }
@@ -1066,11 +1103,11 @@ function AdminPanel({
         <h2>Users</h2>
         <div className="stack-list">
           {users.map((user) => (
-            <div className="module-row" key={user.id}>
+            <div className={`user-row ${user.active ? '' : 'inactive'}`} key={user.id}>
               {editingUserId === user.id ? (
                 <>
                   <input
-                    className="inline-edit"
+                    className="inline-edit user-edit-input"
                     value={editingDisplayName}
                     onChange={(e) => setEditingDisplayName(e.target.value)}
                     autoFocus
@@ -1079,15 +1116,21 @@ function AdminPanel({
                       if (e.key === 'Escape') setEditingUserId(null)
                     }}
                   />
-                  <button type="button" className="ghost" onClick={() => { onPatchUser(user, { displayName: editingDisplayName }); setEditingUserId(null) }}>Save</button>
-                  <button type="button" className="ghost" onClick={() => setEditingUserId(null)}>Cancel</button>
+                  <div className="user-actions">
+                    <button type="button" className="ghost" onClick={() => { onPatchUser(user, { displayName: editingDisplayName }); setEditingUserId(null) }}>Save</button>
+                    <button type="button" className="ghost" onClick={() => setEditingUserId(null)}>Cancel</button>
+                  </div>
                 </>
               ) : (
                 <>
-                  <strong>{user.displayName}</strong>
-                  <span>{user.username} / {user.role}</span>
-                  <button type="button" className="ghost" onClick={() => { setEditingUserId(user.id); setEditingDisplayName(user.displayName) }}>Rename</button>
-                  <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
+                  <div className="user-meta">
+                    <strong>{user.displayName}</strong>
+                    <span>{user.username} / {user.role}{user.active ? '' : ' / disabled'}</span>
+                  </div>
+                  <div className="user-actions">
+                    <button type="button" className="ghost" onClick={() => { setEditingUserId(user.id); setEditingDisplayName(user.displayName) }}>Rename</button>
+                    <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
+                  </div>
                 </>
               )}
             </div>
@@ -1467,6 +1510,18 @@ function suggestedPageMetadata(page: PageLink) {
     null,
     2,
   )
+}
+
+function normaliseExternalUrl(value: string | undefined) {
+  const raw = (value ?? '').trim()
+  if (!raw) return ''
+  const withProtocol = raw.includes('://') ? raw : `https://${raw}`
+  try {
+    const url = new URL(withProtocol)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : ''
+  } catch {
+    return ''
+  }
 }
 
 export default App

@@ -201,6 +201,25 @@ label {
   font-size: 0.82rem;
 }
 
+.top-actions .origin-link {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 9px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  text-decoration: none;
+}
+
+.top-actions .origin-link:hover {
+  color: var(--color-ink);
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-line));
+}
+
 .top-actions .unlock-status {
   border-color: color-mix(in srgb, var(--color-accent-2) 42%, var(--color-line));
   color: var(--color-accent-2);
@@ -642,6 +661,43 @@ button.danger:not(.ghost) {
   border-color: color-mix(in srgb, var(--color-accent-2) 55%, var(--color-line));
 }
 
+.user-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 80%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+}
+
+.user-row.inactive {
+  opacity: 0.8;
+}
+
+.user-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.user-meta span {
+  color: var(--color-muted);
+}
+
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.user-edit-input {
+  width: 100%;
+}
+
 .module-config-row {
   grid-template-columns: minmax(220px, 1fr) minmax(360px, auto);
   align-items: stretch;
@@ -1079,7 +1135,8 @@ body {
   gap: 6px;
 }
 
-.top-actions span {
+.top-actions span,
+.top-actions .origin-link {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1309,6 +1366,19 @@ body {
   grid-template-columns: 1fr;
 }
 
+.workspace-grid.admin-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.network-panel .plain-row {
+  text-decoration: none;
+}
+
+.network-panel .status-badge {
+  align-self: start;
+}
+
 @media (min-width: 821px) {
   :root[data-nav="side"] .app-shell:not(:has(.admin-grid)) {
     display: block;
@@ -1324,7 +1394,23 @@ body {
     width: min(100% - 24px, 568px);
   }
 
-  .top-actions span {
+  .top-actions span,
+  .top-actions .origin-link {
     display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .workspace-grid.admin-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .user-actions {
+    justify-content: flex-start;
   }
 }
