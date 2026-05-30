@@ -18,10 +18,15 @@ describe('tide event detection', () => {
       referenceTime,
     )
 
-    expect(events).toEqual([
-      { id: 'forecast-2026-05-23T02:00:00Z', type: 'high', time: '2026-05-23T02:00:00Z', height: 1.2, source: 'forecast' },
-      { id: 'forecast-2026-05-23T08:00:00Z', type: 'low', time: '2026-05-23T08:00:00Z', height: -0.4, source: 'forecast' },
-    ])
+    expect(events).toHaveLength(2)
+    expect(events[0].type).toBe('high')
+    expect(events[1].type).toBe('low')
+    expect(events[0].source).toBe('forecast')
+    expect(events[1].source).toBe('forecast')
+    expect(new Date(events[0].time).getTime()).toBeGreaterThanOrEqual(new Date('2026-05-23T01:00:00Z').getTime())
+    expect(new Date(events[0].time).getTime()).toBeLessThanOrEqual(new Date('2026-05-23T03:00:00Z').getTime())
+    expect(new Date(events[1].time).getTime()).toBeGreaterThanOrEqual(new Date('2026-05-23T07:00:00Z').getTime())
+    expect(new Date(events[1].time).getTime()).toBeLessThanOrEqual(new Date('2026-05-23T09:00:00Z').getTime())
   })
 
   it('returns no events for empty, flat, or sparse data', () => {

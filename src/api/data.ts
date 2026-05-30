@@ -526,8 +526,16 @@ export async function getWeather(env: Env) {
 }
 
 export async function getMarine(env: Env) {
-  return cached(env, 'marine-v3', 6 * 60 * 60, async () => {
+  const options = await getTidesModuleOptions(env)
+  const source = normaliseTideSource(options.source)
+  const cacheKey = source === 'api' ? 'marine-v4-api' : 'marine-v4-model'
+  return cached(env, cacheKey, 6 * 60 * 60, async () => {
     const settings = await getSettings(env)
+    if (source === 'api') {
+      const fromApi = await getMarineFromApi(settings, options.apiKey)
+      if (fromApi) return fromApi
+    }
+
     const url = new URL('https://marine-api.open-meteo.com/v1/marine')
     url.searchParams.set('latitude', settings.latitude)
     url.searchParams.set('longitude', settings.longitude)
@@ -550,9 +558,77 @@ export async function getMarine(env: Env) {
       },
       forecastUntil: lastPoint?.time ?? null,
       events,
-      note: 'Approximate tide trend from Open-Meteo marine model, not official tide-table data. Not for navigation.',
+      note: source === 'api'
+        ? 'API mode selected but unavailable (missing/invalid key or upstream issue), so built-in estimate is shown. Not for navigation.'
+        : 'Approximate tide trend from Open-Meteo marine model, not official tide-table data. Not for navigation.',
     }
   })
+}
+
+async function getMarineFromApi(settings: Settings, apiKey: string) {
+  const key = String(apiKey ?? '').trim()
+  if (!key) return null
+
+  const url = new URL('https://tidesatlas.com/api/v1/tides')
+  url.searchParams.set('lat', settings.latitude)
+  url.searchParams.set('lon', settings.longitude)
+  url.searchParams.set('days', '3')
+
+  const response = await fetch(url, { headers: { 'X-API-Key': key } })
+  if (!response.ok) return null
+  const raw = (await response.json()) as Record<string, unknown>
+  const extremes = Array.isArray(raw.extremes) ? raw.extremes : []
+  const events = extremes
+    .map((entry) => {
+      if (!entry || typeof entry !== 'object') return null
+      const row = entry as Record<string, unknown>
+      const timeRaw = typeof row.datetime === 'string' ? row.datetime : (typeof row.time === 'string' ? row.time : '')
+      const parsed = new Date(timeRaw)
+      if (!Number.isFinite(parsed.getTime())) return null
+      const typeRaw = String(row.type ?? '').toLowerCase()
+      const type = typeRaw === 'high' || typeRaw === 'h' ? 'high' : (typeRaw === 'low' || typeRaw === 'l' ? 'low' : null)
+      if (!type) return null
+      return {
+        id: `api-${parsed.toISOString()}`,
+        type,
+        time: parsed.toISOString(),
+        height: numericOrNull(row.height_m ?? row.height),
+      }
+    })
+    .filter((event): event is { id: string; type: 'high' | 'low'; time: string; height: number | null } => Boolean(event))
+    .slice(0, 12)
+
+  if (events.length === 0) return null
+
+  return {
+    current: {
+      seaLevel: null,
+      waveHeight: null,
+      time: null,
+    },
+    forecastUntil: events.at(-1)?.time ?? null,
+    events,
+    note: 'Tide events via configured external API. Not for navigation.',
+  }
+}
+
+async function getTidesModuleOptions(env: Env): Promise<{ source: unknown; apiKey: string }> {
+  try {
+    const row = await env.DB.prepare('SELECT options_json FROM module_settings WHERE id = ?').bind('tides').first<DbRow>()
+    const parsed = row ? JSON.parse(rowString(row, 'options_json') || '{}') : {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { source: 'model', apiKey: '' }
+    const record = parsed as Record<string, unknown>
+    return {
+      source: record.source,
+      apiKey: String(record.apiKey ?? ''),
+    }
+  } catch {
+    return { source: 'model', apiKey: '' }
+  }
+}
+
+function normaliseTideSource(value: unknown): 'model' | 'api' {
+  return String(value ?? '').toLowerCase() === 'api' ? 'api' : 'model'
 }
 
 export async function deleteModuleData(env: Env, moduleId: string) {

@@ -15,6 +15,7 @@ type Module = {
   enabled: boolean
   position: number
   size: 'small' | 'medium' | 'wide' | 'full'
+  options: Record<string, unknown>
 }
 
 type ListType = {
@@ -907,12 +908,13 @@ function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) =
     )
   }
   if (module.id === 'tides') {
+    const tideLocation = settings?.locationName?.trim() || home.settings.locationName || 'Local coast'
     return (
       <article className={`${className} tide-panel`} key={module.id}>
         <div className="panel-heading">
           <div>
             <p className="kicker">Tides · Predicted</p>
-            <h2>Newquay Harbour</h2>
+            <h2>{tideLocation}</h2>
           </div>
           <span className="tide-mark" aria-hidden="true">🌊</span>
         </div>
@@ -920,11 +922,18 @@ function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) =
           {(home.tides?.events ?? []).slice(0, 4).map((event) => (
             <div key={event.id} className={`tide-card ${event.type}`}>
               <span>{event.type === 'high' ? '▲ High' : '▼ Low'}</span>
+              <em>{formatDayDate(event.time)}</em>
               <strong>{formatTime(event.time)}</strong>
               <small>{event.height === null ? 'No height' : `${event.height} m`}</small>
             </div>
           ))}
         </div>
+        <p className="tide-source-note">
+          {home.tides?.note ?? 'Model-based estimate only. Not for navigation.'}{' '}
+          <a href="https://www.cornwalls.co.uk/weather/tide_times.htm" target="_blank" rel="noreferrer">
+            Cornwall tide times reference
+          </a>
+        </p>
       </article>
     )
   }
@@ -1063,6 +1072,7 @@ function AdminPanel({
   const { themes, themeId } = useTheme()
   const selectedTheme = themes.find((theme) => theme.id === themeId)
   const [pendingUninstall, setPendingUninstall] = useState<Module | null>(null)
+  const [tideApiKeyDraft, setTideApiKeyDraft] = useState('')
   const [activityFilter, setActivityFilter] = useState({ entityType: '', search: '' })
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [editingDisplayName, setEditingDisplayName] = useState('')
@@ -1080,6 +1090,13 @@ function AdminPanel({
     { label: 'Location', ok: Boolean(settings.latitude && settings.longitude && settings.timezone), detail: 'Weather and tide modules need coordinates and timezone.' },
     { label: 'Custom pages', ok: pageManifestWarnings.length === 0, detail: pageManifestWarnings.length === 0 ? 'Manifest has no warnings.' : 'Resolve manifest warnings before deploy.' },
   ]
+  const tidesModule = modules.find((module) => module.id === 'tides')
+  const tideSource = String(tidesModule?.options?.source ?? 'model')
+
+  useEffect(() => {
+    const key = String(tidesModule?.options?.apiKey ?? '')
+    setTideApiKeyDraft(key)
+  }, [tidesModule?.options])
 
   return (
     <section className="workspace-grid admin-grid">
@@ -1209,6 +1226,37 @@ function AdminPanel({
                       <option value="full">Full</option>
                     </select>
                   </label>
+                )}
+                {module.id === 'tides' && module.installed && (
+                  <>
+                    <label className="compact-field">
+                      Tide source
+                      <select
+                        value={String(module.options?.source ?? 'model')}
+                        onChange={(event) => onPatchModule(module, { options: { ...module.options, source: event.target.value } })}
+                      >
+                        <option value="model">Built-in estimate</option>
+                        <option value="api">API</option>
+                      </select>
+                    </label>
+                    {tideSource === 'api' && (
+                      <>
+                        <label className="compact-field">
+                          API key
+                          <input
+                            value={tideApiKeyDraft}
+                            onChange={(event) => setTideApiKeyDraft(event.target.value)}
+                            onBlur={() => onPatchModule(module, { options: { ...module.options, apiKey: tideApiKeyDraft.trim() } })}
+                            placeholder="Paste API key"
+                          />
+                        </label>
+                        <a className="plain-row compact-link" href="https://tidesatlas.com/api/register" target="_blank" rel="noreferrer">
+                          <strong>Get API key</strong>
+                          <span>Open TidesAtlas signup page</span>
+                        </a>
+                      </>
+                    )}
+                  </>
                 )}
                 <label className="compact-field position-field">
                   Order
@@ -1631,6 +1679,10 @@ function formatDateTime(value: string) {
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function formatDayDate(value: string) {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value))
 }
 
 function formatFullDateTime(value: number) {

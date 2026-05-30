@@ -1404,6 +1404,13 @@ body {
   text-transform: uppercase;
 }
 
+.tide-card em {
+  color: #7b7772;
+  font-style: normal;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
 .tide-card.high span {
   color: #285f43;
 }
@@ -1417,6 +1424,16 @@ body {
 .tide-card small {
   color: #77746f;
   font-size: 0.86rem;
+}
+
+.tide-source-note {
+  margin-top: 12px;
+  color: #6d6a65;
+  font-size: 0.83rem;
+}
+
+.tide-source-note a {
+  color: #285f43;
 }
 
 .workspace-grid {
