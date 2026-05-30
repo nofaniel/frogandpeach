@@ -1,0 +1,78 @@
+# Modular Hub Upgrade Plan Progress
+
+Last updated: 2026-05-30
+
+## Checkpoint Summary
+
+This checkpoint implements the first modular hub pass: D1-backed household users, first-run admin setup, role-aware sessions, admin unlock, built-in module layout state, appearance settings, generic shared lists, note metadata, custom static page discovery, blank starting data, protected admin settings, docs, and focused tests.
+
+The implementation intentionally keeps modules as built-in registry entries. Third-party downloadable module packages remain deferred.
+
+## Completed
+
+- Replaced env-only admin login with D1 `users` records.
+- Added first-run setup via `GET /api/setup/status` and `POST /api/setup/admin`.
+- Added household login/logout/me routes backed by D1 sessions.
+- Added short-lived admin unlock via `POST /api/admin/unlock`.
+- Added admin-only users API for listing, creating, and patching users.
+- Moved sensitive household/network settings behind the top-right Admin control.
+- Added built-in module registry definitions for Weather, Tides, Lists, Notes, Pages, Deployment, and Admin tools.
+- Extended module settings with install state, enable state, position, size, options JSON, and update timestamp.
+- Added admin UI controls for install/uninstall, enable/disable, position, size, and destructive uninstall cleanup.
+- Changed dashboard rendering to use registry module order and sizes instead of scattered enabled-module checks.
+- Removed seeded shopping list/items and example page launcher from fresh setup.
+- Added migration cleanup for known seed list/item/page IDs in existing local databases.
+- Removed `public/pages/example/index.html`.
+- Added generic `lists` and `list_items` tables while preserving old shopping tables for migration compatibility.
+- Added list types: basic, shopping, life goal, daily checklist, and weekly chore checklist.
+- Added daily/weekly checklist reset keys and automatic reset logic.
+- Added `note_type`, `metadata_json`, `created_by`, and `updated_by` support for notes.
+- Added authorship fields for lists and list items.
+- Added custom static page sync from root `custom-pages/` into `public/custom-pages/`.
+- Added generated custom page manifest discovery to the Pages module.
+- Protected `/custom-pages/` through the same session middleware as `/pages/`.
+- Added colour themes: `frog-peach`, `coastal`, `botanical`, and `mono-dark`.
+- Added style themes: `classic`, `compact`, `soft`, and `high-contrast`.
+- Stored appearance in D1 settings and applied it via `data-theme` and `data-style`.
+- Added hosting and review docs:
+  - `docs/site-review.md`
+  - `docs/router-hosting.md`
+  - `docs/cloudflare-hosting.md`
+- Added admin workspace sections for Pages, Cache/Data, Site Review, and Deployment.
+- Added cache listing and clearing API routes for admin use.
+- Added custom page manifest API route for admin use.
+- Added custom page manifest warning generation and an admin validation report.
+- Replaced instant module uninstall actions with an explicit preserve-data/delete-data confirmation flow.
+- Added deployment readiness checks for D1/API reachability, admin users, location settings, and custom page manifest health.
+- Resolved and displayed stored authorship IDs as household display names on lists, list items, and notes.
+- Added a visible admin unlock expiry timestamp in the app header.
+- Ran browser visual QA against the worker UI at desktop and mobile widths.
+- Added unit tests for module normalization, list period reset logic, settings validation, admin unlock helper logic, and custom page manifest parsing.
+- Preserved existing tide and password verification tests.
+
+## Partially Complete
+
+- Custom page discovery supports `page.json` metadata, HTML title fallback, and validation warnings. Editing discovered static page metadata still happens in source files, not in the deployed app.
+- Authorship names are visible in content views, but there is not yet a dedicated activity/audit history.
+- Admin unlock is credential-based and short-lived. The header shows the expiry time, but there is no live countdown or warning toast.
+
+## Deferred
+
+- Fully external third-party module/package runtime.
+- Drag-and-drop module reordering.
+- Dedicated deployment wizard beyond the readiness checklist.
+- Deeper mobile polish pass for dense admin module controls.
+
+## Verification
+
+- `npm test` passes.
+- `npm run build` passes.
+- `npm run cf:migrate:local` applied `0002_modular_hub.sql` successfully.
+- Worker smoke checks passed locally against `http://localhost:8788` for login, admin unlock, admin routes, appearance update/restore, module update/restore, list/item creation, and note creation.
+- Playwright browser checks captured admin desktop and mobile screenshots under `output/playwright/`.
+
+## Local State Notes
+
+- The local D1 database already has an `admin` user, so `/api/setup/status` currently returns `{"needsSetup":false}` locally.
+- Temporary smoke-test users and content were removed after verification.
+- The worker emulator was started during implementation on `http://localhost:8788`.

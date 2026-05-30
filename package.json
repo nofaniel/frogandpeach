@@ -1,15 +1,38 @@
 {
-  "name": "flat-hub",
-  "version": "1.0.0",
-  "description": "Home hub for a fixed location — weather, tides, lists, notes & partner pages",
-  "main": "server.js",
+  "name": "frog-peach-home-hub",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Cloudflare-ready modular home hub for Frog & Peach.",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "dev:watch": "node --watch server.js"
+    "predev": "node scripts/sync-custom-pages.mjs",
+    "dev": "node node_modules/vite/bin/vite.js --host 0.0.0.0",
+    "dev:worker": "node node_modules/wrangler/bin/wrangler.js pages dev dist --ip 0.0.0.0 --port 8788 --d1 DB=frog-peach-db",
+    "prebuild": "node scripts/sync-custom-pages.mjs",
+    "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
+    "preview": "node node_modules/vite/bin/vite.js preview --host 0.0.0.0",
+    "test": "node node_modules/vitest/vitest.mjs run",
+    "test:watch": "node node_modules/vitest/vitest.mjs",
+    "hash-password": "node scripts/generate-password-hash.mjs",
+    "cf:migrate:local": "node node_modules/wrangler/bin/wrangler.js d1 migrations apply frog-peach-db --local",
+    "cf:migrate:remote": "node node_modules/wrangler/bin/wrangler.js d1 migrations apply frog-peach-db --remote",
+    "cf:deploy": "npm run build && node node_modules/wrangler/bin/wrangler.js pages deploy dist"
   },
   "dependencies": {
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "@vitejs/plugin-react": "^6.0.1",
+    "dompurify": "^3.3.0",
+    "marked": "^17.0.1",
+    "vite": "^8.0.12",
+    "typescript": "~6.0.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260523.0",
+    "@types/node": "^24.12.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "vitest": "^4.0.14",
+    "wrangler": "^4.48.0"
   }
 }

@@ -1,0 +1,9 @@
+name = "frog-peach-home-hub"
+compatibility_date = "2026-05-23"
+pages_build_output_dir = "dist"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "frog-peach-db"
+database_id = "6c1807c1-d033-4504-a1a8-068b2ca1eb8c"
+preview_database_id = "frog-peach-db"

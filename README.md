@@ -1,101 +1,63 @@
-# Flat Hub
+# Frog & Peach Home Hub
 
-Flat Hub is a small Express-based home dashboard for a fixed location. It brings together weather, tide predictions, shopping lists, notes, partner pages, and local network info in one lightweight app.
+Frog & Peach is a private-by-default modular home hub built for Cloudflare Pages and D1, with a React/Vite frontend and Cloudflare Functions API.
 
-## Features
+## What It Includes
 
-- Weather card using Open-Meteo, no API key required
-- Local tide predictions with configurable location labels
-- JSON-backed notes and lists
-- Simple partner page builder and viewer
-- Network info endpoint for finding the app on your LAN
+- Single-admin login for external hosting.
+- Built-in modules for weather, tide trends, shopping lists, notes, editable markdown pages, static page launchers, settings, and deployment help.
+- D1-backed persistence.
+- Open-Meteo weather and marine data with local cache records.
 
-## Requirements
+## Local Setup
 
-- Node.js 18 or newer
-
-## Setup
-
-1. Install dependencies:
-
-```bash
+```powershell
 npm install
+npm run hash-password -- "your-admin-password"
 ```
 
-2. Create a local environment file if you want to change the port or location:
-
-```bash
-copy .env.example .env
-```
-
-3. Start the app:
-
-```bash
-npm start
-```
-
-Open `http://localhost:3000` in your browser.
-
-## Environment
-
-- `PORT` - server port, defaults to `3000`
-- `LOCATION_NAME` / `LOCATION_REGION` - labels shown on the dashboard
-- `LOCATION_LATITUDE` / `LOCATION_LONGITUDE` - weather coordinates
-- `LOCATION_TIMEZONE` - timezone sent to Open-Meteo (e.g. `Europe/London`)
-- `TIDE_LOCATION_NAME` - tide card location label
-- `TIDE_Z0` - mean sea level above chart datum (metres)
-- `TIDE_CONSTITUENTS_JSON` - optional harmonic constituent array
-
-## Data
-
-The app stores data in JSON files under `data/`:
-
-- `data/lists.json`
-- `data/notes.json`
-- `data/pages.json`
-
-These files are created automatically if they do not exist.
-
-## Routes
-
-### Pages
-
-- `/` - dashboard
-- `/lists.html` - lists UI
-- `/notes.html` - notes UI
-- `/pages.html` - partner pages UI
-- `/network.html` - network info UI
-- `/page/:id` - partner page viewer
-
-### API
-
-- `GET /api/lists`
-- `POST /api/lists`
-- `GET /api/lists/:id`
-- `PUT /api/lists/:id`
-- `DELETE /api/lists/:id`
-- `GET /api/notes`
-- `POST /api/notes`
-- `PUT /api/notes/:id`
-- `DELETE /api/notes/:id`
-- `GET /api/pages`
-- `POST /api/pages`
-- `GET /api/pages/:id`
-- `PUT /api/pages/:id`
-- `DELETE /api/pages/:id`
-- `GET /api/tides`
-- `GET /api/network`
-
-## Project Structure
+Create `.dev.vars`:
 
 ```text
-server.js        Express server and API routes
-public/          Frontend HTML, CSS, and browser JS
-data/            JSON persistence files
-.env.example     Sample environment config
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD_HASH=pbkdf2_sha256$...
+APP_ORIGIN=http://localhost:8788
 ```
 
-## Notes
+Create and apply the local D1 database schema:
 
-- Weather data comes from Open-Meteo.
-- Tide predictions are computed locally, so no external API key is needed.
+```powershell
+npx wrangler d1 create frog-peach-db
+npm run cf:migrate:local
+```
+
+Build the frontend and run the Cloudflare Pages emulator:
+
+```powershell
+npm run build
+npm run dev:worker
+```
+
+Open `http://localhost:8788`. After login, the admin area is the root page at `/`.
+
+On Windows you can use the included batch files:
+
+- `build.bat` installs missing dependencies and builds the app.
+- `run.bat` builds, then starts the full local app/API at `http://localhost:8788` and prints LAN URLs for phones/tablets on the same Wi-Fi.
+- `start-test-site.bat` starts the quick Vite frontend-only test site at `http://localhost:5173`. Login and API features need `run.bat`.
+
+If another device on the local network cannot connect to the printed LAN URL, check that Windows Firewall allows Node.js/Wrangler on private networks.
+
+## Development
+
+The Vite-only dev server can render the frontend quickly:
+
+```powershell
+npm run dev
+```
+
+API calls need `wrangler pages dev` because they depend on Cloudflare bindings.
+
+## Deployment Notes
+
+Set `ADMIN_USERNAME` as an environment variable and `ADMIN_PASSWORD_HASH` as a Cloudflare secret before publishing. Keep everything private unless you intentionally add public page behavior later.

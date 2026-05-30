@@ -1,0 +1,9 @@
+{
+  "name": "Frog & Peach",
+  "short_name": "F&P",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3eee4",
+  "theme_color": "#17211f",
+  "icons": []
+}

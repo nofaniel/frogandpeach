@@ -1,7 +1,17 @@
 node_modules/
+dist/
+tsconfig.tsbuildinfo
+.wrangler/
+.mf/
+.playwright-cli/
+output/playwright/
 .env
+.dev.vars
 .env.local
 .env.*.local
+imports/
+cookies.txt
+wrangler-dev*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
