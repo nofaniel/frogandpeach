@@ -1,10 +1,10 @@
-/* Frog & Peach theme extras: warm gradient accents on the weather and tide
-   dashboard cards, layered over the token-driven base styles. */
+/* Frog & Peach theme extras. Keep the app-style front page legible while still
+   giving non-home dashboard cards the warmer Frog & Peach treatment. */
 
-.app-shell .weather-panel {
+.app-shell .dashboard-grid:not(.home-dashboard) .weather-panel {
   background: linear-gradient(135deg, var(--color-surface) 0%, #f5e1bd 100%);
 }
 
-.app-shell .tide-panel {
+.app-shell .dashboard-grid:not(.home-dashboard) .tide-panel {
   background: linear-gradient(135deg, #f7fbf8 0%, #d9e7e0 100%);
 }
