@@ -37,7 +37,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
   { id: 'lists', title: 'Lists', description: 'Shared household lists, shopping lists, goals, and checklists.', category: 'content', defaultPosition: 30, defaultEnabled: true, defaultInstalled: true, defaultSize: 'medium' },
   { id: 'notes', title: 'Notes', description: 'Pinned and tagged shared notes with metadata for future note types.', category: 'content', defaultPosition: 40, defaultEnabled: true, defaultInstalled: true, defaultSize: 'medium' },
   { id: 'pages', title: 'Pages', description: 'Editable markdown pages and discovered custom static pages.', category: 'content', defaultPosition: 50, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
-  { id: 'network', title: 'Deployment', description: 'Hosting status and system deployment information.', category: 'system', defaultPosition: 60, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
+  { id: 'network', title: 'Network', description: 'Wi-Fi sharing, usage snapshots, and connected device overview.', category: 'system', defaultPosition: 60, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
   { id: 'settings', title: 'Admin tools', description: 'Users, modules, appearance, household settings, cache, and review tools.', category: 'admin', defaultPosition: 70, defaultEnabled: false, defaultInstalled: true, defaultSize: 'wide' },
 ]
 

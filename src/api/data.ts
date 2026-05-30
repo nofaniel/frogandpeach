@@ -6,8 +6,13 @@ import type { DbRow, Env } from './types'
 export type Settings = {
   wifiName: string
   wifiPassword: string
+  wifiSecurity: string
   routerUrl: string
   adminUrl: string
+  wifiUsagePeriod: string
+  wifiUsageMonthlyGb: string
+  wifiUsageUpdatedAt: string
+  wifiDevicesJson: string
   binDay: string
   flatNotes: string
   locationName: string
@@ -45,11 +50,42 @@ export type ActivityEntry = {
   createdAt: string
 }
 
+export type NetworkDevice = {
+  id: string
+  name: string
+  type: string
+  ip: string
+  mac: string
+  connection: string
+  status: string
+  lastSeen: string
+  usageGb: number | null
+}
+
+export type NetworkOverview = {
+  wifiName: string
+  wifiPassword: string
+  wifiSecurity: string
+  routerUrl: string
+  adminUrl: string
+  usage: {
+    period: string
+    monthlyGb: number | null
+    updatedAt: string | null
+  }
+  devices: NetworkDevice[]
+}
+
 const settingDefaults: Settings = {
   wifiName: '',
   wifiPassword: '',
+  wifiSecurity: 'WPA',
   routerUrl: '',
   adminUrl: '',
+  wifiUsagePeriod: '',
+  wifiUsageMonthlyGb: '',
+  wifiUsageUpdatedAt: '',
+  wifiDevicesJson: '[]',
   binDay: '',
   flatNotes: 'Frog & Peach is private by default. Keep admin credentials out of shared notes.',
   locationName: 'Newquay',
@@ -123,6 +159,23 @@ export async function getSettings(env: Env): Promise<Settings> {
 export async function getPublicSettings(env: Env) {
   const settings = await getSettings(env)
   return Object.fromEntries(publicSettingKeys.map((key) => [key, settings[key]]))
+}
+
+export async function getNetworkOverview(env: Env): Promise<NetworkOverview> {
+  const settings = await getSettings(env)
+  return {
+    wifiName: settings.wifiName,
+    wifiPassword: settings.wifiPassword,
+    wifiSecurity: normaliseWifiSecurity(settings.wifiSecurity),
+    routerUrl: settings.routerUrl,
+    adminUrl: settings.adminUrl,
+    usage: {
+      period: settings.wifiUsagePeriod.trim(),
+      monthlyGb: parseOptionalNumber(settings.wifiUsageMonthlyGb),
+      updatedAt: settings.wifiUsageUpdatedAt.trim() || null,
+    },
+    devices: parseNetworkDevices(settings.wifiDevicesJson),
+  }
 }
 
 export async function updateSettings(env: Env, patch: Partial<Settings>) {
@@ -835,4 +888,46 @@ function getDeploymentInfo(request: Request) {
     ready: true,
     note,
   }
+}
+
+function normaliseWifiSecurity(value: string) {
+  const upper = value.trim().toUpperCase()
+  if (upper === 'WEP') return 'WEP'
+  if (upper === 'NOPASS' || upper === 'OPEN') return 'nopass'
+  return 'WPA'
+}
+
+function parseOptionalNumber(value: string): number | null {
+  if (!value.trim()) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function parseNetworkDevices(value: string): NetworkDevice[] {
+  let raw: unknown
+  try {
+    raw = JSON.parse(value || '[]')
+  } catch {
+    return []
+  }
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((entry, index) => {
+      if (!entry || typeof entry !== 'object') return null
+      const record = entry as Record<string, unknown>
+      const name = String(record.name ?? '').trim()
+      if (!name) return null
+      return {
+        id: String(record.id ?? `device-${index + 1}`),
+        name,
+        type: String(record.type ?? '').trim() || 'device',
+        ip: String(record.ip ?? '').trim(),
+        mac: String(record.mac ?? '').trim(),
+        connection: String(record.connection ?? '').trim() || 'wifi',
+        status: String(record.status ?? '').trim() || 'online',
+        lastSeen: String(record.lastSeen ?? '').trim(),
+        usageGb: record.usageGb === undefined || record.usageGb === null ? null : parseOptionalNumber(String(record.usageGb)),
+      }
+    })
+    .filter((entry): entry is NetworkDevice => Boolean(entry))
 }

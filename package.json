@@ -22,9 +22,11 @@
     "cf:deploy": "npm run build && node node_modules/wrangler/bin/wrangler.js pages deploy dist"
   },
   "dependencies": {
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-react": "^6.0.1",
     "dompurify": "^3.3.0",
     "marked": "^17.0.1",
+    "qrcode": "^1.5.4",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "typescript": "~6.0.2",

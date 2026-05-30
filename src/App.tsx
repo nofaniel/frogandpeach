@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import QRCode from 'qrcode'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useTheme } from './theme/ThemeProvider'
 
@@ -102,8 +103,13 @@ type ActivityEntry = {
 type Settings = {
   wifiName: string
   wifiPassword: string
+  wifiSecurity: string
   routerUrl: string
   adminUrl: string
+  wifiUsagePeriod: string
+  wifiUsageMonthlyGb: string
+  wifiUsageUpdatedAt: string
+  wifiDevicesJson: string
   binDay: string
   flatNotes: string
   locationName: string
@@ -165,6 +171,32 @@ type HomeData = {
   }
 }
 
+type NetworkDevice = {
+  id: string
+  name: string
+  type: string
+  ip: string
+  mac: string
+  connection: string
+  status: string
+  lastSeen: string
+  usageGb: number | null
+}
+
+type NetworkOverview = {
+  wifiName: string
+  wifiPassword: string
+  wifiSecurity: string
+  routerUrl: string
+  adminUrl: string
+  usage: {
+    period: string
+    monthlyGb: number | null
+    updatedAt: string | null
+  }
+  devices: NetworkDevice[]
+}
+
 type Session = {
   authenticated: boolean
   userId: string | null
@@ -200,8 +232,13 @@ const tabs: Array<{ id: Tab; label: string; icon: string }> = [
 const emptySettings: Settings = {
   wifiName: '',
   wifiPassword: '',
+  wifiSecurity: 'WPA',
   routerUrl: '',
   adminUrl: '',
+  wifiUsagePeriod: '',
+  wifiUsageMonthlyGb: '',
+  wifiUsageUpdatedAt: '',
+  wifiDevicesJson: '[]',
   binDay: '',
   flatNotes: '',
   locationName: 'Newquay',
@@ -219,6 +256,7 @@ function App() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)
   const [home, setHome] = useState<HomeData | null>(null)
+  const [network, setNetwork] = useState<NetworkOverview | null>(null)
   const [lists, setLists] = useState<SharedList[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [pages, setPages] = useState<Page[]>([])
@@ -302,13 +340,14 @@ function App() {
     setBusy(true)
     setError('')
     try {
-      const [homeData, listData, noteData, pageData, linkData, appearanceData] = await Promise.all([
+      const [homeData, listData, noteData, pageData, linkData, appearanceData, networkData] = await Promise.all([
         api<HomeData>('/api/home'),
         api<SharedList[]>('/api/lists'),
         api<Note[]>('/api/notes'),
         api<Page[]>('/api/pages'),
         api<PageLink[]>('/api/page-links'),
         api<Appearance>('/api/appearance'),
+        api<NetworkOverview>('/api/network'),
       ])
       setHome(homeData)
       setLists(listData)
@@ -317,6 +356,7 @@ function App() {
       setPageLinks(linkData)
       setModules(homeData.modules)
       setSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
+      setNetwork(networkData)
       void setTheme(appearanceData.themeId)
       if (window.location.pathname.startsWith('/page/')) {
         const slug = window.location.pathname.replace(/^\/page\//, '')
@@ -831,10 +871,11 @@ function App() {
         </section>
       )}
 
-      {!viewedPage && !adminOpen && activeTab === 'network' && home && (
-        <section className="workspace-grid">
-          {renderModule({ id: 'network', title: 'Network', description: '', category: 'system', installed: true, enabled: true, position: 0, size: 'full' }, home, setActiveTab, settings)}
-        </section>
+      {!viewedPage && !adminOpen && activeTab === 'network' && (
+        <NetworkWorkspace
+          network={network}
+          deployment={home?.deployment ?? null}
+        />
       )}
       <ToastTray toasts={toasts} onDismiss={dismissToast} />
     </main>
@@ -1206,8 +1247,18 @@ function AdminPanel({
         <div className="two-col">
           <label>Wi-Fi name<input value={settings.wifiName} onChange={(event) => onSettingsChange({ ...settings, wifiName: event.target.value })} /></label>
           <label>Wi-Fi password<input value={settings.wifiPassword} onChange={(event) => onSettingsChange({ ...settings, wifiPassword: event.target.value })} /></label>
+          <label>Wi-Fi security
+            <select value={settings.wifiSecurity} onChange={(event) => onSettingsChange({ ...settings, wifiSecurity: event.target.value })}>
+              <option value="WPA">WPA/WPA2</option>
+              <option value="WEP">WEP</option>
+              <option value="nopass">Open (no password)</option>
+            </select>
+          </label>
           <label>Router URL<input value={settings.routerUrl} onChange={(event) => onSettingsChange({ ...settings, routerUrl: event.target.value })} /></label>
           <label>Admin URL<input value={settings.adminUrl} onChange={(event) => onSettingsChange({ ...settings, adminUrl: event.target.value })} /></label>
+          <label>Usage period<input value={settings.wifiUsagePeriod} onChange={(event) => onSettingsChange({ ...settings, wifiUsagePeriod: event.target.value })} placeholder="May 2026" /></label>
+          <label>Usage this period (GB)<input value={settings.wifiUsageMonthlyGb} onChange={(event) => onSettingsChange({ ...settings, wifiUsageMonthlyGb: event.target.value })} placeholder="612.4" /></label>
+          <label>Usage updated at<input value={settings.wifiUsageUpdatedAt} onChange={(event) => onSettingsChange({ ...settings, wifiUsageUpdatedAt: event.target.value })} placeholder="2026-05-30T15:30:00Z" /></label>
           <label>Bin day<input value={settings.binDay} onChange={(event) => onSettingsChange({ ...settings, binDay: event.target.value })} /></label>
           <label>Timezone<input value={settings.timezone} onChange={(event) => onSettingsChange({ ...settings, timezone: event.target.value })} /></label>
           <label>Location<input value={settings.locationName} onChange={(event) => onSettingsChange({ ...settings, locationName: event.target.value })} /></label>
@@ -1215,6 +1266,7 @@ function AdminPanel({
           <label>Latitude<input value={settings.latitude} onChange={(event) => onSettingsChange({ ...settings, latitude: event.target.value })} /></label>
           <label>Longitude<input value={settings.longitude} onChange={(event) => onSettingsChange({ ...settings, longitude: event.target.value })} /></label>
         </div>
+        <label>Network devices JSON<textarea value={settings.wifiDevicesJson} onChange={(event) => onSettingsChange({ ...settings, wifiDevicesJson: event.target.value })} placeholder='[{"name":"Living Room TV","type":"tv","ip":"192.168.1.28","status":"online"}]' /></label>
         <label>Flat notes<textarea value={settings.flatNotes} onChange={(event) => onSettingsChange({ ...settings, flatNotes: event.target.value })} /></label>
         <button type="submit">Save settings</button>
       </form>
@@ -1383,6 +1435,141 @@ function AdminPanel({
   )
 }
 
+function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | null; deployment: HomeData['deployment'] | null }) {
+  const [qrDataUrl, setQrDataUrl] = useState('')
+  const [copyState, setCopyState] = useState('')
+  const hasWifi = Boolean(network?.wifiName)
+  const wifiPayload = useMemo(() => {
+    if (!network || !network.wifiName) return ''
+    return toWifiPayload(network.wifiName, network.wifiPassword, network.wifiSecurity)
+  }, [network])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!wifiPayload) {
+      setQrDataUrl('')
+      return
+    }
+    void QRCode.toDataURL(wifiPayload, { width: 300, margin: 1, errorCorrectionLevel: 'M' })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [wifiPayload])
+
+  async function copyValue(text: string, label: string) {
+    if (!text) return
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyState(`${label} copied`)
+      window.setTimeout(() => setCopyState(''), 1400)
+    } catch {
+      setCopyState('Clipboard blocked')
+      window.setTimeout(() => setCopyState(''), 1400)
+    }
+  }
+
+  const routerUrl = normaliseExternalUrl(network?.routerUrl)
+  const adminUrl = normaliseExternalUrl(network?.adminUrl)
+  const devices = network?.devices ?? []
+  const usagePeriod = network?.usage.period || 'Current period'
+  const usageValue = network?.usage.monthlyGb
+
+  return (
+    <section className="workspace-grid network-grid">
+      <article className="panel span-2 network-share">
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Network join</p>
+            <h2>Share local Wi-Fi</h2>
+          </div>
+          {copyState && <span className="status-badge ok">{copyState}</span>}
+        </div>
+        {hasWifi ? (
+          <div className="network-share-grid">
+            <div className="network-credentials">
+              <div className="plain-row">
+                <strong>SSID</strong>
+                <span>{network?.wifiName}</span>
+              </div>
+              <div className="plain-row">
+                <strong>Password</strong>
+                <span>{network?.wifiPassword || '(none)'}</span>
+              </div>
+              <div className="plain-row">
+                <strong>Security</strong>
+                <span>{network?.wifiSecurity}</span>
+              </div>
+              <div className="button-row">
+                <button type="button" className="ghost" onClick={() => void copyValue(network?.wifiName ?? '', 'SSID')}>Copy SSID</button>
+                <button type="button" className="ghost" onClick={() => void copyValue(network?.wifiPassword ?? '', 'Password')}>Copy password</button>
+              </div>
+            </div>
+            <div className="network-qr-wrap">
+              {qrDataUrl ? (
+                <img className="network-qr" src={qrDataUrl} alt="Wi-Fi join QR code" />
+              ) : (
+                <div className="plain-row">
+                  <strong>QR unavailable</strong>
+                  <span>Add SSID/security details in Admin settings.</span>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p>Set Wi-Fi details in Admin settings to enable one-scan join sharing.</p>
+        )}
+      </article>
+
+      <article className="panel">
+        <p className="kicker">Usage</p>
+        <h2>{usageValue === null || usageValue === undefined ? '--' : `${usageValue.toFixed(1)} GB`}</h2>
+        <p>{usagePeriod}</p>
+        <p className="small-note">
+          {network?.usage.updatedAt ? `Updated ${formatDateTime(network.usage.updatedAt)}` : 'Add usage values in Admin settings.'}
+        </p>
+      </article>
+
+      <article className="panel">
+        <p className="kicker">Quick links</p>
+        <h2>Router access</h2>
+        <div className="stack-list">
+          {routerUrl && <a className="plain-row" href={routerUrl} target="_blank" rel="noreferrer"><strong>Router</strong><span>{routerUrl}</span></a>}
+          {adminUrl && <a className="plain-row" href={adminUrl} target="_blank" rel="noreferrer"><strong>Admin</strong><span>{adminUrl}</span></a>}
+          <a className="plain-row" href={deployment?.origin ?? '/'}><strong>Current app host</strong><span>{deployment?.origin ?? 'No host loaded'}</span></a>
+        </div>
+      </article>
+
+      <article className="panel span-2">
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Connected devices</p>
+            <h2>{devices.length} known</h2>
+          </div>
+        </div>
+        <div className="stack-list">
+          {devices.map((device) => (
+            <div className="device-row" key={device.id}>
+              <div>
+                <strong>{device.name}</strong>
+                <span>{device.type} / {device.connection} / {device.status}</span>
+              </div>
+              <small>{device.ip || device.mac || 'No address'}</small>
+              <small>{device.usageGb === null ? '--' : `${device.usageGb.toFixed(1)} GB`}</small>
+            </div>
+          ))}
+          {devices.length === 0 && <p>No devices configured yet. Add JSON entries in Admin settings.</p>}
+        </div>
+      </article>
+    </section>
+  )
+}
+
 function Markdown({ body }: { body: string }) {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(body || '') as string), [body])
   return <div className="markdown" dangerouslySetInnerHTML={{ __html: html || '<p>No content yet.</p>' }} />
@@ -1510,6 +1697,17 @@ function suggestedPageMetadata(page: PageLink) {
     null,
     2,
   )
+}
+
+function toWifiPayload(ssid: string, password: string, security: string) {
+  const type = security.trim().toUpperCase() === 'WEP' ? 'WEP' : (security.trim().toLowerCase() === 'nopass' ? 'nopass' : 'WPA')
+  const escapedSsid = escapeWifiQrValue(ssid)
+  const escapedPassword = escapeWifiQrValue(password)
+  return `WIFI:T:${type};S:${escapedSsid};P:${escapedPassword};H:false;;`
+}
+
+function escapeWifiQrValue(value: string) {
+  return value.replace(/([\\;,:"])/g, '\\$1')
 }
 
 function normaliseExternalUrl(value: string | undefined) {
