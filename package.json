@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "node node_modules/vite/bin/vite.js --host 0.0.0.0",
-    "dev:worker": "node node_modules/wrangler/bin/wrangler.js pages dev dist --d1 DB=frog-peach-db",
+    "dev:worker": "node node_modules/wrangler/bin/wrangler.js pages dev dist --ip 0.0.0.0 --port 8788 --d1 DB=frog-peach-db",
     "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
     "preview": "node node_modules/vite/bin/vite.js preview --host 0.0.0.0",
     "test": "node node_modules/vitest/vitest.mjs run",

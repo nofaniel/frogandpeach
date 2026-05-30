@@ -34,8 +34,8 @@ const settingKeys = Object.keys(settingDefaults) as Array<keyof Settings>
 
 export async function getDashboard(env: Env, request: Request) {
   const [weather, tides, notes, lists, pages, settings, modules] = await Promise.all([
-    getWeather(env),
-    getMarine(env),
+    optionalData('weather', () => getWeather(env)),
+    optionalData('marine', () => getMarine(env)),
     listNotes(env, {}),
     listShoppingLists(env),
     listPageLinks(env),
@@ -52,6 +52,15 @@ export async function getDashboard(env: Env, request: Request) {
     settings,
     modules,
     deployment: getDeploymentInfo(request),
+  }
+}
+
+async function optionalData<T>(label: string, producer: () => Promise<T>): Promise<T | null> {
+  try {
+    return await producer()
+  } catch (error) {
+    console.warn(`${label} data unavailable`, error)
+    return null
   }
 }
 

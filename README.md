@@ -38,7 +38,15 @@ npm run build
 npm run dev:worker
 ```
 
-Open `http://localhost:8788`.
+Open `http://localhost:8788`. After login, the admin area is the root page at `/`.
+
+On Windows you can use the included batch files:
+
+- `build.bat` installs missing dependencies and builds the app.
+- `run.bat` builds, then starts the full local app/API at `http://localhost:8788` and prints LAN URLs for phones/tablets on the same Wi-Fi.
+- `start-test-site.bat` starts the quick Vite frontend-only test site at `http://localhost:5173`. Login and API features need `run.bat`.
+
+If another device on the local network cannot connect to the printed LAN URL, check that Windows Firewall allows Node.js/Wrangler on private networks.
 
 ## Development
 

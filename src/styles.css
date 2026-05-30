@@ -190,6 +190,15 @@ label {
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
 }
 
+.empty-state {
+  margin-top: 12px;
+}
+
+.empty-state h2 {
+  margin: 0;
+  font-size: clamp(1.45rem, 4vw, 2.4rem);
+}
+
 .weather-panel {
   background: linear-gradient(135deg, #fffaf0 0%, #f5e1bd 100%);
 }

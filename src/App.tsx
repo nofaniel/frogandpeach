@@ -331,7 +331,7 @@ function App() {
         <section className="login-panel">
           <p className="kicker">Private home hub</p>
           <h1>Frog & Peach</h1>
-          <p>Sign in with the single admin account configured for this deployment.</p>
+          <p>Sign in with the single admin account configured for this deployment. The admin area opens here after login.</p>
           <form onSubmit={login}>
             <label>
               Username
@@ -486,6 +486,14 @@ function App() {
               <p>{home.deployment.note}</p>
             </article>
           )}
+        </section>
+      )}
+
+      {!viewedPage && activeTab === 'home' && !home && (
+        <section className="panel empty-state">
+          <p className="kicker">Admin</p>
+          <h2>{busy ? 'Loading dashboard...' : 'Dashboard unavailable'}</h2>
+          <p>{error || 'Use Refresh to load the admin dashboard again.'}</p>
         </section>
       )}
 
