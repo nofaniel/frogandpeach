@@ -230,6 +230,13 @@ const tabs: Array<{ id: Tab; label: string; icon: string }> = [
   { id: 'network', label: 'Network', icon: '📡' },
 ]
 
+const tabModuleMap: Partial<Record<Tab, string>> = {
+  lists: 'lists',
+  notes: 'notes',
+  pages: 'pages',
+  network: 'network',
+}
+
 const emptySettings: Settings = {
   wifiName: '',
   wifiPassword: '',
@@ -607,11 +614,27 @@ function App() {
   }
 
   const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
+  const visibleTabs = useMemo(
+    () =>
+      tabs.filter((tab) => {
+        const moduleId = tabModuleMap[tab.id]
+        if (!moduleId) return true
+        const module = modules.find((entry) => entry.id === moduleId)
+        if (!module) return true
+        return module.installed && module.enabled
+      }),
+    [modules],
+  )
   const listTypes = home?.listTypes ?? []
   const adminUnlockExpiresAt = session?.adminUnlockedUntil ? Date.parse(session.adminUnlockedUntil) : NaN
   const adminUnlockRemainingMs = Number.isFinite(adminUnlockExpiresAt) ? Math.max(0, adminUnlockExpiresAt - now) : 0
   const adminUnlockLabel = session?.adminUnlockedUntil ? `Admin ${formatDuration(adminUnlockRemainingMs)} left` : null
   const displayName = session?.displayName || session?.userName || 'there'
+
+  useEffect(() => {
+    if (visibleTabs.some((tab) => tab.id === activeTab)) return
+    setActiveTab('home')
+  }, [activeTab, visibleTabs])
 
   if (session === null) {
     return <main className="loading-screen">Opening Frog & Peach...</main>
@@ -672,7 +695,7 @@ function App() {
       </header>
 
       <nav className="tab-bar" aria-label="Sections">
-        {tabs.map((tab) => (
+        {visibleTabs.map((tab) => (
           <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
             <span aria-hidden="true">{tab.icon}</span>
             <span>{tab.label}</span>
