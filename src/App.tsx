@@ -1,6 +1,6 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 
 type Tab = 'home' | 'lists' | 'notes' | 'pages'
 
@@ -86,6 +86,18 @@ type PageManifestReport = {
   warnings: Array<{ path: string; message: string }>
 }
 
+type ActivityEntry = {
+  id: string
+  actorUserId: string | null
+  actorName: string
+  action: string
+  entityType: string
+  entityId: string
+  summary: string
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
 type Settings = {
   wifiName: string
   wifiPassword: string
@@ -169,6 +181,12 @@ type UserRecord = {
   active: boolean
 }
 
+type Toast = {
+  id: string
+  message: string
+  kind: 'info' | 'warn'
+}
+
 const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'home', label: 'Home' },
   { id: 'lists', label: 'Lists' },
@@ -208,11 +226,16 @@ function App() {
   const [users, setUsers] = useState<UserRecord[]>([])
   const [modules, setModules] = useState<Module[]>([])
   const [cacheEntries, setCacheEntries] = useState<CacheEntry[]>([])
+  const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([])
   const [customPages, setCustomPages] = useState<PageLink[]>([])
   const [pageManifestWarnings, setPageManifestWarnings] = useState<Array<{ path: string; message: string }>>([])
   const [appearance, setAppearance] = useState<Appearance>({ colourTheme: 'frog-peach', styleTheme: 'classic' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [now, setNow] = useState(() => Date.now())
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const toastSeqRef = useRef(0)
+  const warnedNearExpiryRef = useRef(false)
 
   const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '', displayName: '' })
   const [unlockDraft, setUnlockDraft] = useState({ username: 'admin', password: '' })
@@ -226,6 +249,38 @@ function App() {
   useEffect(() => {
     void boot()
   }, [])
+
+  useEffect(() => {
+    if (!session?.adminUnlockedUntil) return undefined
+    setNow(Date.now())
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [session?.adminUnlockedUntil])
+
+  useEffect(() => {
+    if (!session?.adminUnlocked || !session.adminUnlockedUntil) return
+    const expiresAt = Date.parse(session.adminUnlockedUntil)
+    if (!Number.isFinite(expiresAt) || expiresAt > now) return
+    setSession((current) => (current ? { ...current, adminUnlocked: false, adminUnlockedUntil: null } : current))
+    setAdminOpen(false)
+    addToast('Admin session expired', 'warn')
+  }, [now, session?.adminUnlocked, session?.adminUnlockedUntil])
+
+  useEffect(() => {
+    if (!session?.adminUnlocked || !session.adminUnlockedUntil) {
+      warnedNearExpiryRef.current = false
+      return
+    }
+    const expiresAt = Date.parse(session.adminUnlockedUntil)
+    if (!Number.isFinite(expiresAt)) return
+    const remainingMs = Math.max(0, expiresAt - now)
+    if (remainingMs > 120000) {
+      warnedNearExpiryRef.current = false
+    } else if (remainingMs > 0 && !warnedNearExpiryRef.current) {
+      warnedNearExpiryRef.current = true
+      addToast('Admin unlock expires in 2 minutes', 'warn')
+    }
+  }, [now, session?.adminUnlocked, session?.adminUnlockedUntil])
 
   async function boot() {
     setError('')
@@ -275,12 +330,13 @@ function App() {
   }
 
   async function refreshAdmin() {
-    const [settingsData, usersData, modulesData, cacheData, manifestData] = await Promise.all([
+    const [settingsData, usersData, modulesData, cacheData, manifestData, activityData] = await Promise.all([
       api<Settings>('/api/settings'),
       api<UserRecord[]>('/api/users'),
       api<Module[]>('/api/modules'),
       api<CacheEntry[]>('/api/cache'),
       api<PageManifestReport>('/api/page-manifest-report'),
+      api<ActivityEntry[]>('/api/activity'),
     ])
     setSettings(settingsData)
     setUsers(usersData)
@@ -288,6 +344,7 @@ function App() {
     setCacheEntries(cacheData)
     setCustomPages(manifestData.pages)
     setPageManifestWarnings(manifestData.warnings)
+    setActivityEntries(activityData)
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -448,8 +505,23 @@ function App() {
     setCacheEntries(next)
   }
 
+  function addToast(message: string, kind: Toast['kind'] = 'info') {
+    const id = String(++toastSeqRef.current)
+    setToasts((current) => [...current, { id, message, kind }])
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((t) => t.id !== id))
+    }, 5000)
+  }
+
+  function dismissToast(id: string) {
+    setToasts((current) => current.filter((t) => t.id !== id))
+  }
+
   const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
   const listTypes = home?.listTypes ?? []
+  const adminUnlockExpiresAt = session?.adminUnlockedUntil ? Date.parse(session.adminUnlockedUntil) : NaN
+  const adminUnlockRemainingMs = Number.isFinite(adminUnlockExpiresAt) ? Math.max(0, adminUnlockExpiresAt - now) : 0
+  const adminUnlockLabel = session?.adminUnlockedUntil ? `Admin ${formatDuration(adminUnlockRemainingMs)} left` : null
 
   if (session === null) {
     return <main className="loading-screen">Opening Frog & Peach...</main>
@@ -494,7 +566,11 @@ function App() {
         </div>
         <div className="top-actions">
           {home?.deployment.origin && <span>{home.deployment.origin}</span>}
-          {session.adminUnlockedUntil && <span>Admin until {formatTime(session.adminUnlockedUntil)}</span>}
+          {adminUnlockLabel && (
+            <span className={adminUnlockRemainingMs <= 120000 ? 'unlock-status warning' : 'unlock-status'}>
+              {adminUnlockLabel}
+            </span>
+          )}
           <button type="button" onClick={refreshAll} disabled={busy}>Refresh</button>
           <button type="button" className="icon-cog" aria-label="Admin settings" title="Admin settings" onClick={openAdmin}>Admin</button>
           <button type="button" className="ghost" onClick={logout}>Logout</button>
@@ -516,8 +592,8 @@ function App() {
           <form className="panel modal-panel" onSubmit={unlockAdmin}>
             <p className="kicker">Admin unlock</p>
             <h2>Confirm admin credentials</h2>
-            <label>Admin username<input value={unlockDraft.username} onChange={(event) => setUnlockDraft((draft) => ({ ...draft, username: event.target.value }))} /></label>
-            <label>Password<input type="password" value={unlockDraft.password} onChange={(event) => setUnlockDraft((draft) => ({ ...draft, password: event.target.value }))} autoFocus /></label>
+            <label>Admin username<input value={unlockDraft.username} onChange={(event) => setUnlockDraft((draft) => ({ ...draft, username: event.target.value }))} autoComplete="username" /></label>
+            <label>Password<input type="password" value={unlockDraft.password} onChange={(event) => setUnlockDraft((draft) => ({ ...draft, password: event.target.value }))} autoComplete="current-password" autoFocus /></label>
             <div className="button-row">
               <button type="submit">Unlock</button>
               <button type="button" className="ghost" onClick={() => setUnlockOpen(false)}>Cancel</button>
@@ -544,6 +620,7 @@ function App() {
           customPages={customPages}
           pageManifestWarnings={pageManifestWarnings}
           cacheEntries={cacheEntries}
+          activityEntries={activityEntries}
           deployment={home?.deployment ?? null}
           userDraft={userDraft}
           onClose={() => setAdminOpen(false)}
@@ -697,6 +774,7 @@ function App() {
           ))}
         </section>
       )}
+      <ToastTray toasts={toasts} onDismiss={dismissToast} />
     </main>
   )
 }
@@ -823,6 +901,7 @@ function AdminPanel({
   customPages,
   pageManifestWarnings,
   cacheEntries,
+  activityEntries,
   deployment,
   userDraft,
   onClose,
@@ -842,6 +921,7 @@ function AdminPanel({
   customPages: PageLink[]
   pageManifestWarnings: Array<{ path: string; message: string }>
   cacheEntries: CacheEntry[]
+  activityEntries: ActivityEntry[]
   deployment: HomeData['deployment'] | null
   userDraft: { username: string; displayName: string; role: string; password: string }
   onClose: () => void
@@ -855,8 +935,15 @@ function AdminPanel({
   onClearCache: (key?: string) => void
 }) {
   const [pendingUninstall, setPendingUninstall] = useState<Module | null>(null)
+  const [activityFilter, setActivityFilter] = useState({ entityType: '', search: '' })
   const editablePages = pageLinks.filter((page) => page.kind === 'editable')
   const manualLinks = pageLinks.filter((page) => page.kind !== 'editable' && page.kind !== 'custom')
+  const uniqueEntityTypes = [...new Set(activityEntries.map((e) => e.entityType))].sort()
+  const filteredActivity = activityEntries.filter((entry) => {
+    if (activityFilter.entityType && entry.entityType !== activityFilter.entityType) return false
+    if (activityFilter.search && !entry.summary.toLowerCase().includes(activityFilter.search.toLowerCase())) return false
+    return true
+  })
   const deploymentChecks = [
     { label: 'D1 binding', ok: true, detail: 'DB is reachable through the worker API.' },
     { label: 'Admin users', ok: users.some((user) => user.role === 'admin' && user.active), detail: 'At least one active admin account is required.' },
@@ -912,13 +999,13 @@ function AdminPanel({
       <form className="panel form-panel" onSubmit={onCreateUser}>
         <p className="kicker">Users</p>
         <h2>Add household user</h2>
-        <input value={userDraft.username} onChange={(event) => onUserDraftChange({ ...userDraft, username: event.target.value })} placeholder="username" />
-        <input value={userDraft.displayName} onChange={(event) => onUserDraftChange({ ...userDraft, displayName: event.target.value })} placeholder="Display name" />
+        <input value={userDraft.username} onChange={(event) => onUserDraftChange({ ...userDraft, username: event.target.value })} placeholder="username" autoComplete="username" />
+        <input value={userDraft.displayName} onChange={(event) => onUserDraftChange({ ...userDraft, displayName: event.target.value })} placeholder="Display name" autoComplete="name" />
         <select value={userDraft.role} onChange={(event) => onUserDraftChange({ ...userDraft, role: event.target.value })}>
           <option value="member">Member</option>
           <option value="admin">Admin</option>
         </select>
-        <input type="password" value={userDraft.password} onChange={(event) => onUserDraftChange({ ...userDraft, password: event.target.value })} placeholder="Temporary password" />
+        <input type="password" value={userDraft.password} onChange={(event) => onUserDraftChange({ ...userDraft, password: event.target.value })} placeholder="Temporary password" autoComplete="new-password" />
         <button type="submit">Create user</button>
       </form>
 
@@ -941,24 +1028,37 @@ function AdminPanel({
         <h2>Built-in registry</h2>
         <div className="module-list">
           {modules.map((module) => (
-            <div key={module.id} className={module.enabled ? 'module-row enabled' : 'module-row'}>
-              <div>
+            <div key={module.id} className={`module-row module-config-row ${module.enabled ? 'enabled' : ''} ${module.installed ? '' : 'uninstalled'}`}>
+              <div className="module-summary">
                 <strong>{module.title}</strong>
                 <span>{module.description}</span>
+                <div className="module-meta">
+                  <small>{module.category}</small>
+                  <small>{module.installed ? 'Installed' : 'Not installed'}</small>
+                  <small>{module.enabled ? 'Visible' : 'Hidden'}</small>
+                </div>
               </div>
-              <div className="inline-controls">
-                <button type="button" className="ghost" onClick={() => (module.installed ? setPendingUninstall(module) : onPatchModule(module, { installed: true, enabled: true }))}>{module.installed ? 'Uninstall' : 'Install'}</button>
-                {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
+              <div className="module-controls">
+                <div className="inline-controls">
+                  <button type="button" className="ghost" onClick={() => (module.installed ? setPendingUninstall(module) : onPatchModule(module, { installed: true, enabled: true }))}>{module.installed ? 'Uninstall' : 'Install'}</button>
+                  {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
+                </div>
                 {module.installed && (
-                  <select value={module.size} onChange={(event) => onPatchModule(module, { size: event.target.value as Module['size'] })}>
-                    <option value="small">Small</option>
-                    <option value="medium">Medium</option>
-                    <option value="wide">Wide</option>
-                    <option value="full">Full</option>
-                  </select>
+                  <label className="compact-field">
+                    Size
+                    <select value={module.size} onChange={(event) => onPatchModule(module, { size: event.target.value as Module['size'] })}>
+                      <option value="small">Small</option>
+                      <option value="medium">Medium</option>
+                      <option value="wide">Wide</option>
+                      <option value="full">Full</option>
+                    </select>
+                  </label>
                 )}
+                <label className="compact-field position-field">
+                  Order
+                  <input type="number" value={module.position} onChange={(event) => onPatchModule(module, { position: Number(event.target.value) })} aria-label={`${module.title} position`} />
+                </label>
               </div>
-              <input type="number" value={module.position} onChange={(event) => onPatchModule(module, { position: Number(event.target.value) })} aria-label={`${module.title} position`} />
             </div>
           ))}
         </div>
@@ -1007,29 +1107,78 @@ function AdminPanel({
       </form>
 
       <article className="panel span-2">
-        <p className="kicker">Pages</p>
-        <h2>Page inventory</h2>
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Pages</p>
+            <h2>Page inventory</h2>
+          </div>
+          <span className={pageManifestWarnings.length === 0 ? 'status-badge ok' : 'status-badge warn'}>
+            {pageManifestWarnings.length === 0 ? 'Ready' : 'Needs review'}
+          </span>
+        </div>
         <div className="stat-grid">
           <div><strong>{editablePages.length}</strong><span>Editable</span></div>
           <div><strong>{customPages.length}</strong><span>Discovered</span></div>
           <div><strong>{manualLinks.length}</strong><span>Manual links</span></div>
           <div><strong>{pageManifestWarnings.length}</strong><span>Warnings</span></div>
         </div>
-        <div className="stack-list">
-          {pageManifestWarnings.map((warning) => (
-            <div className="plain-row warning-row" key={`${warning.path}-${warning.message}`}>
-              <strong>{warning.path || 'Manifest'}</strong>
-              <span>{warning.message}</span>
-            </div>
-          ))}
-          {[...customPages, ...manualLinks].slice(0, 8).map((page) => (
-            <a className="plain-row" key={`${page.kind}-${page.id}`} href={page.href}>
-              <strong>{page.title}</strong>
-              <span>{page.kind} / {page.href}</span>
-            </a>
-          ))}
-          {customPages.length === 0 && manualLinks.length === 0 && <p>No custom or manual page links discovered.</p>}
-        </div>
+        {pageManifestWarnings.length > 0 && (
+          <div className="stack-list">
+            {pageManifestWarnings.map((warning) => (
+              <div className="plain-row warning-row" key={`${warning.path}-${warning.message}`}>
+                <strong>{warning.path || 'Manifest'}</strong>
+                <span>{warning.message}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {customPages.length > 0 && (
+          <div className="manifest-detail-grid">
+            {customPages.map((page) => (
+              <article className="manifest-card" key={page.id}>
+                <div className="panel-heading">
+                  <div>
+                    <strong>{page.title}</strong>
+                    <span>{page.description || 'No description set.'}</span>
+                  </div>
+                  <a className="button-link ghost compact-link" href={page.href}>Open</a>
+                </div>
+                <dl className="manifest-fields">
+                  <div>
+                    <dt>HTML source</dt>
+                    <dd>{customPageSourcePath(page.href)}</dd>
+                  </div>
+                  <div>
+                    <dt>Metadata file</dt>
+                    <dd>{customPageMetadataPath(page.href)}</dd>
+                  </div>
+                  <div>
+                    <dt>Manifest href</dt>
+                    <dd>{page.href}</dd>
+                  </div>
+                </dl>
+                <div className="metadata-preview">
+                  <div className="metadata-preview-header">
+                    <span>Suggested page.json</span>
+                    <button type="button" className="ghost compact-link" onClick={() => void navigator.clipboard.writeText(suggestedPageMetadata(page))}>Copy</button>
+                  </div>
+                  <textarea readOnly value={suggestedPageMetadata(page)} />
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+        {manualLinks.length > 0 && (
+          <div className="stack-list">
+            {manualLinks.slice(0, 8).map((page) => (
+              <a className="plain-row" key={`${page.kind}-${page.id}`} href={page.href}>
+                <strong>{page.title}</strong>
+                <span>{page.kind} / {page.href}</span>
+              </a>
+            ))}
+          </div>
+        )}
+        {customPages.length === 0 && manualLinks.length === 0 && <p>No custom or manual page links discovered.</p>}
       </article>
 
       <article className="panel span-2">
@@ -1052,6 +1201,41 @@ function AdminPanel({
             </div>
           ))}
           {cacheEntries.length === 0 && <p>No cache rows are currently stored.</p>}
+        </div>
+      </article>
+
+      <article className="panel span-2">
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Activity</p>
+            <h2>Recent changes</h2>
+          </div>
+          {(activityFilter.entityType || activityFilter.search) && (
+            <button type="button" className="ghost compact-link" onClick={() => setActivityFilter({ entityType: '', search: '' })}>Clear filter</button>
+          )}
+        </div>
+        <div className="activity-filter">
+          <select value={activityFilter.entityType} onChange={(event) => setActivityFilter((f) => ({ ...f, entityType: event.target.value }))}>
+            <option value="">All types</option>
+            {uniqueEntityTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+          </select>
+          <input value={activityFilter.search} onChange={(event) => setActivityFilter((f) => ({ ...f, search: event.target.value }))} placeholder="Filter by summary" />
+        </div>
+        <div className="activity-list">
+          {filteredActivity.map((entry) => (
+            <div className="activity-row" key={entry.id}>
+              <div>
+                <strong>{entry.summary}</strong>
+                <span>{entry.actorName} / {formatDateTime(entry.createdAt)}</span>
+              </div>
+              <div className="activity-tags">
+                <small>{entry.action}</small>
+                <small>{entry.entityType}</small>
+              </div>
+            </div>
+          ))}
+          {filteredActivity.length === 0 && activityEntries.length === 0 && <p>No activity has been recorded yet.</p>}
+          {filteredActivity.length === 0 && activityEntries.length > 0 && <p>No entries match the current filter.</p>}
         </div>
       </article>
 
@@ -1089,6 +1273,20 @@ function AdminPanel({
 function Markdown({ body }: { body: string }) {
   const html = useMemo(() => DOMPurify.sanitize(marked.parse(body || '') as string), [body])
   return <div className="markdown" dangerouslySetInnerHTML={{ __html: html || '<p>No content yet.</p>' }} />
+}
+
+function ToastTray({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: string) => void }) {
+  if (toasts.length === 0) return null
+  return (
+    <div className="toast-tray" aria-live="polite" aria-atomic="false">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast toast-${toast.kind}`}>
+          <span>{toast.message}</span>
+          <button type="button" className="ghost" aria-label="Dismiss" onClick={() => onDismiss(toast.id)}>×</button>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 async function api<T>(path: string, options: { method?: string; body?: unknown } = {}, requireOk = true): Promise<T> {
@@ -1139,6 +1337,18 @@ function formatTime(value: string) {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
+function formatDuration(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60)
+    const remainingMinutes = minutes % 60
+    return `${hours}h ${remainingMinutes}m`
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
 function weatherMark(label: string | undefined) {
   if (!label) return 'Weather'
   const value = label.toLowerCase()
@@ -1150,6 +1360,30 @@ function weatherMark(label: string | undefined) {
 
 function firstLine(value: string) {
   return value.split('\n').find((line) => line.trim())?.trim() ?? ''
+}
+
+function customPageSourcePath(href: string) {
+  const relativePath = href.replace(/^\/custom-pages\//, '')
+  return relativePath && relativePath !== href ? `custom-pages/${relativePath}` : href
+}
+
+function customPageMetadataPath(href: string) {
+  const sourcePath = customPageSourcePath(href)
+  if (!sourcePath.startsWith('custom-pages/')) return 'custom-pages/<page-folder>/page.json'
+  const parts = sourcePath.split('/')
+  parts.pop()
+  return `${parts.join('/') || 'custom-pages'}/page.json`
+}
+
+function suggestedPageMetadata(page: PageLink) {
+  return JSON.stringify(
+    {
+      title: page.title,
+      description: page.description,
+    },
+    null,
+    2,
+  )
 }
 
 export default App

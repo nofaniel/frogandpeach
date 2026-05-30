@@ -34,6 +34,18 @@ export type CustomPageManifestReport = {
   warnings: Array<{ path: string; message: string }>
 }
 
+export type ActivityEntry = {
+  id: string
+  actorUserId: string | null
+  actorName: string
+  action: string
+  entityType: string
+  entityId: string
+  summary: string
+  metadata: Record<string, unknown>
+  createdAt: string
+}
+
 const settingDefaults: Settings = {
   wifiName: '',
   wifiPassword: '',
@@ -131,6 +143,47 @@ export async function updateAppearance(env: Env, patch: Partial<Appearance>) {
   if (patch.styleTheme !== undefined) next.styleTheme = normaliseStyleTheme(patch.styleTheme)
   const settings = await updateSettings(env, next)
   return { colourTheme: settings.colourTheme, styleTheme: settings.styleTheme }
+}
+
+export async function listActivity(env: Env, limit = 24): Promise<ActivityEntry[]> {
+  try {
+    const rows = (await env.DB.prepare('SELECT * FROM activity_log ORDER BY created_at DESC LIMIT ?').bind(Math.max(1, Math.min(limit, 100))).all<DbRow>()).results ?? []
+    return rows.map(toActivity)
+  } catch (error) {
+    console.warn('activity log unavailable', error)
+    return []
+  }
+}
+
+export async function logActivity(
+  env: Env,
+  input: {
+    actorUserId?: string | null
+    actorName?: string | null
+    action: string
+    entityType: string
+    entityId?: string | null
+    summary: string
+    metadata?: Record<string, unknown>
+  },
+) {
+  try {
+    await env.DB.prepare('INSERT INTO activity_log (id, actor_user_id, actor_name, action, entity_type, entity_id, summary, metadata_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(
+        id('activity'),
+        input.actorUserId ?? null,
+        input.actorName ?? '',
+        input.action,
+        input.entityType,
+        input.entityId ?? '',
+        input.summary,
+        safeJson(input.metadata ?? {}),
+        nowIso(),
+      )
+      .run()
+  } catch (error) {
+    console.warn('activity log write skipped', error)
+  }
 }
 
 export async function listNotes(env: Env, filters: { q?: string; tag?: string }) {
@@ -664,6 +717,20 @@ function toPageLink(row: DbRow) {
     href: normaliseHref(rowString(row, 'href')),
     description: rowString(row, 'description'),
     kind: rowString(row, 'kind') || 'static',
+  }
+}
+
+function toActivity(row: DbRow): ActivityEntry {
+  return {
+    id: rowString(row, 'id'),
+    actorUserId: rowString(row, 'actor_user_id') || null,
+    actorName: rowString(row, 'actor_name') || 'System',
+    action: rowString(row, 'action'),
+    entityType: rowString(row, 'entity_type'),
+    entityId: rowString(row, 'entity_id'),
+    summary: rowString(row, 'summary'),
+    metadata: parseJsonObject(rowString(row, 'metadata_json')),
+    createdAt: rowString(row, 'created_at'),
   }
 }
 
