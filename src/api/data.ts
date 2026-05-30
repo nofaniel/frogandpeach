@@ -1,4 +1,5 @@
-import { deriveTideEvents, extractTideSeries, numericOrNull, type TideEvent } from '../shared/tide'
+import { listTypes, normaliseListType, resetKeyForListType, shouldRefreshList, type ListTypeId } from '../shared/lists'
+import { deriveTideEvents, extractTideSeries, numericOrNull } from '../shared/tide'
 import { id, normaliseTags, nowIso, rowNumber, rowString, slugify } from './http'
 import type { DbRow, Env } from './types'
 
@@ -14,7 +15,11 @@ export type Settings = {
   latitude: string
   longitude: string
   timezone: string
+  colourTheme: string
+  styleTheme: string
 }
+
+export type Appearance = Pick<Settings, 'colourTheme' | 'styleTheme'>
 
 const settingDefaults: Settings = {
   wifiName: '',
@@ -28,19 +33,25 @@ const settingDefaults: Settings = {
   latitude: '50.4155',
   longitude: '-5.0737',
   timezone: 'Europe/London',
+  colourTheme: 'frog-peach',
+  styleTheme: 'classic',
 }
 
 const settingKeys = Object.keys(settingDefaults) as Array<keyof Settings>
+const publicSettingKeys: Array<keyof Settings> = ['binDay', 'flatNotes', 'locationName', 'locationRegion', 'latitude', 'longitude', 'timezone', 'colourTheme', 'styleTheme']
+const colourThemes = ['frog-peach', 'coastal', 'botanical', 'mono-dark']
+const styleThemes = ['classic', 'compact', 'soft', 'high-contrast']
 
 export async function getDashboard(env: Env, request: Request) {
-  const [weather, tides, notes, lists, pages, settings, modules] = await Promise.all([
+  const [weather, tides, notes, lists, pages, settings, modules, appearance] = await Promise.all([
     optionalData('weather', () => getWeather(env)),
     optionalData('marine', () => getMarine(env)),
     listNotes(env, {}),
-    listShoppingLists(env),
-    listPageLinks(env),
-    getSettings(env),
+    listLists(env),
+    listPageLinks(env, request),
+    getPublicSettings(env),
     import('./modules').then(({ listModules }) => listModules(env)),
+    getAppearance(env),
   ])
 
   return {
@@ -51,6 +62,8 @@ export async function getDashboard(env: Env, request: Request) {
     pages: pages.slice(0, 10),
     settings,
     modules,
+    appearance,
+    listTypes,
     deployment: getDeploymentInfo(request),
   }
 }
@@ -73,17 +86,38 @@ export async function getSettings(env: Env): Promise<Settings> {
     if (settingKeys.includes(key)) settings[key] = rowString(row, 'value')
   }
 
+  settings.colourTheme = normaliseColourTheme(settings.colourTheme)
+  settings.styleTheme = normaliseStyleTheme(settings.styleTheme)
   return settings
+}
+
+export async function getPublicSettings(env: Env) {
+  const settings = await getSettings(env)
+  return Object.fromEntries(publicSettingKeys.map((key) => [key, settings[key]]))
 }
 
 export async function updateSettings(env: Env, patch: Partial<Settings>) {
   const statement = env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
   for (const key of settingKeys) {
     if (Object.hasOwn(patch, key)) {
-      await statement.bind(key, String(patch[key] ?? '')).run()
+      const value = key === 'colourTheme' ? normaliseColourTheme(String(patch[key] ?? '')) : key === 'styleTheme' ? normaliseStyleTheme(String(patch[key] ?? '')) : String(patch[key] ?? '')
+      await statement.bind(key, value).run()
     }
   }
   return getSettings(env)
+}
+
+export async function getAppearance(env: Env): Promise<Appearance> {
+  const settings = await getSettings(env)
+  return { colourTheme: settings.colourTheme, styleTheme: settings.styleTheme }
+}
+
+export async function updateAppearance(env: Env, patch: Partial<Appearance>) {
+  const next: Partial<Appearance> = {}
+  if (patch.colourTheme !== undefined) next.colourTheme = normaliseColourTheme(patch.colourTheme)
+  if (patch.styleTheme !== undefined) next.styleTheme = normaliseStyleTheme(patch.styleTheme)
+  const settings = await updateSettings(env, next)
+  return { colourTheme: settings.colourTheme, styleTheme: settings.styleTheme }
 }
 
 export async function listNotes(env: Env, filters: { q?: string; tag?: string }) {
@@ -104,14 +138,14 @@ export async function listNotes(env: Env, filters: { q?: string; tag?: string })
   return rows.map(toNote)
 }
 
-export async function createNote(env: Env, input: { title?: string; body?: string; tags?: string; pinned?: boolean }) {
+export async function createNote(env: Env, input: { title?: string; body?: string; tags?: string; pinned?: boolean; noteType?: string; metadata?: unknown }, userId?: string) {
   const stamp = nowIso()
   const noteId = id('note')
   const body = String(input.body ?? '')
   const title = String(input.title ?? '').trim() || firstLine(body) || 'Untitled note'
 
-  await env.DB.prepare('INSERT INTO notes (id, title, body, tags, pinned, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .bind(noteId, title, body, normaliseTags(String(input.tags ?? '')), input.pinned ? 1 : 0, stamp, stamp)
+  await env.DB.prepare('INSERT INTO notes (id, title, body, tags, note_type, metadata_json, pinned, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(noteId, title, body, normaliseTags(String(input.tags ?? '')), String(input.noteType ?? 'text') || 'text', safeJson(input.metadata), input.pinned ? 1 : 0, userId ?? null, userId ?? null, stamp, stamp)
     .run()
 
   return getNote(env, noteId)
@@ -122,7 +156,7 @@ export async function getNote(env: Env, noteId: string) {
   return row ? toNote(row) : null
 }
 
-export async function updateNote(env: Env, noteId: string, patch: { title?: string; body?: string; tags?: string; pinned?: boolean }) {
+export async function updateNote(env: Env, noteId: string, patch: { title?: string; body?: string; tags?: string; pinned?: boolean; noteType?: string; metadata?: unknown }, userId?: string) {
   const existing = await getNote(env, noteId)
   if (!existing) return null
 
@@ -130,9 +164,11 @@ export async function updateNote(env: Env, noteId: string, patch: { title?: stri
   const body = patch.body === undefined ? existing.body : String(patch.body)
   const tags = patch.tags === undefined ? existing.tags : normaliseTags(String(patch.tags))
   const pinned = patch.pinned === undefined ? existing.pinned : Boolean(patch.pinned)
+  const noteType = patch.noteType === undefined ? existing.noteType : String(patch.noteType || 'text')
+  const metadata = patch.metadata === undefined ? existing.metadata : patch.metadata
 
-  await env.DB.prepare('UPDATE notes SET title = ?, body = ?, tags = ?, pinned = ?, updated_at = ? WHERE id = ?')
-    .bind(title, body, tags, pinned ? 1 : 0, nowIso(), noteId)
+  await env.DB.prepare('UPDATE notes SET title = ?, body = ?, tags = ?, note_type = ?, metadata_json = ?, pinned = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+    .bind(title, body, tags, noteType, safeJson(metadata), pinned ? 1 : 0, userId ?? existing.updatedBy ?? null, nowIso(), noteId)
     .run()
   return getNote(env, noteId)
 }
@@ -141,72 +177,83 @@ export async function deleteNote(env: Env, noteId: string) {
   await env.DB.prepare('DELETE FROM notes WHERE id = ?').bind(noteId).run()
 }
 
-export async function listShoppingLists(env: Env) {
-  const listRows = (await env.DB.prepare('SELECT * FROM shopping_lists ORDER BY updated_at DESC').all<DbRow>()).results ?? []
-  const itemRows = (await env.DB.prepare('SELECT * FROM shopping_items ORDER BY done ASC, created_at ASC').all<DbRow>()).results ?? []
-  const itemMap = new Map<string, ReturnType<typeof toShoppingItem>[]>()
+export async function listLists(env: Env) {
+  await refreshPeriodicLists(env)
+  const listRows = (await env.DB.prepare('SELECT * FROM lists ORDER BY updated_at DESC').all<DbRow>()).results ?? []
+  const itemRows = (await env.DB.prepare('SELECT * FROM list_items ORDER BY done ASC, created_at ASC').all<DbRow>()).results ?? []
+  const itemMap = new Map<string, ReturnType<typeof toListItem>[]>()
 
   for (const row of itemRows) {
-    const item = toShoppingItem(row)
+    const item = toListItem(row)
     itemMap.set(item.listId, [...(itemMap.get(item.listId) ?? []), item])
   }
 
-  return listRows.map((row) => ({ ...toShoppingList(row), items: itemMap.get(rowString(row, 'id')) ?? [] }))
+  return listRows.map((row) => ({ ...toList(row), items: itemMap.get(rowString(row, 'id')) ?? [] }))
 }
 
-export async function createShoppingList(env: Env, name: string) {
+export async function createList(env: Env, input: { name?: string; listType?: string }, userId?: string) {
   const stamp = nowIso()
   const listId = id('list')
-  await env.DB.prepare('INSERT INTO shopping_lists (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').bind(listId, name.trim() || 'Shopping list', stamp, stamp).run()
-  return getShoppingList(env, listId)
+  const listType = normaliseListType(input.listType ?? 'shopping')
+  await env.DB.prepare('INSERT INTO lists (id, name, list_type, reset_key, metadata_json, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(listId, String(input.name ?? '').trim() || defaultListName(listType), listType, resetKeyForListType(listType), '{}', userId ?? null, userId ?? null, stamp, stamp)
+    .run()
+  return getList(env, listId)
 }
 
-export async function getShoppingList(env: Env, listId: string) {
-  return (await listShoppingLists(env)).find((list) => list.id === listId) ?? null
+export async function getList(env: Env, listId: string) {
+  return (await listLists(env)).find((list) => list.id === listId) ?? null
 }
 
-export async function updateShoppingList(env: Env, listId: string, name: string) {
-  if (!(await getShoppingList(env, listId))) return null
-  await env.DB.prepare('UPDATE shopping_lists SET name = ?, updated_at = ? WHERE id = ?').bind(name.trim() || 'Shopping list', nowIso(), listId).run()
-  return getShoppingList(env, listId)
+export async function updateList(env: Env, listId: string, patch: { name?: string; listType?: string }, userId?: string) {
+  const existing = await getList(env, listId)
+  if (!existing) return null
+  const listType = patch.listType === undefined ? existing.listType : normaliseListType(patch.listType)
+  await env.DB.prepare('UPDATE lists SET name = ?, list_type = ?, reset_key = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+    .bind(patch.name === undefined ? existing.name : String(patch.name).trim() || defaultListName(listType), listType, resetKeyForListType(listType), userId ?? existing.updatedBy ?? null, nowIso(), listId)
+    .run()
+  return getList(env, listId)
 }
 
-export async function deleteShoppingList(env: Env, listId: string) {
-  await env.DB.prepare('DELETE FROM shopping_lists WHERE id = ?').bind(listId).run()
+export async function deleteList(env: Env, listId: string) {
+  await env.DB.prepare('DELETE FROM lists WHERE id = ?').bind(listId).run()
 }
 
-export async function createShoppingItem(env: Env, listId: string, text: string) {
-  if (!(await getShoppingList(env, listId))) return null
+export async function createListItem(env: Env, listId: string, text: string, userId?: string) {
+  if (!(await getList(env, listId))) return null
   const stamp = nowIso()
   const itemId = id('item')
-  await env.DB.prepare('INSERT INTO shopping_items (id, list_id, text, done, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)')
-    .bind(itemId, listId, text.trim() || 'Something useful', stamp, stamp)
+  await env.DB.prepare('INSERT INTO list_items (id, list_id, text, done, completed_at, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?)')
+    .bind(itemId, listId, text.trim() || 'Something useful', userId ?? null, userId ?? null, stamp, stamp)
     .run()
-  await env.DB.prepare('UPDATE shopping_lists SET updated_at = ? WHERE id = ?').bind(stamp, listId).run()
-  return getShoppingItem(env, itemId)
+  await env.DB.prepare('UPDATE lists SET updated_by = ?, updated_at = ? WHERE id = ?').bind(userId ?? null, stamp, listId).run()
+  return getListItem(env, itemId)
 }
 
-export async function getShoppingItem(env: Env, itemId: string) {
-  const row = await env.DB.prepare('SELECT * FROM shopping_items WHERE id = ?').bind(itemId).first<DbRow>()
-  return row ? toShoppingItem(row) : null
+export async function getListItem(env: Env, itemId: string) {
+  const row = await env.DB.prepare('SELECT * FROM list_items WHERE id = ?').bind(itemId).first<DbRow>()
+  return row ? toListItem(row) : null
 }
 
-export async function updateShoppingItem(env: Env, itemId: string, patch: { text?: string; done?: boolean }) {
-  const existing = await getShoppingItem(env, itemId)
+export async function updateListItem(env: Env, itemId: string, patch: { text?: string; done?: boolean }, userId?: string) {
+  const existing = await getListItem(env, itemId)
   if (!existing) return null
   const stamp = nowIso()
   const text = patch.text === undefined ? existing.text : String(patch.text).trim() || 'Something useful'
   const done = patch.done === undefined ? existing.done : Boolean(patch.done)
+  const completedAt = done ? existing.completedAt ?? stamp : null
 
-  await env.DB.prepare('UPDATE shopping_items SET text = ?, done = ?, updated_at = ? WHERE id = ?').bind(text, done ? 1 : 0, stamp, itemId).run()
-  await env.DB.prepare('UPDATE shopping_lists SET updated_at = ? WHERE id = ?').bind(stamp, existing.listId).run()
-  return getShoppingItem(env, itemId)
+  await env.DB.prepare('UPDATE list_items SET text = ?, done = ?, completed_at = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+    .bind(text, done ? 1 : 0, completedAt, userId ?? existing.updatedBy ?? null, stamp, itemId)
+    .run()
+  await env.DB.prepare('UPDATE lists SET updated_by = ?, updated_at = ? WHERE id = ?').bind(userId ?? null, stamp, existing.listId).run()
+  return getListItem(env, itemId)
 }
 
-export async function deleteShoppingItem(env: Env, itemId: string) {
-  const existing = await getShoppingItem(env, itemId)
-  await env.DB.prepare('DELETE FROM shopping_items WHERE id = ?').bind(itemId).run()
-  if (existing) await env.DB.prepare('UPDATE shopping_lists SET updated_at = ? WHERE id = ?').bind(nowIso(), existing.listId).run()
+export async function deleteListItem(env: Env, itemId: string) {
+  const existing = await getListItem(env, itemId)
+  await env.DB.prepare('DELETE FROM list_items WHERE id = ?').bind(itemId).run()
+  if (existing) await env.DB.prepare('UPDATE lists SET updated_at = ? WHERE id = ?').bind(nowIso(), existing.listId).run()
 }
 
 export async function listPages(env: Env) {
@@ -251,10 +298,11 @@ export async function deletePage(env: Env, pageId: string) {
   await env.DB.prepare('DELETE FROM pages WHERE id = ?').bind(pageId).run()
 }
 
-export async function listPageLinks(env: Env) {
-  const [editable, links] = await Promise.all([
+export async function listPageLinks(env: Env, request?: Request) {
+  const [editable, links, manifest] = await Promise.all([
     listPages(env),
     env.DB.prepare('SELECT * FROM page_links ORDER BY updated_at DESC').all<DbRow>(),
+    getCustomPageManifest(request),
   ])
 
   return [
@@ -265,6 +313,7 @@ export async function listPageLinks(env: Env) {
       description: page.occasion || firstLine(page.body),
       kind: 'editable',
     })),
+    ...manifest,
     ...((links.results ?? []).map(toPageLink)),
   ]
 }
@@ -283,7 +332,7 @@ export async function deletePageLink(env: Env, linkId: string) {
 }
 
 export async function getWeather(env: Env) {
-  return cached(env, 'weather-newquay-v3', 45 * 60, async () => {
+  return cached(env, 'weather-v4', 45 * 60, async () => {
     const settings = await getSettings(env)
     const url = new URL('https://api.open-meteo.com/v1/forecast')
     url.searchParams.set('latitude', settings.latitude)
@@ -337,7 +386,7 @@ export async function getWeather(env: Env) {
 }
 
 export async function getMarine(env: Env) {
-  return cached(env, 'marine-newquay-v2', 6 * 60 * 60, async () => {
+  return cached(env, 'marine-v3', 6 * 60 * 60, async () => {
     const settings = await getSettings(env)
     const url = new URL('https://marine-api.open-meteo.com/v1/marine')
     url.searchParams.set('latitude', settings.latitude)
@@ -366,6 +415,34 @@ export async function getMarine(env: Env) {
   })
 }
 
+export async function deleteModuleData(env: Env, moduleId: string) {
+  if (moduleId === 'lists') {
+    await env.DB.prepare('DELETE FROM list_items').run()
+    await env.DB.prepare('DELETE FROM lists').run()
+  } else if (moduleId === 'notes') {
+    await env.DB.prepare('DELETE FROM notes').run()
+  } else if (moduleId === 'pages') {
+    await env.DB.prepare('DELETE FROM pages').run()
+    await env.DB.prepare('DELETE FROM page_links').run()
+  } else if (moduleId === 'weather' || moduleId === 'tides') {
+    await env.DB.prepare("DELETE FROM cache WHERE cache_key LIKE 'weather-%' OR cache_key LIKE 'marine-%' OR cache_key LIKE 'weather-v%' OR cache_key LIKE 'marine-v%'").run()
+  }
+}
+
+async function refreshPeriodicLists(env: Env) {
+  const rows = (await env.DB.prepare('SELECT id, list_type, reset_key, metadata_json FROM lists').all<DbRow>()).results ?? []
+  for (const row of rows) {
+    const listType = normaliseListType(rowString(row, 'list_type'))
+    if (!shouldRefreshList(listType, rowString(row, 'reset_key'))) continue
+    const nextKey = resetKeyForListType(listType)
+    const metadata = parseJsonObject(rowString(row, 'metadata_json'))
+    metadata.lastResetAt = nowIso()
+    metadata.lastResetKey = rowString(row, 'reset_key')
+    await env.DB.prepare('UPDATE list_items SET done = 0, completed_at = NULL, updated_at = ? WHERE list_id = ?').bind(nowIso(), rowString(row, 'id')).run()
+    await env.DB.prepare('UPDATE lists SET reset_key = ?, metadata_json = ?, updated_at = ? WHERE id = ?').bind(nextKey, JSON.stringify(metadata), nowIso(), rowString(row, 'id')).run()
+  }
+}
+
 async function cached<T>(env: Env, key: string, ttlSeconds: number, producer: () => Promise<T>): Promise<T> {
   const cachedRow = await env.DB.prepare('SELECT payload FROM cache WHERE cache_key = ? AND expires_at > ?').bind(key, nowIso()).first<DbRow>()
   if (cachedRow) return JSON.parse(rowString(cachedRow, 'payload')) as T
@@ -384,6 +461,27 @@ async function fetchJson<T>(url: URL): Promise<T> {
   const response = await fetch(url)
   if (!response.ok) throw new Error(`Request failed: ${response.status} ${response.statusText}`)
   return (await response.json()) as T
+}
+
+async function getCustomPageManifest(request?: Request) {
+  if (!request) return []
+  try {
+    const manifestUrl = new URL('/custom-pages/manifest.json', request.url)
+    const response = await fetch(manifestUrl, { headers: { cookie: request.headers.get('cookie') ?? '' } })
+    if (!response.ok) return []
+    const payload = (await response.json()) as { pages?: Array<{ id?: string; title?: string; href?: string; description?: string }> }
+    return (payload.pages ?? [])
+      .filter((page) => page.href && page.title)
+      .map((page) => ({
+        id: String(page.id ?? page.href),
+        title: String(page.title),
+        href: normaliseHref(String(page.href)),
+        description: String(page.description ?? ''),
+        kind: 'custom',
+      }))
+  } catch {
+    return []
+  }
 }
 
 function weatherLabel(code: unknown) {
@@ -405,27 +503,39 @@ function toNote(row: DbRow) {
     title: rowString(row, 'title'),
     body: rowString(row, 'body'),
     tags: rowString(row, 'tags'),
+    noteType: rowString(row, 'note_type') || 'text',
+    metadata: parseJsonObject(rowString(row, 'metadata_json')),
     pinned: rowNumber(row, 'pinned') === 1,
+    createdBy: rowString(row, 'created_by') || null,
+    updatedBy: rowString(row, 'updated_by') || null,
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }
 }
 
-function toShoppingList(row: DbRow) {
+function toList(row: DbRow) {
   return {
     id: rowString(row, 'id'),
     name: rowString(row, 'name'),
+    listType: normaliseListType(rowString(row, 'list_type')),
+    resetKey: rowString(row, 'reset_key'),
+    metadata: parseJsonObject(rowString(row, 'metadata_json')),
+    createdBy: rowString(row, 'created_by') || null,
+    updatedBy: rowString(row, 'updated_by') || null,
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }
 }
 
-function toShoppingItem(row: DbRow) {
+function toListItem(row: DbRow) {
   return {
     id: rowString(row, 'id'),
     listId: rowString(row, 'list_id'),
     text: rowString(row, 'text'),
     done: rowNumber(row, 'done') === 1,
+    completedAt: rowString(row, 'completed_at') || null,
+    createdBy: rowString(row, 'created_by') || null,
+    updatedBy: rowString(row, 'updated_by') || null,
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }
@@ -455,14 +565,40 @@ function toPageLink(row: DbRow) {
   }
 }
 
+function defaultListName(listType: ListTypeId) {
+  return listTypes.find((type) => type.id === listType)?.title ?? 'List'
+}
+
 function normaliseTheme(theme: string) {
   return ['shell', 'peach', 'moon', 'fern', 'botanical'].includes(theme) ? theme : 'shell'
 }
 
 function normaliseHref(href: string) {
-  if (!href) return '/pages/example/index.html'
+  if (!href) return '/custom-pages/'
   if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('/')) return href
-  return `/pages/${href.replace(/^\/+/, '')}`
+  return `/custom-pages/${href.replace(/^\/+/, '')}`
+}
+
+function normaliseColourTheme(value: string) {
+  return colourThemes.includes(value) ? value : 'frog-peach'
+}
+
+function normaliseStyleTheme(value: string) {
+  return styleThemes.includes(value) ? value : 'classic'
+}
+
+function parseJsonObject(value: string) {
+  try {
+    const parsed = JSON.parse(value || '{}')
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function safeJson(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return '{}'
+  return JSON.stringify(value)
 }
 
 function firstLine(value: string) {
@@ -475,6 +611,6 @@ function getDeploymentInfo(request: Request) {
     origin: url.origin,
     host: url.host,
     cloudflareReady: true,
-    note: 'When hosted externally, all app data is private behind the admin login.',
+    note: 'The full app needs Cloudflare Pages Functions with D1, or a local worker runtime. Static router hosting can only serve copied custom pages.',
   }
 }

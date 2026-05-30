@@ -19,9 +19,22 @@ export async function verifyPassword(password: string, encodedHash: string) {
   return timingSafeEqual(new Uint8Array(bits), expected)
 }
 
+export async function hashPassword(password: string, iterations = 210_000) {
+  const salt = crypto.getRandomValues(new Uint8Array(16))
+  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits'])
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256)
+  return `pbkdf2_sha256$${iterations}$${bytesToBase64(salt)}$${bytesToBase64(new Uint8Array(bits))}`
+}
+
 function base64ToBytes(value: string) {
   const binary = atob(value)
   return Uint8Array.from(binary, (char) => char.charCodeAt(0))
+}
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary)
 }
 
 function timingSafeEqual(left: Uint8Array, right: Uint8Array) {

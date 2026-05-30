@@ -2,14 +2,24 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 
-type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'settings'
+type Tab = 'home' | 'lists' | 'notes' | 'pages'
 
 type Module = {
   id: string
   title: string
   description: string
-  position: number
+  category: string
+  installed: boolean
   enabled: boolean
+  position: number
+  size: 'small' | 'medium' | 'wide' | 'full'
+}
+
+type ListType = {
+  id: string
+  title: string
+  description: string
+  reset: string
 }
 
 type Note = {
@@ -17,21 +27,25 @@ type Note = {
   title: string
   body: string
   tags: string
+  noteType: string
   pinned: boolean
   updatedAt: string
 }
 
-type ShoppingItem = {
+type ListItem = {
   id: string
   text: string
   done: boolean
+  completedAt: string | null
 }
 
-type ShoppingList = {
+type SharedList = {
   id: string
   name: string
+  listType: string
+  resetKey: string
   updatedAt: string
-  items: ShoppingItem[]
+  items: ListItem[]
 }
 
 type Page = {
@@ -65,7 +79,11 @@ type Settings = {
   latitude: string
   longitude: string
   timezone: string
+  colourTheme: string
+  styleTheme: string
 }
+
+type Appearance = Pick<Settings, 'colourTheme' | 'styleTheme'>
 
 type WeatherSummary = {
   location: string
@@ -85,21 +103,9 @@ type WeatherSummary = {
     min: number | null
     precipitationChance: number | null
   }>
-  hourly: Array<{
-    time: string
-    temperature: number | null
-    precipitationChance: number | null
-    label: string
-  }>
 }
 
 type TideSummary = {
-  current: {
-    seaLevel: number | null
-    waveHeight: number | null
-    time: string | null
-  }
-  forecastUntil: string | null
   events: Array<{
     id: string
     type: 'high' | 'low'
@@ -113,10 +119,12 @@ type HomeData = {
   weather: WeatherSummary | null
   tides: TideSummary | null
   notes: Note[]
-  lists: ShoppingList[]
+  lists: SharedList[]
   pages: PageLink[]
-  settings: Settings
+  settings: Partial<Settings>
   modules: Module[]
+  appearance: Appearance
+  listTypes: ListType[]
   deployment: {
     origin: string
     host: string
@@ -126,7 +134,19 @@ type HomeData = {
 
 type Session = {
   authenticated: boolean
+  userId: string | null
   userName: string | null
+  displayName: string | null
+  role: 'admin' | 'member' | null
+  adminUnlocked: boolean
+}
+
+type UserRecord = {
+  id: string
+  username: string
+  displayName: string
+  role: 'admin' | 'member'
+  active: boolean
 }
 
 const tabs: Array<{ id: Tab; label: string }> = [
@@ -134,7 +154,6 @@ const tabs: Array<{ id: Tab; label: string }> = [
   { id: 'lists', label: 'Lists' },
   { id: 'notes', label: 'Notes' },
   { id: 'pages', label: 'Pages' },
-  { id: 'settings', label: 'Settings' },
 ]
 
 const emptySettings: Settings = {
@@ -149,27 +168,37 @@ const emptySettings: Settings = {
   latitude: '50.4155',
   longitude: '-5.0737',
   timezone: 'Europe/London',
+  colourTheme: 'frog-peach',
+  styleTheme: 'classic',
 }
 
 function App() {
+  const [setupNeeded, setSetupNeeded] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('home')
+  const [adminOpen, setAdminOpen] = useState(false)
+  const [unlockOpen, setUnlockOpen] = useState(false)
   const [home, setHome] = useState<HomeData | null>(null)
-  const [lists, setLists] = useState<ShoppingList[]>([])
+  const [lists, setLists] = useState<SharedList[]>([])
   const [notes, setNotes] = useState<Note[]>([])
   const [pages, setPages] = useState<Page[]>([])
   const [pageLinks, setPageLinks] = useState<PageLink[]>([])
   const [viewedPage, setViewedPage] = useState<Page | null>(null)
   const [settings, setSettings] = useState<Settings>(emptySettings)
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [modules, setModules] = useState<Module[]>([])
+  const [appearance, setAppearance] = useState<Appearance>({ colourTheme: 'frog-peach', styleTheme: 'classic' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '' })
-  const [listDraft, setListDraft] = useState('')
+  const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '', displayName: '' })
+  const [unlockDraft, setUnlockDraft] = useState({ username: 'admin', password: '' })
+  const [userDraft, setUserDraft] = useState({ username: '', displayName: '', role: 'member', password: '' })
+  const [listDraft, setListDraft] = useState({ name: '', listType: 'shopping' })
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({})
   const [noteDraft, setNoteDraft] = useState({ title: '', body: '', tags: '' })
   const [pageDraft, setPageDraft] = useState({ title: '', slug: '', body: '', theme: 'shell', occasion: '', emoji: '' })
-  const [linkDraft, setLinkDraft] = useState({ title: '', href: 'example/index.html', description: '', kind: 'static' })
+  const [linkDraft, setLinkDraft] = useState({ title: '', href: 'index.html', description: '', kind: 'static' })
 
   useEffect(() => {
     void boot()
@@ -178,11 +207,13 @@ function App() {
   async function boot() {
     setError('')
     try {
+      const setup = await api<{ needsSetup: boolean }>('/api/setup/status', {}, false)
+      setSetupNeeded(setup.needsSetup)
       const current = await api<Session>('/api/auth/me', {}, false)
       setSession(current)
       if (current.authenticated) await refreshAll()
     } catch (caught) {
-      setSession({ authenticated: false, userName: null })
+      setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false })
       setError(caught instanceof Error ? caught.message : 'Unable to reach API. Run `npm run dev:worker` for full local development.')
     }
   }
@@ -191,20 +222,22 @@ function App() {
     setBusy(true)
     setError('')
     try {
-      const [homeData, listData, noteData, pageData, linkData, settingsData] = await Promise.all([
+      const [homeData, listData, noteData, pageData, linkData, appearanceData] = await Promise.all([
         api<HomeData>('/api/home'),
-        api<ShoppingList[]>('/api/lists'),
+        api<SharedList[]>('/api/lists'),
         api<Note[]>('/api/notes'),
         api<Page[]>('/api/pages'),
         api<PageLink[]>('/api/page-links'),
-        api<Settings>('/api/settings'),
+        api<Appearance>('/api/appearance'),
       ])
       setHome(homeData)
       setLists(listData)
       setNotes(noteData)
       setPages(pageData)
       setPageLinks(linkData)
-      setSettings(settingsData)
+      setModules(homeData.modules)
+      setAppearance(appearanceData)
+      setSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
       if (window.location.pathname.startsWith('/page/')) {
         const slug = window.location.pathname.replace(/^\/page\//, '')
         setViewedPage(await api<Page>(`/api/pages/${slug}`))
@@ -218,13 +251,30 @@ function App() {
     }
   }
 
+  async function refreshAdmin() {
+    const [settingsData, usersData, modulesData] = await Promise.all([
+      api<Settings>('/api/settings'),
+      api<UserRecord[]>('/api/users'),
+      api<Module[]>('/api/modules'),
+    ])
+    setSettings(settingsData)
+    setUsers(usersData)
+    setModules(modulesData)
+  }
+
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError('')
     try {
-      const next = await api<Session>('/api/auth/login', { method: 'POST', body: loginDraft }, false)
+      const path = setupNeeded ? '/api/setup/admin' : '/api/auth/login'
+      const next = await api<Session>(path, { method: 'POST', body: loginDraft }, false)
       setSession(next)
+      setSetupNeeded(false)
       await refreshAll()
+      if (next.adminUnlocked) {
+        setAdminOpen(true)
+        await refreshAdmin()
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Login failed')
     }
@@ -232,15 +282,36 @@ function App() {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' }, false)
-    setSession({ authenticated: false, userName: null })
+    setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false })
     setHome(null)
+    setAdminOpen(false)
+  }
+
+  async function openAdmin() {
+    if (!session?.adminUnlocked) {
+      setUnlockDraft((draft) => ({ ...draft, username: session?.userName ?? 'admin' }))
+      setUnlockOpen(true)
+      return
+    }
+    setAdminOpen(true)
+    await refreshAdmin()
+  }
+
+  async function unlockAdmin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await api('/api/admin/unlock', { method: 'POST', body: unlockDraft })
+    setSession((current) => (current ? { ...current, adminUnlocked: true } : current))
+    setUnlockDraft((draft) => ({ ...draft, password: '' }))
+    setUnlockOpen(false)
+    setAdminOpen(true)
+    await refreshAdmin()
   }
 
   async function createList(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!listDraft.trim()) return
-    await api('/api/lists', { method: 'POST', body: { name: listDraft } })
-    setListDraft('')
+    if (!listDraft.name.trim()) return
+    await api('/api/lists', { method: 'POST', body: listDraft })
+    setListDraft({ name: '', listType: listDraft.listType })
     await refreshAll()
   }
 
@@ -253,7 +324,7 @@ function App() {
     await refreshAll()
   }
 
-  async function toggleItem(item: ShoppingItem) {
+  async function toggleItem(item: ListItem) {
     await api(`/api/items/${item.id}`, { method: 'PATCH', body: { done: !item.done } })
     await refreshAll()
   }
@@ -319,7 +390,33 @@ function App() {
     await refreshAll()
   }
 
-  const enabledModules = useMemo(() => home?.modules.filter((module) => module.enabled).map((module) => module.id) ?? [], [home])
+  async function saveAppearance(next: Appearance) {
+    const updated = await api<Appearance>('/api/appearance', { method: 'PUT', body: next })
+    setAppearance(updated)
+    setSettings((current) => ({ ...current, ...updated }))
+    await refreshAll()
+  }
+
+  async function createUser(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await api('/api/users', { method: 'POST', body: userDraft })
+    setUserDraft({ username: '', displayName: '', role: 'member', password: '' })
+    await refreshAdmin()
+  }
+
+  async function patchUser(user: UserRecord, patch: Partial<UserRecord>) {
+    await api(`/api/users/${user.id}`, { method: 'PATCH', body: patch })
+    await refreshAdmin()
+  }
+
+  async function patchModule(module: Module, patch: Partial<Module> & { deleteData?: boolean }) {
+    await api('/api/modules', { method: 'PATCH', body: [{ id: module.id, ...patch }] })
+    await refreshAdmin()
+    await refreshAll()
+  }
+
+  const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
+  const listTypes = home?.listTypes ?? []
 
   if (session === null) {
     return <main className="loading-screen">Opening Frog & Peach...</main>
@@ -329,20 +426,26 @@ function App() {
     return (
       <main className="login-screen">
         <section className="login-panel">
-          <p className="kicker">Private home hub</p>
+          <p className="kicker">{setupNeeded ? 'First run setup' : 'Private home hub'}</p>
           <h1>Frog & Peach</h1>
-          <p>Sign in with the single admin account configured for this deployment. The admin area opens here after login.</p>
+          <p>{setupNeeded ? 'Create the first administrator account. After this, household members can sign in with their own accounts.' : 'Sign in with your household account.'}</p>
           <form onSubmit={login}>
             <label>
               Username
               <input value={loginDraft.username} onChange={(event) => setLoginDraft((draft) => ({ ...draft, username: event.target.value }))} autoComplete="username" />
             </label>
+            {setupNeeded && (
+              <label>
+                Display name
+                <input value={loginDraft.displayName} onChange={(event) => setLoginDraft((draft) => ({ ...draft, displayName: event.target.value }))} autoComplete="name" />
+              </label>
+            )}
             <label>
               Password
-              <input value={loginDraft.password} onChange={(event) => setLoginDraft((draft) => ({ ...draft, password: event.target.value }))} type="password" autoComplete="current-password" />
+              <input value={loginDraft.password} onChange={(event) => setLoginDraft((draft) => ({ ...draft, password: event.target.value }))} type="password" autoComplete={setupNeeded ? 'new-password' : 'current-password'} />
             </label>
             {error && <div className="form-error">{error}</div>}
-            <button type="submit">Sign in</button>
+            <button type="submit">{setupNeeded ? 'Create admin' : 'Sign in'}</button>
           </form>
         </section>
       </main>
@@ -350,7 +453,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-theme={appearance.colourTheme} data-style={appearance.styleTheme}>
       <header className="top-strip">
         <div>
           <p className="kicker">Modular home page tool</p>
@@ -359,6 +462,7 @@ function App() {
         <div className="top-actions">
           {home?.deployment.origin && <span>{home.deployment.origin}</span>}
           <button type="button" onClick={refreshAll} disabled={busy}>Refresh</button>
+          <button type="button" className="icon-cog" aria-label="Admin settings" title="Admin settings" onClick={openAdmin}>Admin</button>
           <button type="button" className="ghost" onClick={logout}>Logout</button>
         </div>
       </header>
@@ -373,6 +477,21 @@ function App() {
 
       {error && <section className="notice error">{error}</section>}
 
+      {unlockOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <form className="panel modal-panel" onSubmit={unlockAdmin}>
+            <p className="kicker">Admin unlock</p>
+            <h2>Confirm admin credentials</h2>
+            <label>Admin username<input value={unlockDraft.username} onChange={(event) => setUnlockDraft((draft) => ({ ...draft, username: event.target.value }))} /></label>
+            <label>Password<input type="password" value={unlockDraft.password} onChange={(event) => setUnlockDraft((draft) => ({ ...draft, password: event.target.value }))} autoFocus /></label>
+            <div className="button-row">
+              <button type="submit">Unlock</button>
+              <button type="button" className="ghost" onClick={() => setUnlockOpen(false)}>Cancel</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {viewedPage && (
         <section className={`standalone-page ${viewedPage.theme}`}>
           <a className="button-link" href="/">Back</a>
@@ -382,133 +501,55 @@ function App() {
         </section>
       )}
 
-      {!viewedPage && activeTab === 'home' && home && (
+      {!viewedPage && adminOpen && (
+        <AdminPanel
+          settings={settings}
+          users={users}
+          modules={modules}
+          userDraft={userDraft}
+          onClose={() => setAdminOpen(false)}
+          onSettingsChange={setSettings}
+          onSaveSettings={saveSettings}
+          onAppearanceChange={saveAppearance}
+          onUserDraftChange={setUserDraft}
+          onCreateUser={createUser}
+          onPatchUser={patchUser}
+          onPatchModule={patchModule}
+        />
+      )}
+
+      {!viewedPage && !adminOpen && activeTab === 'home' && home && (
         <section className="dashboard-grid">
-          {enabledModules.includes('weather') && (
-            <article className="panel weather-panel span-2">
-              <div className="panel-heading">
-                <div>
-                  <p className="kicker">Weather</p>
-                  <h2>{weatherMark(home.weather?.current.label)} {home.weather?.current.label ?? 'Unavailable'}</h2>
-                  <p>{home.weather?.location}</p>
-                </div>
-                <strong className="big-number">{formatTemperature(home.weather?.current.temperature)}</strong>
-              </div>
-              <div className="metric-row">
-                <span>Feels {formatTemperature(home.weather?.current.feelsLike)}</span>
-                <span>Wind {formatNumber(home.weather?.current.windSpeed)} km/h</span>
-                <span>Gusts {formatNumber(home.weather?.current.windGusts)} km/h</span>
-                <span>Rain {formatNumber(home.weather?.current.precipitation)} mm</span>
-              </div>
-              <div className="day-grid">
-                {home.weather?.daily.map((day) => (
-                  <div key={day.date}>
-                    <span>{formatDay(day.date)}</span>
-                    <strong>{day.label}</strong>
-                    <small>{formatTemperature(day.min)} / {formatTemperature(day.max)} · {formatNumber(day.precipitationChance)}% rain</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-          )}
-
-          {enabledModules.includes('tides') && (
-            <article className="panel tide-panel span-2">
-              <div className="panel-heading">
-                <div>
-                  <p className="kicker">Tides</p>
-                  <h2>Newquay trend</h2>
-                </div>
-                <span className="pill">modelled</span>
-              </div>
-              <div className="tide-track">
-                {(home.tides?.events ?? []).slice(0, 6).map((event) => (
-                  <div key={event.id} className={`tide-card ${event.type}`}>
-                    <span>{event.type}</span>
-                    <strong>{formatDateTime(event.time)}</strong>
-                    <small>{event.height === null ? 'No height' : `${event.height} m`}</small>
-                  </div>
-                ))}
-              </div>
-              <p className="small-note">{home.tides?.note}</p>
-            </article>
-          )}
-
-          {enabledModules.includes('lists') && (
-            <article className="panel">
-              <p className="kicker">Lists</p>
-              <h2>Active</h2>
-              <div className="stack-list">
-                {home.lists.map((list) => (
-                  <button key={list.id} type="button" className="plain-row" onClick={() => setActiveTab('lists')}>
-                    <strong>{list.name}</strong>
-                    <span>{list.items.filter((item) => !item.done).length} left</span>
-                  </button>
-                ))}
-              </div>
-            </article>
-          )}
-
-          {enabledModules.includes('notes') && (
-            <article className="panel">
-              <p className="kicker">Notes</p>
-              <h2>Pinned & recent</h2>
-              <div className="stack-list">
-                {home.notes.map((note) => (
-                  <button key={note.id} type="button" className="plain-row" onClick={() => setActiveTab('notes')}>
-                    <strong>{note.pinned ? 'Pinned: ' : ''}{note.title}</strong>
-                    <span>{note.tags || firstLine(note.body) || 'No detail yet'}</span>
-                  </button>
-                ))}
-              </div>
-            </article>
-          )}
-
-          {enabledModules.includes('pages') && (
-            <article className="panel span-2">
-              <p className="kicker">Pages</p>
-              <h2>Custom launchpad</h2>
-              <div className="page-chip-row">
-                {home.pages.map((page) => (
-                  <a key={`${page.kind}-${page.id}`} href={page.href} className="page-chip">
-                    <span>{page.kind}</span>
-                    <strong>{page.title}</strong>
-                  </a>
-                ))}
-              </div>
-            </article>
-          )}
-
-          {enabledModules.includes('network') && (
-            <article className="panel span-2">
-              <p className="kicker">Deployment</p>
-              <h2>{home.deployment.host}</h2>
-              <p>{home.deployment.note}</p>
-            </article>
-          )}
+          {dashboardModules.map((module) => renderModule(module, home, setActiveTab))}
         </section>
       )}
 
-      {!viewedPage && activeTab === 'home' && !home && (
+      {!viewedPage && !adminOpen && activeTab === 'home' && !home && (
         <section className="panel empty-state">
-          <p className="kicker">Admin</p>
+          <p className="kicker">Home</p>
           <h2>{busy ? 'Loading dashboard...' : 'Dashboard unavailable'}</h2>
-          <p>{error || 'Use Refresh to load the admin dashboard again.'}</p>
+          <p>{error || 'Use Refresh to load the dashboard again.'}</p>
         </section>
       )}
 
-      {!viewedPage && activeTab === 'lists' && (
+      {!viewedPage && !adminOpen && activeTab === 'lists' && (
         <section className="workspace-grid">
           <form className="panel form-panel" onSubmit={createList}>
-            <p className="kicker">Shopping</p>
+            <p className="kicker">Lists</p>
             <h2>New list</h2>
-            <input value={listDraft} onChange={(event) => setListDraft(event.target.value)} placeholder="Big shop, DIY bits..." />
+            <input value={listDraft.name} onChange={(event) => setListDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Big shop, chores, goals..." />
+            <select value={listDraft.listType} onChange={(event) => setListDraft((draft) => ({ ...draft, listType: event.target.value }))}>
+              {listTypes.map((type) => <option key={type.id} value={type.id}>{type.title}</option>)}
+            </select>
             <button type="submit">Add list</button>
           </form>
           {lists.map((list) => (
             <article className="panel list-panel" key={list.id}>
               <div className="panel-heading">
-                <h2>{list.name}</h2>
+                <div>
+                  <p className="kicker">{labelForListType(list.listType, listTypes)} {list.resetKey && ` / ${list.resetKey}`}</p>
+                  <h2>{list.name}</h2>
+                </div>
                 <button type="button" className="ghost danger" onClick={() => removeList(list.id)}>Delete</button>
               </div>
               <form className="inline-form" onSubmit={(event) => createItem(event, list.id)}>
@@ -529,7 +570,7 @@ function App() {
         </section>
       )}
 
-      {!viewedPage && activeTab === 'notes' && (
+      {!viewedPage && !adminOpen && activeTab === 'notes' && (
         <section className="workspace-grid">
           <form className="panel form-panel" onSubmit={createNote}>
             <p className="kicker">Notes</p>
@@ -543,7 +584,7 @@ function App() {
             <article className="panel note-panel" key={note.id}>
               <div className="panel-heading">
                 <div>
-                  <p className="kicker">{note.pinned ? 'Pinned' : formatDate(note.updatedAt)}</p>
+                  <p className="kicker">{note.pinned ? 'Pinned' : formatDate(note.updatedAt)} / {note.noteType}</p>
                   <h2>{note.title}</h2>
                 </div>
                 <button type="button" className="ghost" onClick={() => toggleNote(note)}>{note.pinned ? 'Unpin' : 'Pin'}</button>
@@ -556,7 +597,7 @@ function App() {
         </section>
       )}
 
-      {!viewedPage && activeTab === 'pages' && (
+      {!viewedPage && !adminOpen && activeTab === 'pages' && (
         <section className="workspace-grid">
           <form className="panel form-panel" onSubmit={createPage}>
             <p className="kicker">Editable page</p>
@@ -579,10 +620,10 @@ function App() {
           </form>
 
           <form className="panel form-panel" onSubmit={createPageLink}>
-            <p className="kicker">Static launcher</p>
-            <h2>Link a page folder</h2>
-            <input value={linkDraft.title} onChange={(event) => setLinkDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="Example page" />
-            <input value={linkDraft.href} onChange={(event) => setLinkDraft((draft) => ({ ...draft, href: event.target.value }))} placeholder="example/index.html" />
+            <p className="kicker">Custom launcher</p>
+            <h2>Link a page file</h2>
+            <input value={linkDraft.title} onChange={(event) => setLinkDraft((draft) => ({ ...draft, title: event.target.value }))} placeholder="House rules" />
+            <input value={linkDraft.href} onChange={(event) => setLinkDraft((draft) => ({ ...draft, href: event.target.value }))} placeholder="house-rules/index.html" />
             <input value={linkDraft.description} onChange={(event) => setLinkDraft((draft) => ({ ...draft, description: event.target.value }))} placeholder="Description" />
             <button type="submit">Add launcher</button>
           </form>
@@ -602,7 +643,7 @@ function App() {
           ))}
 
           {pageLinks.map((link) => (
-            <article className="panel page-panel" key={link.id}>
+            <article className="panel page-panel" key={`${link.kind}-${link.id}`}>
               <div className="panel-heading">
                 <div>
                   <p className="kicker">{link.kind}</p>
@@ -611,49 +652,272 @@ function App() {
                 <a className="button-link" href={link.href}>Open</a>
               </div>
               <p>{link.description}</p>
-              {link.kind !== 'editable' && <button type="button" className="ghost danger" onClick={() => removePageLink(link.id)}>Delete launcher</button>}
+              {link.kind !== 'editable' && link.kind !== 'custom' && <button type="button" className="ghost danger" onClick={() => removePageLink(link.id)}>Delete launcher</button>}
             </article>
           ))}
         </section>
       )}
-
-      {!viewedPage && activeTab === 'settings' && (
-        <section className="workspace-grid">
-          <form className="panel form-panel span-2" onSubmit={saveSettings}>
-            <p className="kicker">Settings</p>
-            <h2>Household and location</h2>
-            <div className="two-col">
-              <label>Wi-Fi name<input value={settings.wifiName} onChange={(event) => setSettings({ ...settings, wifiName: event.target.value })} /></label>
-              <label>Wi-Fi password<input value={settings.wifiPassword} onChange={(event) => setSettings({ ...settings, wifiPassword: event.target.value })} /></label>
-              <label>Router URL<input value={settings.routerUrl} onChange={(event) => setSettings({ ...settings, routerUrl: event.target.value })} /></label>
-              <label>Admin URL<input value={settings.adminUrl} onChange={(event) => setSettings({ ...settings, adminUrl: event.target.value })} /></label>
-              <label>Bin day<input value={settings.binDay} onChange={(event) => setSettings({ ...settings, binDay: event.target.value })} /></label>
-              <label>Timezone<input value={settings.timezone} onChange={(event) => setSettings({ ...settings, timezone: event.target.value })} /></label>
-              <label>Location<input value={settings.locationName} onChange={(event) => setSettings({ ...settings, locationName: event.target.value })} /></label>
-              <label>Region<input value={settings.locationRegion} onChange={(event) => setSettings({ ...settings, locationRegion: event.target.value })} /></label>
-              <label>Latitude<input value={settings.latitude} onChange={(event) => setSettings({ ...settings, latitude: event.target.value })} /></label>
-              <label>Longitude<input value={settings.longitude} onChange={(event) => setSettings({ ...settings, longitude: event.target.value })} /></label>
-            </div>
-            <label>Flat notes<textarea value={settings.flatNotes} onChange={(event) => setSettings({ ...settings, flatNotes: event.target.value })} /></label>
-            <button type="submit">Save settings</button>
-          </form>
-
-          <article className="panel span-2">
-            <p className="kicker">Modules</p>
-            <h2>Built-in module registry</h2>
-            <div className="module-list">
-              {home?.modules.map((module) => (
-                <div key={module.id} className={module.enabled ? 'module-row enabled' : 'module-row'}>
-                  <strong>{module.title}</strong>
-                  <span>{module.description}</span>
-                  <small>{module.enabled ? 'Enabled' : 'Disabled'}</small>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-      )}
     </main>
+  )
+}
+
+function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) => void) {
+  const className = `panel module-${module.size}`
+  if (module.id === 'weather') {
+    return (
+      <article className={`${className} weather-panel`} key={module.id}>
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Weather</p>
+            <h2>{weatherMark(home.weather?.current.label)} {home.weather?.current.label ?? 'Unavailable'}</h2>
+            <p>{home.weather?.location}</p>
+          </div>
+          <strong className="big-number">{formatTemperature(home.weather?.current.temperature)}</strong>
+        </div>
+        <div className="metric-row">
+          <span>Feels {formatTemperature(home.weather?.current.feelsLike)}</span>
+          <span>Wind {formatNumber(home.weather?.current.windSpeed)} km/h</span>
+          <span>Gusts {formatNumber(home.weather?.current.windGusts)} km/h</span>
+          <span>Rain {formatNumber(home.weather?.current.precipitation)} mm</span>
+        </div>
+        <div className="day-grid">
+          {home.weather?.daily.map((day) => (
+            <div key={day.date}>
+              <span>{formatDay(day.date)}</span>
+              <strong>{day.label}</strong>
+              <small>{formatTemperature(day.min)} / {formatTemperature(day.max)} | {formatNumber(day.precipitationChance)}% rain</small>
+            </div>
+          ))}
+        </div>
+      </article>
+    )
+  }
+  if (module.id === 'tides') {
+    return (
+      <article className={`${className} tide-panel`} key={module.id}>
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Tides</p>
+            <h2>Newquay trend</h2>
+          </div>
+          <span className="pill">modelled</span>
+        </div>
+        <div className="tide-track">
+          {(home.tides?.events ?? []).slice(0, 6).map((event) => (
+            <div key={event.id} className={`tide-card ${event.type}`}>
+              <span>{event.type}</span>
+              <strong>{formatDateTime(event.time)}</strong>
+              <small>{event.height === null ? 'No height' : `${event.height} m`}</small>
+            </div>
+          ))}
+        </div>
+        <p className="small-note">{home.tides?.note}</p>
+      </article>
+    )
+  }
+  if (module.id === 'lists') {
+    return (
+      <article className={className} key={module.id}>
+        <p className="kicker">Lists</p>
+        <h2>Active</h2>
+        <div className="stack-list">
+          {home.lists.map((list) => (
+            <button key={list.id} type="button" className="plain-row" onClick={() => setActiveTab('lists')}>
+              <strong>{list.name}</strong>
+              <span>{list.items.filter((item) => !item.done).length} left</span>
+            </button>
+          ))}
+        </div>
+      </article>
+    )
+  }
+  if (module.id === 'notes') {
+    return (
+      <article className={className} key={module.id}>
+        <p className="kicker">Notes</p>
+        <h2>Pinned & recent</h2>
+        <div className="stack-list">
+          {home.notes.map((note) => (
+            <button key={note.id} type="button" className="plain-row" onClick={() => setActiveTab('notes')}>
+              <strong>{note.pinned ? 'Pinned: ' : ''}{note.title}</strong>
+              <span>{note.tags || firstLine(note.body) || 'No detail yet'}</span>
+            </button>
+          ))}
+        </div>
+      </article>
+    )
+  }
+  if (module.id === 'pages') {
+    return (
+      <article className={className} key={module.id}>
+        <p className="kicker">Pages</p>
+        <h2>Custom launchpad</h2>
+        <div className="page-chip-row">
+          {home.pages.map((page) => (
+            <a key={`${page.kind}-${page.id}`} href={page.href} className="page-chip">
+              <span>{page.kind}</span>
+              <strong>{page.title}</strong>
+            </a>
+          ))}
+        </div>
+      </article>
+    )
+  }
+  if (module.id === 'network') {
+    return (
+      <article className={className} key={module.id}>
+        <p className="kicker">Deployment</p>
+        <h2>{home.deployment.host}</h2>
+        <p>{home.deployment.note}</p>
+      </article>
+    )
+  }
+  return null
+}
+
+function AdminPanel({
+  settings,
+  users,
+  modules,
+  userDraft,
+  onClose,
+  onSettingsChange,
+  onSaveSettings,
+  onAppearanceChange,
+  onUserDraftChange,
+  onCreateUser,
+  onPatchUser,
+  onPatchModule,
+}: {
+  settings: Settings
+  users: UserRecord[]
+  modules: Module[]
+  userDraft: { username: string; displayName: string; role: string; password: string }
+  onClose: () => void
+  onSettingsChange: (settings: Settings) => void
+  onSaveSettings: (event: FormEvent<HTMLFormElement>) => void
+  onAppearanceChange: (appearance: Appearance) => void
+  onUserDraftChange: (draft: { username: string; displayName: string; role: string; password: string }) => void
+  onCreateUser: (event: FormEvent<HTMLFormElement>) => void
+  onPatchUser: (user: UserRecord, patch: Partial<UserRecord>) => void
+  onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
+}) {
+  return (
+    <section className="workspace-grid admin-grid">
+      <article className="panel span-2">
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Admin</p>
+            <h2>Settings</h2>
+          </div>
+          <button type="button" className="ghost" onClick={onClose}>Close</button>
+        </div>
+      </article>
+
+      <form className="panel form-panel" onSubmit={onCreateUser}>
+        <p className="kicker">Users</p>
+        <h2>Add household user</h2>
+        <input value={userDraft.username} onChange={(event) => onUserDraftChange({ ...userDraft, username: event.target.value })} placeholder="username" />
+        <input value={userDraft.displayName} onChange={(event) => onUserDraftChange({ ...userDraft, displayName: event.target.value })} placeholder="Display name" />
+        <select value={userDraft.role} onChange={(event) => onUserDraftChange({ ...userDraft, role: event.target.value })}>
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </select>
+        <input type="password" value={userDraft.password} onChange={(event) => onUserDraftChange({ ...userDraft, password: event.target.value })} placeholder="Temporary password" />
+        <button type="submit">Create user</button>
+      </form>
+
+      <article className="panel">
+        <p className="kicker">Active accounts</p>
+        <h2>Users</h2>
+        <div className="stack-list">
+          {users.map((user) => (
+            <div className="module-row" key={user.id}>
+              <strong>{user.displayName}</strong>
+              <span>{user.username} / {user.role}</span>
+              <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="panel span-2">
+        <p className="kicker">Modules</p>
+        <h2>Built-in registry</h2>
+        <div className="module-list">
+          {modules.map((module) => (
+            <div key={module.id} className={module.enabled ? 'module-row enabled' : 'module-row'}>
+              <div>
+                <strong>{module.title}</strong>
+                <span>{module.description}</span>
+              </div>
+              <div className="inline-controls">
+                <button type="button" className="ghost" onClick={() => onPatchModule(module, { installed: !module.installed, enabled: !module.installed })}>{module.installed ? 'Uninstall' : 'Install'}</button>
+                {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
+                {module.installed && (
+                  <select value={module.size} onChange={(event) => onPatchModule(module, { size: event.target.value as Module['size'] })}>
+                    <option value="small">Small</option>
+                    <option value="medium">Medium</option>
+                    <option value="wide">Wide</option>
+                    <option value="full">Full</option>
+                  </select>
+                )}
+                {module.installed && <button type="button" className="ghost danger" onClick={() => onPatchModule(module, { installed: false, enabled: false, deleteData: true })}>Uninstall + data</button>}
+              </div>
+              <input type="number" value={module.position} onChange={(event) => onPatchModule(module, { position: Number(event.target.value) })} aria-label={`${module.title} position`} />
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="panel">
+        <p className="kicker">Appearance</p>
+        <h2>Theme</h2>
+        <div className="two-col">
+          <label>Colour theme
+            <select value={settings.colourTheme} onChange={(event) => onAppearanceChange({ colourTheme: event.target.value, styleTheme: settings.styleTheme })}>
+              <option value="frog-peach">Frog & Peach</option>
+              <option value="coastal">Coastal</option>
+              <option value="botanical">Botanical</option>
+              <option value="mono-dark">Mono dark</option>
+            </select>
+          </label>
+          <label>Style theme
+            <select value={settings.styleTheme} onChange={(event) => onAppearanceChange({ colourTheme: settings.colourTheme, styleTheme: event.target.value })}>
+              <option value="classic">Classic</option>
+              <option value="compact">Compact</option>
+              <option value="soft">Soft</option>
+              <option value="high-contrast">High contrast</option>
+            </select>
+          </label>
+        </div>
+      </article>
+
+      <form className="panel form-panel" onSubmit={onSaveSettings}>
+        <p className="kicker">Household and location</p>
+        <h2>Private settings</h2>
+        <div className="two-col">
+          <label>Wi-Fi name<input value={settings.wifiName} onChange={(event) => onSettingsChange({ ...settings, wifiName: event.target.value })} /></label>
+          <label>Wi-Fi password<input value={settings.wifiPassword} onChange={(event) => onSettingsChange({ ...settings, wifiPassword: event.target.value })} /></label>
+          <label>Router URL<input value={settings.routerUrl} onChange={(event) => onSettingsChange({ ...settings, routerUrl: event.target.value })} /></label>
+          <label>Admin URL<input value={settings.adminUrl} onChange={(event) => onSettingsChange({ ...settings, adminUrl: event.target.value })} /></label>
+          <label>Bin day<input value={settings.binDay} onChange={(event) => onSettingsChange({ ...settings, binDay: event.target.value })} /></label>
+          <label>Timezone<input value={settings.timezone} onChange={(event) => onSettingsChange({ ...settings, timezone: event.target.value })} /></label>
+          <label>Location<input value={settings.locationName} onChange={(event) => onSettingsChange({ ...settings, locationName: event.target.value })} /></label>
+          <label>Region<input value={settings.locationRegion} onChange={(event) => onSettingsChange({ ...settings, locationRegion: event.target.value })} /></label>
+          <label>Latitude<input value={settings.latitude} onChange={(event) => onSettingsChange({ ...settings, latitude: event.target.value })} /></label>
+          <label>Longitude<input value={settings.longitude} onChange={(event) => onSettingsChange({ ...settings, longitude: event.target.value })} /></label>
+        </div>
+        <label>Flat notes<textarea value={settings.flatNotes} onChange={(event) => onSettingsChange({ ...settings, flatNotes: event.target.value })} /></label>
+        <button type="submit">Save settings</button>
+      </form>
+
+      <article className="panel span-2">
+        <p className="kicker">Deployment</p>
+        <h2>Hosting notes</h2>
+        <p>See the docs folder for router hosting limits, Cloudflare setup, and the current site review.</p>
+      </article>
+    </section>
   )
 }
 
@@ -673,7 +937,7 @@ async function api<T>(path: string, options: { method?: string; body?: unknown }
     if (response.status === 404 && path.startsWith('/api/')) {
       throw new Error('API not found in Vite-only mode. Use `npm run dev:worker` and open http://localhost:8788.')
     }
-    if (!requireOk && response.status === 401) return { authenticated: false, userName: null } as T
+    if (!requireOk && response.status === 401) return { authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false } as T
     const payload = (await response.json().catch(() => ({}))) as { error?: string }
     throw new Error(payload.error || `Request failed: ${response.status}`)
   }
@@ -682,8 +946,12 @@ async function api<T>(path: string, options: { method?: string; body?: unknown }
   return (await response.json()) as T
 }
 
+function labelForListType(value: string, listTypes: ListType[]) {
+  return listTypes.find((type) => type.id === value)?.title ?? value
+}
+
 function formatTemperature(value: number | null | undefined) {
-  return value === null || value === undefined ? '--' : `${Math.round(value)}°`
+  return value === null || value === undefined ? '--' : `${Math.round(value)} deg`
 }
 
 function formatNumber(value: number | null | undefined) {
@@ -703,12 +971,12 @@ function formatDateTime(value: string) {
 }
 
 function weatherMark(label: string | undefined) {
-  if (!label) return '◇'
+  if (!label) return 'Weather'
   const value = label.toLowerCase()
-  if (value.includes('rain') || value.includes('drizzle')) return '◆'
-  if (value.includes('clear')) return '○'
-  if (value.includes('cloud')) return '◒'
-  return '◇'
+  if (value.includes('rain') || value.includes('drizzle')) return 'Rain'
+  if (value.includes('clear')) return 'Clear'
+  if (value.includes('cloud')) return 'Cloud'
+  return 'Weather'
 }
 
 function firstLine(value: string) {

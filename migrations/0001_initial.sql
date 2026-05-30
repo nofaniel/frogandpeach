@@ -91,14 +91,3 @@ INSERT OR IGNORE INTO module_settings (id, enabled, position) VALUES
   ('notes', 1, 40),
   ('pages', 1, 50),
   ('network', 1, 60);
-
-INSERT OR IGNORE INTO shopping_lists (id, name, created_at, updated_at)
-VALUES ('seed-flat-bits', 'Flat bits', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));
-
-INSERT OR IGNORE INTO shopping_items (id, list_id, text, done, created_at, updated_at)
-VALUES
-  ('seed-milk', 'seed-flat-bits', 'Milk', 0, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-  ('seed-bread', 'seed-flat-bits', 'Bread', 0, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));
-
-INSERT OR IGNORE INTO page_links (id, title, href, description, kind, created_at, updated_at)
-VALUES ('example', 'Example page', '/pages/example/index.html', 'Replace this with one of your own custom pages.', 'static', strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now'));

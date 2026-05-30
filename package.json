@@ -5,8 +5,10 @@
   "description": "Cloudflare-ready modular home hub for Frog & Peach.",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-custom-pages.mjs",
     "dev": "node node_modules/vite/bin/vite.js --host 0.0.0.0",
     "dev:worker": "node node_modules/wrangler/bin/wrangler.js pages dev dist --ip 0.0.0.0 --port 8788 --d1 DB=frog-peach-db",
+    "prebuild": "node scripts/sync-custom-pages.mjs",
     "build": "node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build",
     "preview": "node node_modules/vite/bin/vite.js preview --host 0.0.0.0",
     "test": "node node_modules/vitest/vitest.mjs run",
