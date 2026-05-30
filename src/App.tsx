@@ -384,125 +384,163 @@ function App() {
 
   async function unlockAdmin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const unlocked = await api<{ adminUnlocked: boolean; unlockedUntil: string }>('/api/admin/unlock', { method: 'POST', body: unlockDraft })
-    setSession((current) => (current ? { ...current, adminUnlocked: unlocked.adminUnlocked, adminUnlockedUntil: unlocked.unlockedUntil } : current))
-    setUnlockDraft((draft) => ({ ...draft, password: '' }))
-    setUnlockOpen(false)
-    setAdminOpen(true)
-    await refreshAdmin()
+    await run(async () => {
+      const unlocked = await api<{ adminUnlocked: boolean; unlockedUntil: string }>('/api/admin/unlock', { method: 'POST', body: unlockDraft })
+      setSession((current) => (current ? { ...current, adminUnlocked: unlocked.adminUnlocked, adminUnlockedUntil: unlocked.unlockedUntil } : current))
+      setUnlockDraft((draft) => ({ ...draft, password: '' }))
+      setUnlockOpen(false)
+      setAdminOpen(true)
+      await refreshAdmin()
+    })
   }
 
   async function createList(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!listDraft.name.trim()) return
-    await api('/api/lists', { method: 'POST', body: listDraft })
-    setListDraft({ name: '', listType: listDraft.listType })
-    await refreshAll()
+    await run(async () => {
+      await api('/api/lists', { method: 'POST', body: listDraft })
+      setListDraft({ name: '', listType: listDraft.listType })
+      await refreshAll()
+    })
   }
 
   async function createItem(event: FormEvent<HTMLFormElement>, listId: string) {
     event.preventDefault()
     const text = itemDrafts[listId]?.trim()
     if (!text) return
-    await api(`/api/lists/${listId}/items`, { method: 'POST', body: { text } })
-    setItemDrafts((drafts) => ({ ...drafts, [listId]: '' }))
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/lists/${listId}/items`, { method: 'POST', body: { text } })
+      setItemDrafts((drafts) => ({ ...drafts, [listId]: '' }))
+      await refreshAll()
+    })
   }
 
   async function toggleItem(item: ListItem) {
-    await api(`/api/items/${item.id}`, { method: 'PATCH', body: { done: !item.done } })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/items/${item.id}`, { method: 'PATCH', body: { done: !item.done } })
+      await refreshAll()
+    })
   }
 
   async function removeItem(id: string) {
-    await api(`/api/items/${id}`, { method: 'DELETE' })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/items/${id}`, { method: 'DELETE' })
+      await refreshAll()
+    })
   }
 
   async function removeList(id: string) {
-    await api(`/api/lists/${id}`, { method: 'DELETE' })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/lists/${id}`, { method: 'DELETE' })
+      await refreshAll()
+    })
   }
 
   async function createNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!noteDraft.title.trim() && !noteDraft.body.trim()) return
-    await api('/api/notes', { method: 'POST', body: noteDraft })
-    setNoteDraft({ title: '', body: '', tags: '' })
-    await refreshAll()
+    await run(async () => {
+      await api('/api/notes', { method: 'POST', body: noteDraft })
+      setNoteDraft({ title: '', body: '', tags: '' })
+      await refreshAll()
+    })
   }
 
   async function toggleNote(note: Note) {
-    await api(`/api/notes/${note.id}`, { method: 'PATCH', body: { pinned: !note.pinned } })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/notes/${note.id}`, { method: 'PATCH', body: { pinned: !note.pinned } })
+      await refreshAll()
+    })
   }
 
   async function removeNote(id: string) {
-    await api(`/api/notes/${id}`, { method: 'DELETE' })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/notes/${id}`, { method: 'DELETE' })
+      await refreshAll()
+    })
   }
 
   async function createPage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!pageDraft.title.trim() && !pageDraft.body.trim()) return
-    await api('/api/pages', { method: 'POST', body: pageDraft })
-    setPageDraft({ title: '', slug: '', body: '', theme: 'shell', occasion: '', emoji: '' })
-    await refreshAll()
+    await run(async () => {
+      await api('/api/pages', { method: 'POST', body: pageDraft })
+      setPageDraft({ title: '', slug: '', body: '', theme: 'shell', occasion: '', emoji: '' })
+      await refreshAll()
+    })
   }
 
   async function removePage(id: string) {
-    await api(`/api/pages/${id}`, { method: 'DELETE' })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/pages/${id}`, { method: 'DELETE' })
+      await refreshAll()
+    })
   }
 
   async function createPageLink(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!linkDraft.title.trim() || !linkDraft.href.trim()) return
-    await api('/api/page-links', { method: 'POST', body: linkDraft })
-    setLinkDraft({ title: '', href: '', description: '', kind: 'static' })
-    await refreshAll()
+    await run(async () => {
+      await api('/api/page-links', { method: 'POST', body: linkDraft })
+      setLinkDraft({ title: '', href: '', description: '', kind: 'static' })
+      await refreshAll()
+    })
   }
 
   async function removePageLink(id: string) {
-    await api(`/api/page-links/${id}`, { method: 'DELETE' })
-    await refreshAll()
+    await run(async () => {
+      await api(`/api/page-links/${id}`, { method: 'DELETE' })
+      await refreshAll()
+    })
   }
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const updated = await api<Settings>('/api/settings', { method: 'PUT', body: settings })
-    setSettings(updated)
-    await refreshAll()
+    await run(async () => {
+      const updated = await api<Settings>('/api/settings', { method: 'PUT', body: settings })
+      setSettings(updated)
+      await refreshAll()
+    })
   }
 
   async function saveAppearance(next: Appearance) {
-    const updated = await api<Appearance>('/api/appearance', { method: 'PUT', body: next })
-    setAppearance(updated)
-    setSettings((current) => ({ ...current, ...updated }))
-    await refreshAll()
+    await run(async () => {
+      const updated = await api<Appearance>('/api/appearance', { method: 'PUT', body: next })
+      setAppearance(updated)
+      setSettings((current) => ({ ...current, ...updated }))
+      await refreshAll()
+    })
   }
 
   async function createUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await api('/api/users', { method: 'POST', body: userDraft })
-    setUserDraft({ username: '', displayName: '', role: 'member', password: '' })
-    await refreshAdmin()
+    await run(async () => {
+      await api('/api/users', { method: 'POST', body: userDraft })
+      setUserDraft({ username: '', displayName: '', role: 'member', password: '' })
+      await refreshAdmin()
+    })
   }
 
   async function patchUser(user: UserRecord, patch: Partial<UserRecord>) {
-    await api(`/api/users/${user.id}`, { method: 'PATCH', body: patch })
-    await refreshAdmin()
+    await run(async () => {
+      await api(`/api/users/${user.id}`, { method: 'PATCH', body: patch })
+      await refreshAdmin()
+    })
   }
 
   async function patchModule(module: Module, patch: Partial<Module> & { deleteData?: boolean }) {
-    await api('/api/modules', { method: 'PATCH', body: [{ id: module.id, ...patch }] })
-    await refreshAdmin()
-    await refreshAll()
+    await run(async () => {
+      await api('/api/modules', { method: 'PATCH', body: [{ id: module.id, ...patch }] })
+      await refreshAdmin()
+      await refreshAll()
+    })
   }
 
   async function clearCache(key?: string) {
-    const next = await api<CacheEntry[]>(key ? `/api/cache/${encodeURIComponent(key)}` : '/api/cache', { method: 'DELETE' })
-    setCacheEntries(next)
+    await run(async () => {
+      const next = await api<CacheEntry[]>(key ? `/api/cache/${encodeURIComponent(key)}` : '/api/cache', { method: 'DELETE' })
+      setCacheEntries(next)
+    })
   }
 
   function addToast(message: string, kind: Toast['kind'] = 'info') {
@@ -515,6 +553,14 @@ function App() {
 
   function dismissToast(id: string) {
     setToasts((current) => current.filter((t) => t.id !== id))
+  }
+
+  async function run(fn: () => Promise<void>) {
+    try {
+      await fn()
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Something went wrong', 'warn')
+    }
   }
 
   const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
@@ -936,6 +982,8 @@ function AdminPanel({
 }) {
   const [pendingUninstall, setPendingUninstall] = useState<Module | null>(null)
   const [activityFilter, setActivityFilter] = useState({ entityType: '', search: '' })
+  const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [editingDisplayName, setEditingDisplayName] = useState('')
   const editablePages = pageLinks.filter((page) => page.kind === 'editable')
   const manualLinks = pageLinks.filter((page) => page.kind !== 'editable' && page.kind !== 'custom')
   const uniqueEntityTypes = [...new Set(activityEntries.map((e) => e.entityType))].sort()
@@ -1015,9 +1063,29 @@ function AdminPanel({
         <div className="stack-list">
           {users.map((user) => (
             <div className="module-row" key={user.id}>
-              <strong>{user.displayName}</strong>
-              <span>{user.username} / {user.role}</span>
-              <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
+              {editingUserId === user.id ? (
+                <>
+                  <input
+                    className="inline-edit"
+                    value={editingDisplayName}
+                    onChange={(e) => setEditingDisplayName(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { onPatchUser(user, { displayName: editingDisplayName }); setEditingUserId(null) }
+                      if (e.key === 'Escape') setEditingUserId(null)
+                    }}
+                  />
+                  <button type="button" className="ghost" onClick={() => { onPatchUser(user, { displayName: editingDisplayName }); setEditingUserId(null) }}>Save</button>
+                  <button type="button" className="ghost" onClick={() => setEditingUserId(null)}>Cancel</button>
+                </>
+              ) : (
+                <>
+                  <strong>{user.displayName}</strong>
+                  <span>{user.username} / {user.role}</span>
+                  <button type="button" className="ghost" onClick={() => { setEditingUserId(user.id); setEditingDisplayName(user.displayName) }}>Rename</button>
+                  <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
+                </>
+              )}
             </div>
           ))}
         </div>

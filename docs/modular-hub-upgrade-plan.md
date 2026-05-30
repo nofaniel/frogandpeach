@@ -49,12 +49,17 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
 - Ran browser visual QA against the worker UI at desktop and mobile widths.
 - Added unit tests for module normalization, list period reset logic, settings validation, admin unlock helper logic, and custom page manifest parsing.
 - Preserved existing tide and password verification tests.
+- Added an `activity_log` table (`0003_activity_log.sql`), `logActivity`/`listActivity` helpers, and a `GET /api/activity` route.
+- Wired activity recording into every admin and content mutation (users, modules, appearance, cache, notes, lists, list items, pages, page links, settings).
+- Added an admin Activity panel with entity-type and summary filters that resolves actor display names.
+- Added toast notifications with a dismissible tray and routed all mutation errors through a shared `run()` helper so failures surface to the user instead of failing silently.
+- Added a live admin-unlock countdown in the header plus warning toasts at the two-minute mark and on expiry.
+- Added inline display-name renaming for household users in the admin Users panel.
+- Returned a clear 409 conflict on duplicate usernames when creating or updating users.
 
 ## Partially Complete
 
 - Custom page discovery supports `page.json` metadata, HTML title fallback, and validation warnings. Editing discovered static page metadata still happens in source files, not in the deployed app.
-- Authorship names are visible in content views, but there is not yet a dedicated activity/audit history.
-- Admin unlock is credential-based and short-lived. The header shows the expiry time, but there is no live countdown or warning toast.
 
 ## Deferred
 
@@ -63,12 +68,18 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
 - Dedicated deployment wizard beyond the readiness checklist.
 - Deeper mobile polish pass for dense admin module controls.
 
+## Current Working Set
+
+- The admin UX/error-handling slice (activity log, toast notifications, unlock countdown, inline rename, duplicate-username handling) is complete and ready to commit.
+- Removed the stale `AGENTS.md` and `docs/handover.md` scratch files now that this plan is the single source of truth.
+- Next likely follow-up work is either a deeper mobile admin controls pass or a dedicated module reorder control, depending on priority.
+
 ## Verification
 
 - `npm test` passes.
 - `npm run build` passes.
-- `npm run cf:migrate:local` applied `0002_modular_hub.sql` successfully.
-- Worker smoke checks passed locally against `http://localhost:8788` for login, admin unlock, admin routes, appearance update/restore, module update/restore, list/item creation, and note creation.
+- `npm run cf:migrate:local` applied `0002_modular_hub.sql` and `0003_activity_log.sql` successfully.
+- Worker smoke checks passed locally against `http://localhost:8788` for login, admin unlock, admin routes, appearance update/restore, module update/restore, list/item creation, note creation, and activity recording/listing.
 - Playwright browser checks captured admin desktop and mobile screenshots under `output/playwright/`.
 
 ## Local State Notes

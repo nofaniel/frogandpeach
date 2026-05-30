@@ -102,9 +102,17 @@ export async function createUser(env: Env, input: { username?: string; displayNa
 
   const stamp = nowIso()
   const userId = id('user')
-  await env.DB.prepare('INSERT INTO users (id, username, display_name, role, password_hash, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
-    .bind(userId, username, displayName, role, await hashPassword(password), stamp, stamp)
-    .run()
+  try {
+    await env.DB.prepare('INSERT INTO users (id, username, display_name, role, password_hash, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+      .bind(userId, username, displayName, role, await hashPassword(password), stamp, stamp)
+      .run()
+  } catch (err) {
+    const msg = String((err as { message?: string }).message ?? err)
+    if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('duplicate')) {
+      throw new ApiError(409, 'Username already taken.')
+    }
+    throw err
+  }
   return getUserById(env, userId)
 }
 
@@ -120,13 +128,25 @@ export async function updateUser(env: Env, userId: string, patch: { username?: s
 
   if (patch.password !== undefined && String(patch.password).length > 0) {
     if (String(patch.password).length < 8) throw new ApiError(400, 'Password must be at least 8 characters.')
-    await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, password_hash = ?, updated_at = ? WHERE id = ?')
-      .bind(username, displayName, role, active ? 1 : 0, await hashPassword(String(patch.password)), nowIso(), userId)
-      .run()
+    try {
+      await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, password_hash = ?, updated_at = ? WHERE id = ?')
+        .bind(username, displayName, role, active ? 1 : 0, await hashPassword(String(patch.password)), nowIso(), userId)
+        .run()
+    } catch (err) {
+      const msg = String((err as { message?: string }).message ?? err)
+      if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('duplicate')) throw new ApiError(409, 'Username already taken.')
+      throw err
+    }
   } else {
-    await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?')
-      .bind(username, displayName, role, active ? 1 : 0, nowIso(), userId)
-      .run()
+    try {
+      await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?')
+        .bind(username, displayName, role, active ? 1 : 0, nowIso(), userId)
+        .run()
+    } catch (err) {
+      const msg = String((err as { message?: string }).message ?? err)
+      if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('duplicate')) throw new ApiError(409, 'Username already taken.')
+      throw err
+    }
   }
 
   return getUserById(env, userId)

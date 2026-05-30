@@ -391,6 +391,12 @@ label {
   background: rgba(255, 253, 247, 0.66);
 }
 
+.inline-edit {
+  min-height: unset;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+}
+
 .tide-track {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
