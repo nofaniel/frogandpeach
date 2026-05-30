@@ -29,6 +29,8 @@ type Note = {
   tags: string
   noteType: string
   pinned: boolean
+  createdByName: string | null
+  updatedByName: string | null
   updatedAt: string
 }
 
@@ -37,6 +39,8 @@ type ListItem = {
   text: string
   done: boolean
   completedAt: string | null
+  createdByName: string | null
+  updatedByName: string | null
 }
 
 type SharedList = {
@@ -44,6 +48,8 @@ type SharedList = {
   name: string
   listType: string
   resetKey: string
+  createdByName: string | null
+  updatedByName: string | null
   updatedAt: string
   items: ListItem[]
 }
@@ -65,6 +71,19 @@ type PageLink = {
   href: string
   description: string
   kind: string
+}
+
+type CacheEntry = {
+  key: string
+  expiresAt: string
+  updatedAt: string
+  payloadBytes: number
+  expired: boolean
+}
+
+type PageManifestReport = {
+  pages: PageLink[]
+  warnings: Array<{ path: string; message: string }>
 }
 
 type Settings = {
@@ -139,6 +158,7 @@ type Session = {
   displayName: string | null
   role: 'admin' | 'member' | null
   adminUnlocked: boolean
+  adminUnlockedUntil: string | null
 }
 
 type UserRecord = {
@@ -187,6 +207,9 @@ function App() {
   const [settings, setSettings] = useState<Settings>(emptySettings)
   const [users, setUsers] = useState<UserRecord[]>([])
   const [modules, setModules] = useState<Module[]>([])
+  const [cacheEntries, setCacheEntries] = useState<CacheEntry[]>([])
+  const [customPages, setCustomPages] = useState<PageLink[]>([])
+  const [pageManifestWarnings, setPageManifestWarnings] = useState<Array<{ path: string; message: string }>>([])
   const [appearance, setAppearance] = useState<Appearance>({ colourTheme: 'frog-peach', styleTheme: 'classic' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -213,7 +236,7 @@ function App() {
       setSession(current)
       if (current.authenticated) await refreshAll()
     } catch (caught) {
-      setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false })
+      setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false, adminUnlockedUntil: null })
       setError(caught instanceof Error ? caught.message : 'Unable to reach API. Run `npm run dev:worker` for full local development.')
     }
   }
@@ -252,14 +275,19 @@ function App() {
   }
 
   async function refreshAdmin() {
-    const [settingsData, usersData, modulesData] = await Promise.all([
+    const [settingsData, usersData, modulesData, cacheData, manifestData] = await Promise.all([
       api<Settings>('/api/settings'),
       api<UserRecord[]>('/api/users'),
       api<Module[]>('/api/modules'),
+      api<CacheEntry[]>('/api/cache'),
+      api<PageManifestReport>('/api/page-manifest-report'),
     ])
     setSettings(settingsData)
     setUsers(usersData)
     setModules(modulesData)
+    setCacheEntries(cacheData)
+    setCustomPages(manifestData.pages)
+    setPageManifestWarnings(manifestData.warnings)
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -282,7 +310,7 @@ function App() {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' }, false)
-    setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false })
+    setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false, adminUnlockedUntil: null })
     setHome(null)
     setAdminOpen(false)
   }
@@ -299,8 +327,8 @@ function App() {
 
   async function unlockAdmin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    await api('/api/admin/unlock', { method: 'POST', body: unlockDraft })
-    setSession((current) => (current ? { ...current, adminUnlocked: true } : current))
+    const unlocked = await api<{ adminUnlocked: boolean; unlockedUntil: string }>('/api/admin/unlock', { method: 'POST', body: unlockDraft })
+    setSession((current) => (current ? { ...current, adminUnlocked: unlocked.adminUnlocked, adminUnlockedUntil: unlocked.unlockedUntil } : current))
     setUnlockDraft((draft) => ({ ...draft, password: '' }))
     setUnlockOpen(false)
     setAdminOpen(true)
@@ -415,6 +443,11 @@ function App() {
     await refreshAll()
   }
 
+  async function clearCache(key?: string) {
+    const next = await api<CacheEntry[]>(key ? `/api/cache/${encodeURIComponent(key)}` : '/api/cache', { method: 'DELETE' })
+    setCacheEntries(next)
+  }
+
   const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
   const listTypes = home?.listTypes ?? []
 
@@ -461,6 +494,7 @@ function App() {
         </div>
         <div className="top-actions">
           {home?.deployment.origin && <span>{home.deployment.origin}</span>}
+          {session.adminUnlockedUntil && <span>Admin until {formatTime(session.adminUnlockedUntil)}</span>}
           <button type="button" onClick={refreshAll} disabled={busy}>Refresh</button>
           <button type="button" className="icon-cog" aria-label="Admin settings" title="Admin settings" onClick={openAdmin}>Admin</button>
           <button type="button" className="ghost" onClick={logout}>Logout</button>
@@ -506,6 +540,11 @@ function App() {
           settings={settings}
           users={users}
           modules={modules}
+          pageLinks={pageLinks}
+          customPages={customPages}
+          pageManifestWarnings={pageManifestWarnings}
+          cacheEntries={cacheEntries}
+          deployment={home?.deployment ?? null}
           userDraft={userDraft}
           onClose={() => setAdminOpen(false)}
           onSettingsChange={setSettings}
@@ -515,6 +554,7 @@ function App() {
           onCreateUser={createUser}
           onPatchUser={patchUser}
           onPatchModule={patchModule}
+          onClearCache={clearCache}
         />
       )}
 
@@ -547,7 +587,7 @@ function App() {
             <article className="panel list-panel" key={list.id}>
               <div className="panel-heading">
                 <div>
-                  <p className="kicker">{labelForListType(list.listType, listTypes)} {list.resetKey && ` / ${list.resetKey}`}</p>
+                  <p className="kicker">{labelForListType(list.listType, listTypes)}{list.resetKey ? ` / ${list.resetKey}` : ''}{list.updatedByName ? ` / ${list.updatedByName}` : ''}</p>
                   <h2>{list.name}</h2>
                 </div>
                 <button type="button" className="ghost danger" onClick={() => removeList(list.id)}>Delete</button>
@@ -560,7 +600,7 @@ function App() {
                 {list.items.map((item) => (
                   <label key={item.id} className={item.done ? 'item done' : 'item'}>
                     <input type="checkbox" checked={item.done} onChange={() => toggleItem(item)} />
-                    <span>{item.text}</span>
+                    <span>{item.text}{item.updatedByName ? ` / ${item.updatedByName}` : ''}</span>
                     <button type="button" className="icon-button" aria-label={`Delete ${item.text}`} onClick={() => removeItem(item.id)}>x</button>
                   </label>
                 ))}
@@ -584,7 +624,7 @@ function App() {
             <article className="panel note-panel" key={note.id}>
               <div className="panel-heading">
                 <div>
-                  <p className="kicker">{note.pinned ? 'Pinned' : formatDate(note.updatedAt)} / {note.noteType}</p>
+                  <p className="kicker">{note.pinned ? 'Pinned' : formatDate(note.updatedAt)} / {note.noteType}{note.updatedByName ? ` / ${note.updatedByName}` : ''}</p>
                   <h2>{note.title}</h2>
                 </div>
                 <button type="button" className="ghost" onClick={() => toggleNote(note)}>{note.pinned ? 'Unpin' : 'Pin'}</button>
@@ -779,6 +819,11 @@ function AdminPanel({
   settings,
   users,
   modules,
+  pageLinks,
+  customPages,
+  pageManifestWarnings,
+  cacheEntries,
+  deployment,
   userDraft,
   onClose,
   onSettingsChange,
@@ -788,10 +833,16 @@ function AdminPanel({
   onCreateUser,
   onPatchUser,
   onPatchModule,
+  onClearCache,
 }: {
   settings: Settings
   users: UserRecord[]
   modules: Module[]
+  pageLinks: PageLink[]
+  customPages: PageLink[]
+  pageManifestWarnings: Array<{ path: string; message: string }>
+  cacheEntries: CacheEntry[]
+  deployment: HomeData['deployment'] | null
   userDraft: { username: string; displayName: string; role: string; password: string }
   onClose: () => void
   onSettingsChange: (settings: Settings) => void
@@ -801,9 +852,53 @@ function AdminPanel({
   onCreateUser: (event: FormEvent<HTMLFormElement>) => void
   onPatchUser: (user: UserRecord, patch: Partial<UserRecord>) => void
   onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
+  onClearCache: (key?: string) => void
 }) {
+  const [pendingUninstall, setPendingUninstall] = useState<Module | null>(null)
+  const editablePages = pageLinks.filter((page) => page.kind === 'editable')
+  const manualLinks = pageLinks.filter((page) => page.kind !== 'editable' && page.kind !== 'custom')
+  const deploymentChecks = [
+    { label: 'D1 binding', ok: true, detail: 'DB is reachable through the worker API.' },
+    { label: 'Admin users', ok: users.some((user) => user.role === 'admin' && user.active), detail: 'At least one active admin account is required.' },
+    { label: 'Location', ok: Boolean(settings.latitude && settings.longitude && settings.timezone), detail: 'Weather and tide modules need coordinates and timezone.' },
+    { label: 'Custom pages', ok: pageManifestWarnings.length === 0, detail: pageManifestWarnings.length === 0 ? 'Manifest has no warnings.' : 'Resolve manifest warnings before deploy.' },
+  ]
+
   return (
     <section className="workspace-grid admin-grid">
+      {pendingUninstall && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="panel modal-panel">
+            <p className="kicker">Module uninstall</p>
+            <h2>{pendingUninstall.title}</h2>
+            <p>Choose whether to keep this module's data for later reinstall, or delete its stored rows now.</p>
+            <div className="button-row">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  onPatchModule(pendingUninstall, { installed: false, enabled: false })
+                  setPendingUninstall(null)
+                }}
+              >
+                Preserve data
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={() => {
+                  onPatchModule(pendingUninstall, { installed: false, enabled: false, deleteData: true })
+                  setPendingUninstall(null)
+                }}
+              >
+                Delete data
+              </button>
+              <button type="button" className="ghost" onClick={() => setPendingUninstall(null)}>Cancel</button>
+            </div>
+          </section>
+        </div>
+      )}
+
       <article className="panel span-2">
         <div className="panel-heading">
           <div>
@@ -852,7 +947,7 @@ function AdminPanel({
                 <span>{module.description}</span>
               </div>
               <div className="inline-controls">
-                <button type="button" className="ghost" onClick={() => onPatchModule(module, { installed: !module.installed, enabled: !module.installed })}>{module.installed ? 'Uninstall' : 'Install'}</button>
+                <button type="button" className="ghost" onClick={() => (module.installed ? setPendingUninstall(module) : onPatchModule(module, { installed: true, enabled: true }))}>{module.installed ? 'Uninstall' : 'Install'}</button>
                 {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
                 {module.installed && (
                   <select value={module.size} onChange={(event) => onPatchModule(module, { size: event.target.value as Module['size'] })}>
@@ -862,7 +957,6 @@ function AdminPanel({
                     <option value="full">Full</option>
                   </select>
                 )}
-                {module.installed && <button type="button" className="ghost danger" onClick={() => onPatchModule(module, { installed: false, enabled: false, deleteData: true })}>Uninstall + data</button>}
               </div>
               <input type="number" value={module.position} onChange={(event) => onPatchModule(module, { position: Number(event.target.value) })} aria-label={`${module.title} position`} />
             </div>
@@ -913,9 +1007,80 @@ function AdminPanel({
       </form>
 
       <article className="panel span-2">
+        <p className="kicker">Pages</p>
+        <h2>Page inventory</h2>
+        <div className="stat-grid">
+          <div><strong>{editablePages.length}</strong><span>Editable</span></div>
+          <div><strong>{customPages.length}</strong><span>Discovered</span></div>
+          <div><strong>{manualLinks.length}</strong><span>Manual links</span></div>
+          <div><strong>{pageManifestWarnings.length}</strong><span>Warnings</span></div>
+        </div>
+        <div className="stack-list">
+          {pageManifestWarnings.map((warning) => (
+            <div className="plain-row warning-row" key={`${warning.path}-${warning.message}`}>
+              <strong>{warning.path || 'Manifest'}</strong>
+              <span>{warning.message}</span>
+            </div>
+          ))}
+          {[...customPages, ...manualLinks].slice(0, 8).map((page) => (
+            <a className="plain-row" key={`${page.kind}-${page.id}`} href={page.href}>
+              <strong>{page.title}</strong>
+              <span>{page.kind} / {page.href}</span>
+            </a>
+          ))}
+          {customPages.length === 0 && manualLinks.length === 0 && <p>No custom or manual page links discovered.</p>}
+        </div>
+      </article>
+
+      <article className="panel span-2">
+        <div className="panel-heading">
+          <div>
+            <p className="kicker">Cache and data</p>
+            <h2>Cached API payloads</h2>
+          </div>
+          <button type="button" className="ghost danger" onClick={() => onClearCache()}>Clear all</button>
+        </div>
+        <div className="module-list">
+          {cacheEntries.map((entry) => (
+            <div className={entry.expired ? 'module-row' : 'module-row enabled'} key={entry.key}>
+              <div>
+                <strong>{entry.key}</strong>
+                <span>{entry.payloadBytes} bytes / expires {formatDateTime(entry.expiresAt)}</span>
+              </div>
+              <small>{entry.expired ? 'Expired' : 'Active'}</small>
+              <button type="button" className="ghost danger" onClick={() => onClearCache(entry.key)}>Clear</button>
+            </div>
+          ))}
+          {cacheEntries.length === 0 && <p>No cache rows are currently stored.</p>}
+        </div>
+      </article>
+
+      <article className="panel">
+        <p className="kicker">Site review</p>
+        <h2>Review notes</h2>
+        <div className="stack-list">
+          <a className="plain-row" href="/docs/site-review.md"><strong>Current review</strong><span>Bugs, risks, and visual improvement ideas</span></a>
+          <a className="plain-row" href="/docs/modular-hub-upgrade-plan.md"><strong>Plan progress</strong><span>Completed, partial, and deferred work</span></a>
+        </div>
+      </article>
+
+      <article className="panel span-2">
         <p className="kicker">Deployment</p>
-        <h2>Hosting notes</h2>
-        <p>See the docs folder for router hosting limits, Cloudflare setup, and the current site review.</p>
+        <h2>{deployment?.host ?? 'Local app'}</h2>
+        <div className="stat-grid">
+          {deploymentChecks.map((check) => (
+            <div className={check.ok ? 'check-card ok' : 'check-card warn'} key={check.label}>
+              <strong>{check.ok ? 'OK' : 'Check'}</strong>
+              <span>{check.label}</span>
+              <small>{check.detail}</small>
+            </div>
+          ))}
+        </div>
+        <div className="stack-list">
+          <a className="plain-row" href="/docs/cloudflare-hosting.md"><strong>Cloudflare hosting</strong><span>Pages, Functions, D1, and migrations</span></a>
+          <a className="plain-row" href="/docs/router-hosting.md"><strong>Router hosting</strong><span>Static-only limits and local runtime options</span></a>
+          <div className="plain-row"><strong>{deployment?.origin ?? 'No origin loaded'}</strong><span>{deployment?.note ?? 'Refresh the dashboard to load deployment details.'}</span></div>
+        </div>
       </article>
     </section>
   )
@@ -937,7 +1102,7 @@ async function api<T>(path: string, options: { method?: string; body?: unknown }
     if (response.status === 404 && path.startsWith('/api/')) {
       throw new Error('API not found in Vite-only mode. Use `npm run dev:worker` and open http://localhost:8788.')
     }
-    if (!requireOk && response.status === 401) return { authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false } as T
+    if (!requireOk && response.status === 401) return { authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false, adminUnlockedUntil: null } as T
     const payload = (await response.json().catch(() => ({}))) as { error?: string }
     throw new Error(payload.error || `Request failed: ${response.status}`)
   }
@@ -968,6 +1133,10 @@ function formatDay(value: string) {
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value))
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
 function weatherMark(label: string | undefined) {

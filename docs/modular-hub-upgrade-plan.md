@@ -38,26 +38,30 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
   - `docs/site-review.md`
   - `docs/router-hosting.md`
   - `docs/cloudflare-hosting.md`
-- Added unit tests for module normalization and list period reset logic.
+- Added admin workspace sections for Pages, Cache/Data, Site Review, and Deployment.
+- Added cache listing and clearing API routes for admin use.
+- Added custom page manifest API route for admin use.
+- Added custom page manifest warning generation and an admin validation report.
+- Replaced instant module uninstall actions with an explicit preserve-data/delete-data confirmation flow.
+- Added deployment readiness checks for D1/API reachability, admin users, location settings, and custom page manifest health.
+- Resolved and displayed stored authorship IDs as household display names on lists, list items, and notes.
+- Added a visible admin unlock expiry timestamp in the app header.
+- Ran browser visual QA against the worker UI at desktop and mobile widths.
+- Added unit tests for module normalization, list period reset logic, settings validation, admin unlock helper logic, and custom page manifest parsing.
 - Preserved existing tide and password verification tests.
 
 ## Partially Complete
 
-- Admin settings page exists as a single admin workspace with Users, Modules, Appearance, Household/Location, and Deployment sections. Dedicated Pages, Cache/Data, and Site Review management sections are not yet full control panels.
-- Module uninstall supports preserve-data and delete-data paths, but the UI exposes them as separate buttons rather than a richer confirmation flow.
-- Custom page discovery supports `page.json` metadata and HTML title fallback in the sync script. There is not yet a UI for validating or editing discovered static page metadata.
-- Authorship fields are stored for new notes/lists/items, but the UI does not yet resolve and display household member names beside content.
-- Admin unlock is credential-based and short-lived. It is separate from normal login, but no visible countdown or expiry warning is shown.
+- Custom page discovery supports `page.json` metadata, HTML title fallback, and validation warnings. Editing discovered static page metadata still happens in source files, not in the deployed app.
+- Authorship names are visible in content views, but there is not yet a dedicated activity/audit history.
+- Admin unlock is credential-based and short-lived. The header shows the expiry time, but there is no live countdown or warning toast.
 
 ## Deferred
 
 - Fully external third-party module/package runtime.
 - Drag-and-drop module reordering.
-- Full cache/data management tools.
-- Full Site Review admin section surfaced in-app.
-- Dedicated deployment wizard in the app.
-- Broader tests for settings validation, admin unlock helpers, and custom page manifest parsing.
-- Manual browser visual QA across desktop/mobile viewports.
+- Dedicated deployment wizard beyond the readiness checklist.
+- Deeper mobile polish pass for dense admin module controls.
 
 ## Verification
 
@@ -65,6 +69,7 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
 - `npm run build` passes.
 - `npm run cf:migrate:local` applied `0002_modular_hub.sql` successfully.
 - Worker smoke checks passed locally against `http://localhost:8788` for login, admin unlock, admin routes, appearance update/restore, module update/restore, list/item creation, and note creation.
+- Playwright browser checks captured admin desktop and mobile screenshots under `output/playwright/`.
 
 ## Local State Notes
 

@@ -3,6 +3,8 @@ dist/
 tsconfig.tsbuildinfo
 .wrangler/
 .mf/
+.playwright-cli/
+output/playwright/
 .env
 .dev.vars
 .env.local

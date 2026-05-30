@@ -22,6 +22,7 @@ export type Session = {
   displayName: string
   role: UserRole
   adminUnlocked: boolean
+  adminUnlockedUntil: string | null
 }
 
 export type UserRecord = {
@@ -54,6 +55,7 @@ export async function handleAuth(context: ApiContext, parts: string[]) {
       displayName: session?.displayName ?? null,
       role: session?.role ?? null,
       adminUnlocked: session?.adminUnlocked ?? false,
+      adminUnlockedUntil: session?.adminUnlockedUntil ?? null,
     })
   }
 
@@ -153,8 +155,13 @@ export async function getSession(request: Request, env: Env): Promise<Session | 
     userName: rowString(user, 'username'),
     displayName: rowString(user, 'display_name'),
     role: normaliseRole(rowString(user, 'role')),
-    adminUnlocked: Boolean(adminUnlockedUntil && new Date(adminUnlockedUntil).getTime() > Date.now()),
+    adminUnlocked: isAdminUnlockActive(adminUnlockedUntil),
+    adminUnlockedUntil: adminUnlockedUntil || null,
   }
+}
+
+export function isAdminUnlockActive(value: string, now = Date.now()) {
+  return Boolean(value && new Date(value).getTime() > now)
 }
 
 async function setupAdmin(request: Request, env: Env) {
@@ -226,7 +233,7 @@ async function createSessionResponse(request: Request, env: Env, userId: string,
 
   const user = await getUserById(env, userId)
   return json(
-    { authenticated: true, userId, userName: username, displayName: user?.displayName ?? username, role, adminUnlocked: Boolean(adminUnlockedUntil) },
+    { authenticated: true, userId, userName: username, displayName: user?.displayName ?? username, role, adminUnlocked: Boolean(adminUnlockedUntil), adminUnlockedUntil },
     {
       headers: {
         'set-cookie': buildCookie(request, rawSession, maxAge),

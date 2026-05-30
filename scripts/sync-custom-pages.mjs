@@ -6,6 +6,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const sourceDir = join(root, 'custom-pages')
 const targetDir = join(root, 'public', 'custom-pages')
 const manifestPath = join(targetDir, 'manifest.json')
+const warnings = []
 
 mkdirSync(targetDir, { recursive: true })
 
@@ -21,7 +22,7 @@ if (existsSync(sourceDir)) {
   discoverHtml(sourceDir)
 }
 
-writeFileSync(manifestPath, `${JSON.stringify({ generatedAt: '', pages }, null, 2)}\n`)
+writeFileSync(manifestPath, `${JSON.stringify({ generatedAt: '', pages, warnings }, null, 2)}\n`)
 
 function discoverHtml(dir) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -50,11 +51,14 @@ function readMetadata(htmlPath) {
     const parsed = JSON.parse(readFileSync(jsonPath, 'utf8'))
     return parsed && typeof parsed === 'object' ? parsed : {}
   } catch {
+    warnings.push({ path: relative(sourceDir, jsonPath).replaceAll('\\', '/'), message: 'page.json is not valid JSON.' })
     return {}
   }
 }
 
 function readHtmlTitle(htmlPath) {
   const html = readFileSync(htmlPath, 'utf8')
-  return html.match(/<title>(.*?)<\/title>/i)?.[1]?.trim() ?? ''
+  const title = html.match(/<title>(.*?)<\/title>/i)?.[1]?.trim() ?? ''
+  if (!title) warnings.push({ path: relative(sourceDir, htmlPath).replaceAll('\\', '/'), message: 'HTML file has no title and no page.json title.' })
+  return title
 }

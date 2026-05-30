@@ -21,6 +21,19 @@ export type Settings = {
 
 export type Appearance = Pick<Settings, 'colourTheme' | 'styleTheme'>
 
+export type CustomPageManifestEntry = {
+  id: string
+  title: string
+  href: string
+  description: string
+  kind: 'custom'
+}
+
+export type CustomPageManifestReport = {
+  pages: CustomPageManifestEntry[]
+  warnings: Array<{ path: string; message: string }>
+}
+
 const settingDefaults: Settings = {
   wifiName: '',
   wifiPassword: '',
@@ -124,6 +137,7 @@ export async function listNotes(env: Env, filters: { q?: string; tag?: string })
   const q = filters.q?.trim()
   const tag = filters.tag?.trim()
   let rows: DbRow[]
+  const users = await getUserNameMap(env)
 
   if (q) {
     const like = `%${q}%`
@@ -135,7 +149,7 @@ export async function listNotes(env: Env, filters: { q?: string; tag?: string })
     rows = (await env.DB.prepare('SELECT * FROM notes ORDER BY pinned DESC, updated_at DESC').all<DbRow>()).results ?? []
   }
 
-  return rows.map(toNote)
+  return rows.map((row) => toNote(row, users))
 }
 
 export async function createNote(env: Env, input: { title?: string; body?: string; tags?: string; pinned?: boolean; noteType?: string; metadata?: unknown }, userId?: string) {
@@ -153,7 +167,7 @@ export async function createNote(env: Env, input: { title?: string; body?: strin
 
 export async function getNote(env: Env, noteId: string) {
   const row = await env.DB.prepare('SELECT * FROM notes WHERE id = ?').bind(noteId).first<DbRow>()
-  return row ? toNote(row) : null
+  return row ? toNote(row, await getUserNameMap(env)) : null
 }
 
 export async function updateNote(env: Env, noteId: string, patch: { title?: string; body?: string; tags?: string; pinned?: boolean; noteType?: string; metadata?: unknown }, userId?: string) {
@@ -179,16 +193,17 @@ export async function deleteNote(env: Env, noteId: string) {
 
 export async function listLists(env: Env) {
   await refreshPeriodicLists(env)
+  const users = await getUserNameMap(env)
   const listRows = (await env.DB.prepare('SELECT * FROM lists ORDER BY updated_at DESC').all<DbRow>()).results ?? []
   const itemRows = (await env.DB.prepare('SELECT * FROM list_items ORDER BY done ASC, created_at ASC').all<DbRow>()).results ?? []
   const itemMap = new Map<string, ReturnType<typeof toListItem>[]>()
 
   for (const row of itemRows) {
-    const item = toListItem(row)
+    const item = toListItem(row, users)
     itemMap.set(item.listId, [...(itemMap.get(item.listId) ?? []), item])
   }
 
-  return listRows.map((row) => ({ ...toList(row), items: itemMap.get(rowString(row, 'id')) ?? [] }))
+  return listRows.map((row) => ({ ...toList(row, users), items: itemMap.get(rowString(row, 'id')) ?? [] }))
 }
 
 export async function createList(env: Env, input: { name?: string; listType?: string }, userId?: string) {
@@ -232,7 +247,7 @@ export async function createListItem(env: Env, listId: string, text: string, use
 
 export async function getListItem(env: Env, itemId: string) {
   const row = await env.DB.prepare('SELECT * FROM list_items WHERE id = ?').bind(itemId).first<DbRow>()
-  return row ? toListItem(row) : null
+  return row ? toListItem(row, await getUserNameMap(env)) : null
 }
 
 export async function updateListItem(env: Env, itemId: string, patch: { text?: string; done?: boolean }, userId?: string) {
@@ -316,6 +331,22 @@ export async function listPageLinks(env: Env, request?: Request) {
     ...manifest,
     ...((links.results ?? []).map(toPageLink)),
   ]
+}
+
+export async function listCustomPageManifest(request?: Request) {
+  return getCustomPageManifest(request)
+}
+
+export async function getCustomPageManifestReport(request?: Request): Promise<CustomPageManifestReport> {
+  if (!request) return { pages: [], warnings: [] }
+  try {
+    const manifestUrl = new URL('/custom-pages/manifest.json', request.url)
+    const response = await fetch(manifestUrl, { headers: { cookie: request.headers.get('cookie') ?? '' } })
+    if (!response.ok) return { pages: [], warnings: [{ path: '/custom-pages/manifest.json', message: `Manifest returned ${response.status}.` }] }
+    return parseCustomPageManifestReport(await response.json())
+  } catch {
+    return { pages: [], warnings: [{ path: '/custom-pages/manifest.json', message: 'Manifest could not be read.' }] }
+  }
 }
 
 export async function createPageLink(env: Env, input: { title?: string; href?: string; description?: string; kind?: string }) {
@@ -429,6 +460,32 @@ export async function deleteModuleData(env: Env, moduleId: string) {
   }
 }
 
+export async function listCacheEntries(env: Env) {
+  const rows =
+    (
+      await env.DB.prepare(
+        'SELECT cache_key, expires_at, updated_at, length(payload) AS payload_bytes FROM cache ORDER BY updated_at DESC',
+      ).all<DbRow>()
+    ).results ?? []
+
+  return rows.map((row) => ({
+    key: rowString(row, 'cache_key'),
+    expiresAt: rowString(row, 'expires_at'),
+    updatedAt: rowString(row, 'updated_at'),
+    payloadBytes: rowNumber(row, 'payload_bytes'),
+    expired: new Date(rowString(row, 'expires_at')).getTime() <= Date.now(),
+  }))
+}
+
+export async function clearCache(env: Env, key?: string) {
+  if (key) {
+    await env.DB.prepare('DELETE FROM cache WHERE cache_key = ?').bind(key).run()
+  } else {
+    await env.DB.prepare('DELETE FROM cache').run()
+  }
+  return listCacheEntries(env)
+}
+
 async function refreshPeriodicLists(env: Env) {
   const rows = (await env.DB.prepare('SELECT id, list_type, reset_key, metadata_json FROM lists').all<DbRow>()).results ?? []
   for (const row of rows) {
@@ -463,25 +520,49 @@ async function fetchJson<T>(url: URL): Promise<T> {
   return (await response.json()) as T
 }
 
-async function getCustomPageManifest(request?: Request) {
+async function getCustomPageManifest(request?: Request): Promise<CustomPageManifestEntry[]> {
   if (!request) return []
   try {
     const manifestUrl = new URL('/custom-pages/manifest.json', request.url)
     const response = await fetch(manifestUrl, { headers: { cookie: request.headers.get('cookie') ?? '' } })
     if (!response.ok) return []
-    const payload = (await response.json()) as { pages?: Array<{ id?: string; title?: string; href?: string; description?: string }> }
-    return (payload.pages ?? [])
-      .filter((page) => page.href && page.title)
-      .map((page) => ({
-        id: String(page.id ?? page.href),
-        title: String(page.title),
-        href: normaliseHref(String(page.href)),
-        description: String(page.description ?? ''),
-        kind: 'custom',
-      }))
+    return parseCustomPageManifest(await response.json())
   } catch {
     return []
   }
+}
+
+export function parseCustomPageManifest(payload: unknown): CustomPageManifestEntry[] {
+  return parseCustomPageManifestReport(payload).pages
+}
+
+export function parseCustomPageManifestReport(payload: unknown): CustomPageManifestReport {
+  if (!payload || typeof payload !== 'object' || !Array.isArray((payload as { pages?: unknown }).pages)) {
+    return { pages: [], warnings: [{ path: '/custom-pages/manifest.json', message: 'Manifest is malformed or missing a pages array.' }] }
+  }
+  const warnings = Array.isArray((payload as { warnings?: unknown }).warnings)
+    ? ((payload as { warnings: Array<{ path?: unknown; message?: unknown }> }).warnings ?? []).map((warning) => ({
+        path: String(warning.path ?? ''),
+        message: String(warning.message ?? ''),
+      }))
+    : []
+
+  const pages: CustomPageManifestEntry[] = []
+  for (const page of (payload as { pages: Array<{ id?: unknown; title?: unknown; href?: unknown; description?: unknown }> }).pages ?? []) {
+    if (!page.href || !page.title) {
+      warnings.push({ path: String(page.href ?? 'unknown'), message: 'Manifest page is missing title or href.' })
+      continue
+    }
+    pages.push({
+      id: String(page.id ?? page.href),
+      title: String(page.title),
+      href: normaliseHref(String(page.href)),
+      description: String(page.description ?? ''),
+      kind: 'custom',
+    })
+  }
+
+  return { pages, warnings }
 }
 
 function weatherLabel(code: unknown) {
@@ -497,7 +578,18 @@ function weatherLabel(code: unknown) {
   return 'Changeable'
 }
 
-function toNote(row: DbRow) {
+async function getUserNameMap(env: Env) {
+  const rows = (await env.DB.prepare('SELECT id, display_name FROM users').all<DbRow>()).results ?? []
+  return new Map(rows.map((row) => [rowString(row, 'id'), rowString(row, 'display_name')]))
+}
+
+function displayNameFor(users: Map<string, string>, userId: string) {
+  return userId ? users.get(userId) ?? userId : null
+}
+
+function toNote(row: DbRow, users = new Map<string, string>()) {
+  const createdBy = rowString(row, 'created_by')
+  const updatedBy = rowString(row, 'updated_by')
   return {
     id: rowString(row, 'id'),
     title: rowString(row, 'title'),
@@ -506,36 +598,46 @@ function toNote(row: DbRow) {
     noteType: rowString(row, 'note_type') || 'text',
     metadata: parseJsonObject(rowString(row, 'metadata_json')),
     pinned: rowNumber(row, 'pinned') === 1,
-    createdBy: rowString(row, 'created_by') || null,
-    updatedBy: rowString(row, 'updated_by') || null,
+    createdBy: createdBy || null,
+    createdByName: displayNameFor(users, createdBy),
+    updatedBy: updatedBy || null,
+    updatedByName: displayNameFor(users, updatedBy),
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }
 }
 
-function toList(row: DbRow) {
+function toList(row: DbRow, users = new Map<string, string>()) {
+  const createdBy = rowString(row, 'created_by')
+  const updatedBy = rowString(row, 'updated_by')
   return {
     id: rowString(row, 'id'),
     name: rowString(row, 'name'),
     listType: normaliseListType(rowString(row, 'list_type')),
     resetKey: rowString(row, 'reset_key'),
     metadata: parseJsonObject(rowString(row, 'metadata_json')),
-    createdBy: rowString(row, 'created_by') || null,
-    updatedBy: rowString(row, 'updated_by') || null,
+    createdBy: createdBy || null,
+    createdByName: displayNameFor(users, createdBy),
+    updatedBy: updatedBy || null,
+    updatedByName: displayNameFor(users, updatedBy),
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }
 }
 
-function toListItem(row: DbRow) {
+function toListItem(row: DbRow, users = new Map<string, string>()) {
+  const createdBy = rowString(row, 'created_by')
+  const updatedBy = rowString(row, 'updated_by')
   return {
     id: rowString(row, 'id'),
     listId: rowString(row, 'list_id'),
     text: rowString(row, 'text'),
     done: rowNumber(row, 'done') === 1,
     completedAt: rowString(row, 'completed_at') || null,
-    createdBy: rowString(row, 'created_by') || null,
-    updatedBy: rowString(row, 'updated_by') || null,
+    createdBy: createdBy || null,
+    createdByName: displayNameFor(users, createdBy),
+    updatedBy: updatedBy || null,
+    updatedByName: displayNameFor(users, updatedBy),
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }
@@ -579,11 +681,11 @@ function normaliseHref(href: string) {
   return `/custom-pages/${href.replace(/^\/+/, '')}`
 }
 
-function normaliseColourTheme(value: string) {
+export function normaliseColourTheme(value: string) {
   return colourThemes.includes(value) ? value : 'frog-peach'
 }
 
-function normaliseStyleTheme(value: string) {
+export function normaliseStyleTheme(value: string) {
   return styleThemes.includes(value) ? value : 'classic'
 }
 

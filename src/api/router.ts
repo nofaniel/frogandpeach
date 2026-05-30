@@ -5,6 +5,7 @@ import {
   createNote,
   createPage,
   createPageLink,
+  clearCache,
   deleteList,
   deleteListItem,
   deleteModuleData,
@@ -12,11 +13,14 @@ import {
   deletePage,
   deletePageLink,
   getAppearance,
+  getCustomPageManifestReport,
   getDashboard,
   getMarine,
   getPage,
   getSettings,
   getWeather,
+  listCacheEntries,
+  listCustomPageManifest,
   listLists,
   listNotes,
   listPageLinks,
@@ -49,6 +53,9 @@ export async function handleApi(context: ApiContext): Promise<Response> {
     if (resource === 'modules') return await routeModules(context, parts.slice(1))
     if (resource === 'users') return await routeUsers(context, parts.slice(1))
     if (resource === 'appearance') return await routeAppearance(context)
+    if (resource === 'cache') return await routeCache(context, parts.slice(1))
+    if (resource === 'page-manifest') return await routePageManifest(context)
+    if (resource === 'page-manifest-report') return await routePageManifestReport(context)
     if (resource === 'weather' && context.request.method === 'GET') return json(await getWeather(context.env))
     if ((resource === 'tides' || resource === 'marine') && context.request.method === 'GET') return json(await getMarine(context.env))
     if (resource === 'notes') return await routeNotes(context, parts.slice(1), url, session.userId)
@@ -98,6 +105,25 @@ async function routeAppearance(context: ApiContext) {
   if (context.request.method === 'GET') return json(await getAppearance(context.env))
   await requireAdminUnlock(context.request, context.env)
   if (context.request.method === 'PUT') return json(await updateAppearance(context.env, await readJson(context.request)))
+  return methodNotAllowed()
+}
+
+async function routeCache(context: ApiContext, parts: string[]) {
+  await requireAdminUnlock(context.request, context.env)
+  if (context.request.method === 'GET') return json(await listCacheEntries(context.env))
+  if (context.request.method === 'DELETE') return json(await clearCache(context.env, parts[0] ? decodeURIComponent(parts[0]) : undefined))
+  return methodNotAllowed()
+}
+
+async function routePageManifest(context: ApiContext) {
+  await requireAdminUnlock(context.request, context.env)
+  if (context.request.method === 'GET') return json(await listCustomPageManifest(context.request))
+  return methodNotAllowed()
+}
+
+async function routePageManifestReport(context: ApiContext) {
+  await requireAdminUnlock(context.request, context.env)
+  if (context.request.method === 'GET') return json(await getCustomPageManifestReport(context.request))
   return methodNotAllowed()
 }
 
