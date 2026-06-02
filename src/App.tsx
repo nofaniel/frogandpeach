@@ -578,6 +578,34 @@ function App() {
     })
   }
 
+  async function useDeviceLocation() {
+    if (!navigator.geolocation) {
+      addToast('Browser geolocation is unavailable', 'warn')
+      return
+    }
+
+    await new Promise<void>((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const timeZone = resolveBrowserTimeZone()
+          setSettings((current) => ({
+            ...current,
+            latitude: String(position.coords.latitude),
+            longitude: String(position.coords.longitude),
+            timezone: timeZone || current.timezone,
+          }))
+          addToast('Filled coordinates from this device')
+          resolve()
+        },
+        () => {
+          addToast('Unable to read this device location', 'warn')
+          resolve()
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 },
+      )
+    })
+  }
+
   async function saveAppearance(next: Appearance) {
     await run(async () => {
       void setTheme(next.themeId)
@@ -668,6 +696,7 @@ function App() {
   }
 
   const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
+  const locationConfigured = isLocationConfigured(settings)
   const visibleTabs = useMemo(
     () =>
       tabs.filter((tab) => {
@@ -842,6 +871,7 @@ function App() {
           onClose={() => setAdminOpen(false)}
           onSettingsChange={setSettings}
           onSaveSettings={saveSettings}
+          onUseDeviceLocation={useDeviceLocation}
           onAppearanceChange={saveAppearance}
           onUserDraftChange={setUserDraft}
           onCreateUser={createUser}
@@ -856,7 +886,7 @@ function App() {
         <section className="dashboard-grid home-dashboard">
           {dashboardModules
             .filter((module) => module.id === 'weather' || module.id === 'tides')
-            .map((module) => renderModule(module, home, setActiveTab))}
+            .map((module) => renderModule(module, home, setActiveTab, locationConfigured, openAdmin, settings))}
         </section>
       )}
 
@@ -1085,7 +1115,7 @@ function renderModule(
         <div className="panel-heading">
           <div>
             <p className="kicker">Tides · Predicted</p>
-            <h2>{tideLocation}</h2>
+            <h2>Local tides</h2>
             <p className="tide-panel-summary">Next 2 tides first, then a 5-day tide timeline.</p>
           </div>
           <span className="tide-mark" aria-hidden="true">🌊</span>
@@ -1140,10 +1170,8 @@ function renderModule(
           </div>
         </section>
         <p className="tide-source-note">
-          {home.tides?.note ?? 'Model-based estimate only. Not for navigation.'}{' '}
-          <a href="https://www.cornwalls.co.uk/weather/tide_times.htm" target="_blank" rel="noreferrer">
-            Cornwall tide times reference
-          </a>
+          {home.tides?.note ?? 'Approximate tide trend from Open-Meteo marine model. Not for navigation.'}{' '}
+          <span className="tide-source-label">Source: configured tide data</span>
         </p>
       </article>
     )
@@ -1253,6 +1281,7 @@ function AdminPanel({
   onClose,
   onSettingsChange,
   onSaveSettings,
+  onUseDeviceLocation,
   onAppearanceChange,
   onUserDraftChange,
   onCreateUser,
@@ -1274,6 +1303,7 @@ function AdminPanel({
   onClose: () => void
   onSettingsChange: (settings: Settings) => void
   onSaveSettings: (event: FormEvent<HTMLFormElement>) => void
+  onUseDeviceLocation: () => Promise<void>
   onAppearanceChange: (appearance: Appearance) => void
   onUserDraftChange: (draft: { username: string; displayName: string; role: string; password: string }) => void
   onCreateUser: (event: FormEvent<HTMLFormElement>) => void
@@ -1304,7 +1334,7 @@ function AdminPanel({
   const deploymentChecks = [
     { label: 'D1 binding', ok: true, detail: 'DB is reachable through the worker API.' },
     { label: 'Admin users', ok: users.some((user) => user.role === 'admin' && user.active), detail: 'At least one active admin account is required.' },
-    { label: 'Location', ok: Boolean(settings.latitude && settings.longitude && settings.timezone), detail: 'Weather and tide modules need coordinates and timezone.' },
+    { label: 'Location', ok: isLocationConfigured(settings), detail: 'Weather and tide modules stay neutral until valid coordinates and timezone are saved.' },
     { label: 'Custom pages', ok: pageManifestWarnings.length === 0, detail: pageManifestWarnings.length === 0 ? 'Manifest has no warnings.' : 'Resolve manifest warnings before deploy.' },
   ]
   const tidesModule = modules.find((module) => module.id === 'tides')
@@ -1630,8 +1660,12 @@ function AdminPanel({
           <label>Latitude<input value={settings.latitude} onChange={(event) => onSettingsChange({ ...settings, latitude: event.target.value })} /></label>
           <label>Longitude<input value={settings.longitude} onChange={(event) => onSettingsChange({ ...settings, longitude: event.target.value })} /></label>
         </div>
+        <div className="button-row">
+          <button type="button" className="ghost" onClick={() => void onUseDeviceLocation()}>Use this device location</button>
+          <p className="small-note">Timezone comes from your browser and can still be edited manually.</p>
+        </div>
         <label>Network devices JSON<textarea value={settings.wifiDevicesJson} onChange={(event) => onSettingsChange({ ...settings, wifiDevicesJson: event.target.value })} placeholder='[{"name":"Living Room TV","type":"tv","ip":"192.168.1.28","status":"online"}]' /></label>
-        <label>Flat notes<textarea value={settings.flatNotes} onChange={(event) => onSettingsChange({ ...settings, flatNotes: event.target.value })} /></label>
+        <label>Household notes<textarea value={settings.flatNotes} onChange={(event) => onSettingsChange({ ...settings, flatNotes: event.target.value })} /></label>
         <button type="submit">Save settings</button>
       </form>
 

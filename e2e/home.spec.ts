@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { expectNoConsoleErrors, signIn } from './helpers/auth'
 
 test.describe('home dashboard', () => {
-  test('logs in and renders weather, tides, and bottom navigation', async ({ page }) => {
+  test('logs in and renders neutral weather and tides setup state', async ({ page }) => {
     const consoleErrors: string[] = []
     page.on('console', (message) => {
       if (message.type() === 'error') consoleErrors.push(message.text())
@@ -10,8 +10,8 @@ test.describe('home dashboard', () => {
 
     await signIn(page)
 
-    await expect(page.getByText('NEWQUAY, CORNWALL')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Newquay Harbour' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Location not set' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Open Admin settings' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Home' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Lists' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Notes' })).toBeVisible()
@@ -42,7 +42,7 @@ test.describe('home dashboard', () => {
     await expect(page.getByRole('heading', { name: /frog-peach-home-hub|Local app/ })).toBeVisible()
 
     await page.getByRole('button', { name: 'Home' }).click()
-    await expect(page.getByRole('heading', { name: 'Newquay Harbour' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Location not set' })).toBeVisible()
 
     await expectNoConsoleErrors(page, consoleErrors)
   })
