@@ -533,6 +533,59 @@ small {
   font-variant-numeric: tabular-nums;
 }
 
+.position-label {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.74rem;
+}
+
+.reorder-bar {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+}
+
+.reorder-bar .position-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-height: 22px;
+  padding: 2px 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  cursor: grab;
+  font-size: 0.7rem;
+  letter-spacing: 1px;
+  line-height: 1;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.dragging {
+  opacity: 0.55;
+}
+
+.drag-over {
+  border-color: var(--color-accent-2) !important;
+  background: color-mix(in srgb, var(--color-accent-2) 10%, var(--color-surface)) !important;
+}
+
 .item {
   display: grid;
   grid-template-columns: auto 1fr auto;
@@ -656,6 +709,12 @@ button.danger:not(.ghost) {
 .module-summary {
   display: grid;
   gap: 5px;
+}
+
+.module-title-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .module-row.enabled {
@@ -1080,7 +1139,11 @@ button.danger:not(.ghost) {
     grid-template-columns: 1fr;
   }
 
-  .tide-track {
+  .tide-feature-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tide-day-events {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1109,6 +1172,15 @@ button.danger:not(.ghost) {
 
   .module-controls .inline-controls button {
     width: 100%;
+  }
+
+  .reorder-bar {
+    min-height: 44px;
+  }
+
+  .reorder-bar .icon-button {
+    min-width: 40px;
+    min-height: 40px;
   }
 
   .manifest-detail-grid,
@@ -1356,11 +1428,15 @@ body {
 .tide-panel {
   padding: 18px 20px;
   background: var(--app-card);
+  display: grid;
+  gap: 14px;
 }
 
 .tide-panel .panel-heading {
   display: flex;
+  justify-content: space-between;
   align-items: start;
+  gap: 16px;
 }
 
 .tide-panel .kicker {
@@ -1378,6 +1454,13 @@ body {
   letter-spacing: -0.04em;
 }
 
+.tide-panel-summary {
+  max-width: 30ch;
+  margin-top: 4px;
+  color: #6d6a65;
+  font-size: 0.84rem;
+}
+
 .tide-mark {
   display: inline-grid;
   width: 28px;
@@ -1387,52 +1470,180 @@ body {
   background: rgba(47, 102, 69, 0.08);
 }
 
-.tide-track {
+.tide-section {
+  display: grid;
+  gap: 8px;
+}
+
+.tide-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.tide-section-title {
+  color: var(--app-ink);
+  font-size: 0.86rem;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.tide-section-subtitle {
+  color: #7b7772;
+  font-size: 0.78rem;
+}
+
+.tide-feature-grid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 14px;
 }
 
-.tide-card {
-  min-height: 95px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--app-tile);
-  padding: 14px;
+.tide-feature-card,
+.tide-day-card,
+.tide-empty-state {
+  border: 1px solid color-mix(in srgb, var(--color-line) 80%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
 }
 
-.tide-card span {
-  color: #6d6a65;
+.tide-feature-card {
+  display: grid;
+  gap: 6px;
+  min-height: 136px;
+  padding: 16px;
+}
+
+.tide-feature-card.high {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line));
+}
+
+.tide-feature-card.low {
+  border-color: color-mix(in srgb, var(--color-accent-2) 45%, var(--color-line));
+}
+
+.tide-feature-badge,
+.tide-day-event span,
+.tide-day-head span {
+  color: var(--color-muted);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.tide-card em {
+.tide-feature-card strong {
+  color: var(--app-ink);
+  font-size: 1.02rem;
+  letter-spacing: -0.03em;
+}
+
+.tide-feature-time {
+  color: var(--app-ink);
+  font-size: 1.7rem;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.tide-feature-card em {
   color: #7b7772;
   font-style: normal;
   font-size: 0.76rem;
   font-weight: 700;
 }
 
-.tide-card.high span {
-  color: #285f43;
-}
-
-.tide-card strong {
-  margin-top: 6px;
-  font-size: 1.28rem;
-  letter-spacing: -0.04em;
-}
-
-.tide-card small {
+.tide-feature-card small,
+.tide-day-event small {
   color: #77746f;
-  font-size: 0.86rem;
+  font-size: 0.82rem;
+}
+
+.tide-day-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tide-day-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.tide-day-head {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+}
+
+.tide-day-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tide-day-head strong {
+  color: var(--app-ink);
+  font-size: 0.92rem;
+  letter-spacing: -0.03em;
+}
+
+.tide-day-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent-2) 12%, var(--color-surface));
+  color: var(--color-accent-2);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tide-day-events {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tide-day-event {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid color-mix(in srgb, var(--color-line) 75%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+}
+
+.tide-day-event.high {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-line));
+}
+
+.tide-day-event.low {
+  border-color: color-mix(in srgb, var(--color-accent-2) 45%, var(--color-line));
+}
+
+.tide-day-event strong {
+  color: var(--app-ink);
+  font-size: 0.94rem;
+  letter-spacing: -0.02em;
+}
+
+.tide-empty-state {
+  padding: 14px;
+  color: #6d6a65;
+  font-size: 0.88rem;
 }
 
 .tide-source-note {
-  margin-top: 12px;
+  margin-top: 2px;
   color: #6d6a65;
   font-size: 0.83rem;
 }

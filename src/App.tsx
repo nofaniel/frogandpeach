@@ -586,6 +586,14 @@ function App() {
     })
   }
 
+  async function batchPatchModules(patches: Array<{ id: string; position: number }>) {
+    await run(async () => {
+      await api('/api/modules', { method: 'PATCH', body: patches })
+      await refreshAdmin()
+      await refreshAll()
+    })
+  }
+
   async function clearCache(key?: string) {
     await run(async () => {
       const next = await api<CacheEntry[]>(key ? `/api/cache/${encodeURIComponent(key)}` : '/api/cache', { method: 'DELETE' })
@@ -755,6 +763,7 @@ function App() {
           onCreateUser={createUser}
           onPatchUser={patchUser}
           onPatchModule={patchModule}
+          onBatchPatchModules={batchPatchModules}
           onClearCache={clearCache}
         />
       )}
@@ -938,25 +947,68 @@ function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) =
   }
   if (module.id === 'tides') {
     const tideLocation = settings?.locationName?.trim() || home.settings.locationName || 'Local coast'
+    const tideEvents = home.tides?.events ?? []
+    const featuredTides = tideEvents.slice(0, 2)
+    const tideDays = groupTideDays(tideEvents, 5)
     return (
       <article className={`${className} tide-panel`} key={module.id}>
         <div className="panel-heading">
           <div>
             <p className="kicker">Tides · Predicted</p>
             <h2>{tideLocation}</h2>
+            <p className="tide-panel-summary">Next 2 tides first, then a 5-day tide timeline.</p>
           </div>
           <span className="tide-mark" aria-hidden="true">🌊</span>
         </div>
-        <div className="tide-track">
-          {(home.tides?.events ?? []).slice(0, 4).map((event) => (
-            <div key={event.id} className={`tide-card ${event.type}`}>
-              <span>{event.type === 'high' ? '▲ High' : '▼ Low'}</span>
-              <em>{formatDayDate(event.time)}</em>
-              <strong>{formatTime(event.time)}</strong>
-              <small>{event.height === null ? 'No height' : `${event.height} m`}</small>
-            </div>
-          ))}
-        </div>
+        <section className="tide-section tide-feature-section" aria-labelledby="tide-feature-heading">
+          <div className="tide-section-head">
+            <p id="tide-feature-heading" className="tide-section-title">Next 2 tides</p>
+            <span className="tide-section-subtitle">The next tide events in sequence</span>
+          </div>
+          <div className="tide-feature-grid">
+            {featuredTides.length > 0 ? featuredTides.map((event, index) => (
+              <article key={event.id} className={`tide-feature-card ${event.type}`}>
+                <span className="tide-feature-badge">{index === 0 ? 'Next up' : 'Then'}</span>
+                <strong>{formatTideEventLabel(event.type)}</strong>
+                <div className="tide-feature-time">{formatTime(event.time)}</div>
+                <em>{formatDayDate(event.time)}</em>
+                <small>{formatTideHeight(event.height)}</small>
+              </article>
+            )) : (
+              <div className="tide-empty-state">No tide events available yet.</div>
+            )}
+          </div>
+        </section>
+
+        <section className="tide-section tide-timeline-section" aria-labelledby="tide-timeline-heading">
+          <div className="tide-section-head">
+            <p id="tide-timeline-heading" className="tide-section-title">Next 5 days</p>
+            <span className="tide-section-subtitle">Each day with its tide times and dates</span>
+          </div>
+          <div className="tide-day-list">
+            {tideDays.length > 0 ? tideDays.map((day, index) => (
+              <article key={day.key} className="tide-day-card">
+                <div className="tide-day-head">
+                  <div className="tide-day-title">
+                    <strong>{day.label}</strong>
+                    <span className="tide-day-badge">{formatTideDayBadge(index)}</span>
+                  </div>
+                </div>
+                <div className="tide-day-events">
+                  {day.events.map((event) => (
+                    <div key={event.id} className={`tide-day-event ${event.type}`}>
+                      <span>{event.type === 'high' ? 'High tide' : 'Low tide'}</span>
+                      <strong>{formatTime(event.time)}</strong>
+                      <small>{formatTideHeight(event.height)}</small>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            )) : (
+              <div className="tide-empty-state">No tide timeline available.</div>
+            )}
+          </div>
+        </section>
         <p className="tide-source-note">
           {home.tides?.note ?? 'Model-based estimate only. Not for navigation.'}{' '}
           <a href="https://www.cornwalls.co.uk/weather/tide_times.htm" target="_blank" rel="noreferrer">
@@ -1076,6 +1128,7 @@ function AdminPanel({
   onCreateUser,
   onPatchUser,
   onPatchModule,
+  onBatchPatchModules,
   onClearCache,
 }: {
   settings: Settings
@@ -1096,6 +1149,7 @@ function AdminPanel({
   onCreateUser: (event: FormEvent<HTMLFormElement>) => void
   onPatchUser: (user: UserRecord, patch: Partial<UserRecord>) => void
   onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
+  onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
   onClearCache: (key?: string) => void
 }) {
   const { themes, themeId } = useTheme()
@@ -1105,6 +1159,8 @@ function AdminPanel({
   const [activityFilter, setActivityFilter] = useState({ entityType: '', search: '' })
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [editingDisplayName, setEditingDisplayName] = useState('')
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
+  const [dropOverIndex, setDropOverIndex] = useState<number | null>(null)
   const editablePages = pageLinks.filter((page) => page.kind === 'editable')
   const manualLinks = pageLinks.filter((page) => page.kind !== 'editable' && page.kind !== 'custom')
   const uniqueEntityTypes = [...new Set(activityEntries.map((e) => e.entityType))].sort()
@@ -1121,6 +1177,18 @@ function AdminPanel({
   ]
   const tidesModule = modules.find((module) => module.id === 'tides')
   const tideSource = String(tidesModule?.options?.source ?? 'model')
+
+  function moveModule(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return
+    const reordered = [...modules]
+    const [moved] = reordered.splice(fromIndex, 1)
+    reordered.splice(toIndex, 0, moved)
+    const patches = reordered.map((module, index) => ({
+      id: module.id,
+      position: (index + 1) * 10,
+    }))
+    onBatchPatchModules(patches)
+  }
 
   useEffect(() => {
     const key = String(tidesModule?.options?.apiKey ?? '')
@@ -1229,10 +1297,50 @@ function AdminPanel({
         <p className="kicker">Modules</p>
         <h2>Built-in registry</h2>
         <div className="module-list">
-          {modules.map((module) => (
-            <div key={module.id} className={`module-row module-config-row ${module.enabled ? 'enabled' : ''} ${module.installed ? '' : 'uninstalled'}`}>
+          {modules.map((module, index) => (
+            <div
+              key={module.id}
+              className={`module-row module-config-row ${module.enabled ? 'enabled' : ''} ${module.installed ? '' : 'uninstalled'} ${draggingIndex === index ? 'dragging' : ''} ${dropOverIndex === index ? 'drag-over' : ''}`}
+              onDragOver={(e) => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                setDropOverIndex(index)
+              }}
+              onDragLeave={() => setDropOverIndex(null)}
+              onDrop={(e) => {
+                e.preventDefault()
+                const fromIndex = Number(e.dataTransfer.getData('text/plain'))
+                setDropOverIndex(null)
+                setDraggingIndex(null)
+                moveModule(fromIndex, index)
+              }}
+            >
               <div className="module-summary">
-                <strong>{module.title}</strong>
+                <div className="module-title-row">
+                  <span
+                    className="drag-handle"
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData('text/plain', String(index))
+                      e.dataTransfer.effectAllowed = 'move'
+                      const row = e.currentTarget.closest('.module-config-row') as HTMLElement
+                      if (row) e.dataTransfer.setDragImage(row, 0, 0)
+                      setDraggingIndex(index)
+                    }}
+                    onDragEnd={() => {
+                      setDraggingIndex(null)
+                      setDropOverIndex(null)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp') { e.preventDefault(); moveModule(index, index - 1) }
+                      if (e.key === 'ArrowDown') { e.preventDefault(); moveModule(index, index + 1) }
+                    }}
+                    aria-label="Drag to reorder, or use arrow keys"
+                    role="button"
+                    tabIndex={0}
+                  >⋮⋮</span>
+                  <strong>{module.title}</strong>
+                </div>
                 <span>{module.description}</span>
                 <div className="module-meta">
                   <small>{module.category}</small>
@@ -1287,10 +1395,14 @@ function AdminPanel({
                     )}
                   </>
                 )}
-                <label className="compact-field position-field">
-                  Order
-                  <input type="number" value={module.position} onChange={(event) => onPatchModule(module, { position: Number(event.target.value) })} aria-label={`${module.title} position`} />
-                </label>
+                <div className="compact-field position-field">
+                  <span className="position-label">Order</span>
+                  <div className="reorder-bar">
+                    <button type="button" className="icon-button" disabled={index === 0} onClick={() => moveModule(index, index - 1)} aria-label="Move up">▲</button>
+                    <span className="position-value" aria-label={`Position ${module.position}`}>{module.position}</span>
+                    <button type="button" className="icon-button" disabled={index === modules.length - 1} onClick={() => moveModule(index, index + 1)} aria-label="Move down">▼</button>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
@@ -1712,6 +1824,41 @@ function formatTime(value: string) {
 
 function formatDayDate(value: string) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value))
+}
+
+function formatTideEventLabel(type: 'high' | 'low') {
+  return type === 'high' ? 'High tide' : 'Low tide'
+}
+
+function formatTideHeight(height: number | null) {
+  return height === null ? 'Height unavailable' : `${height.toFixed(1)} m`
+}
+
+function formatTideDayBadge(index: number) {
+  if (index === 0) return 'Today'
+  if (index === 1) return 'Tomorrow'
+  return `Day ${index + 1}`
+}
+
+function groupTideDays(events: TideSummary['events'], maxDays: number) {
+  const dayMap = new Map<string, { key: string; label: string; events: TideSummary['events'] }>()
+
+  for (const event of events) {
+    const key = new Date(event.time).toDateString()
+    const current = dayMap.get(key)
+    if (current) {
+      current.events.push(event)
+      continue
+    }
+
+    dayMap.set(key, {
+      key,
+      label: formatDayDate(event.time),
+      events: [event],
+    })
+  }
+
+  return Array.from(dayMap.values()).slice(0, maxDays)
 }
 
 function formatFullDateTime(value: number) {

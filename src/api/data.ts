@@ -572,7 +572,7 @@ async function getMarineFromApi(settings: Settings, apiKey: string) {
   const url = new URL('https://tidesatlas.com/api/v1/tides')
   url.searchParams.set('lat', settings.latitude)
   url.searchParams.set('lon', settings.longitude)
-  url.searchParams.set('days', '3')
+  url.searchParams.set('days', '5')
 
   const response = await fetch(url, { headers: { 'X-API-Key': key } })
   if (!response.ok) return null
