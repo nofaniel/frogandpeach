@@ -9,6 +9,16 @@ Frog & Peach is a private-by-default modular home hub built for Cloudflare Pages
 - D1-backed persistence.
 - Open-Meteo weather and marine data with local cache records.
 
+## Screenshots
+
+Captured locally with Playwright against the worker runtime.
+
+| Home dashboard | Admin settings |
+| --- | --- |
+| <img src="docs/readme-screenshots/home-desktop.png" alt="Home dashboard" width="640" /> | <img src="docs/readme-screenshots/admin-desktop.png" alt="Admin settings" width="640" /> |
+
+A single shareable montage is available at [docs/readme-screenshots/frog-peach-shareable-montage.png](docs/readme-screenshots/frog-peach-shareable-montage.png).
+
 ## Local Setup
 
 ```powershell
