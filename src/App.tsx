@@ -1015,29 +1015,68 @@ function renderModule(
 ) {
   const className = `panel module-${module.size}`
   if (module.id === 'weather') {
+    if (!locationConfigured) {
+      return (
+        <article className={`${className} weather-panel`} key={module.id}>
+          <div className="weather-orb" aria-hidden="true" />
+          <p className="kicker">Weather</p>
+          <h2>Location not set</h2>
+          <p>Set latitude, longitude, and timezone in Admin settings before weather and tides can load.</p>
+          <button type="button" className="button-link" onClick={onOpenAdminSettings}>Open Admin settings</button>
+        </article>
+      )
+    }
+
+    if (!home.weather) {
+      return (
+        <article className={`${className} weather-panel`} key={module.id}>
+          <div className="weather-orb" aria-hidden="true" />
+          <div className="weather-place">LOCAL WEATHER</div>
+          <h2>Weather unavailable</h2>
+          <p>Weather data could not be loaded right now.</p>
+        </article>
+      )
+    }
+
+    const weatherLocation = home.weather.location?.trim() || formatLocationLabel(settings)
     return (
       <article className={`${className} weather-panel`} key={module.id}>
         <div className="weather-orb" aria-hidden="true" />
-        <div className="weather-place">{(home.weather?.location ?? 'Newquay, Cornwall').toUpperCase()}</div>
+        <div className="weather-place">{weatherLocation.toUpperCase()}</div>
         <div className="weather-current">
-          <div className="weather-icon" aria-hidden="true">{weatherIcon(home.weather?.current.label)}</div>
+          <div className="weather-icon" aria-hidden="true">{weatherIcon(home.weather.current.label)}</div>
           <div>
-            <strong className="big-number">{formatTemperature(home.weather?.current.temperature)}</strong>
-            <p>{home.weather?.current.label ?? 'Weather unavailable'}</p>
+            <strong className="big-number">{formatTemperature(home.weather.current.temperature)}</strong>
+            <p>{home.weather.current.label ?? 'Weather unavailable'}</p>
           </div>
         </div>
         <div className="metric-row">
-          {home.weather?.daily[0] && <span>↑ {formatTemperature(home.weather.daily[0].max)} ↓ {formatTemperature(home.weather.daily[0].min)}</span>}
-          <span>💨 {formatNumber(home.weather?.current.windSpeed)} mph</span>
-          <span>💧 {formatNumber(home.weather?.daily[0]?.precipitationChance)}%</span>
-          <span>☂️ {formatNumber(home.weather?.current.precipitation)}% rain</span>
-          <span>Feels {formatTemperature(home.weather?.current.feelsLike)}</span>
+          {home.weather.daily[0] && <span>↑ {formatTemperature(home.weather.daily[0].max)} ↓ {formatTemperature(home.weather.daily[0].min)}</span>}
+          <span>💨 {formatNumber(home.weather.current.windSpeed)} km/h</span>
+          <span>💧 {formatNumber(home.weather.daily[0]?.precipitationChance)}%</span>
+          <span>☂️ {formatNumber(home.weather.current.precipitation)}% rain</span>
+          <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
         </div>
       </article>
     )
   }
   if (module.id === 'tides') {
-    const tideLocation = settings?.locationName?.trim() || home.settings.locationName || 'Local coast'
+    if (!locationConfigured) {
+      return (
+        <article className={`${className} tide-panel`} key={module.id}>
+          <div className="panel-heading">
+            <div>
+              <p className="kicker">Tides · Predicted</p>
+              <h2>Location not set</h2>
+              <p className="tide-panel-summary">Set latitude, longitude, and timezone in Admin settings before tides can load.</p>
+            </div>
+            <span className="tide-mark" aria-hidden="true">🌊</span>
+          </div>
+          <button type="button" className="button-link" onClick={onOpenAdminSettings}>Open Admin settings</button>
+        </article>
+      )
+    }
+
     const tideEvents = home.tides?.events ?? []
     const featuredTides = tideEvents.slice(0, 2)
     const tideDays = groupTideDays(tideEvents, 5)
