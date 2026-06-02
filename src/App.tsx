@@ -1483,12 +1483,19 @@ function AdminPanel({
                 <>
                   <div className="user-meta">
                     <strong>{user.displayName}</strong>
-                    <span>{user.username} / {user.role}{user.active ? '' : ' / disabled'}{user.passwordResetRequired ? ' / username login' : ''}</span>
+                    <span className="user-subline">
+                      <span className="user-username">{user.username}</span>
+                      <span className="user-role">
+                        {user.role}
+                        {user.active ? '' : ' / disabled'}
+                        {user.passwordResetRequired ? ' / username login' : ''}
+                      </span>
+                    </span>
                   </div>
                   <div className="user-actions">
                     <button type="button" className="ghost" onClick={() => { setEditingUserId(user.id); setEditingDisplayName(user.displayName) }}>Rename</button>
                     <button type="button" className="ghost" onClick={() => { setEditingPasswordUserId(user.id); setEditingPassword('') }}>Change password</button>
-                    <button type="button" className="ghost" onClick={() => onPatchUser(user, { passwordResetRequired: true })}>Allow username login</button>
+                    <button type="button" className="ghost" onClick={() => onPatchUser(user, { passwordResetRequired: true })}>Username login</button>
                     <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
                   </div>
                 </>
@@ -1554,57 +1561,59 @@ function AdminPanel({
                 </div>
               </div>
               <div className="module-controls">
-                <div className="inline-controls">
+                <div className="module-actions">
                   <button type="button" className="ghost" onClick={() => (module.installed ? setPendingUninstall(module) : onPatchModule(module, { installed: true, enabled: true }))}>{module.installed ? 'Uninstall' : 'Install'}</button>
                   {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
                 </div>
-                {module.installed && (
-                  <label className="compact-field">
-                    Size
-                    <select value={module.size} onChange={(event) => onPatchModule(module, { size: event.target.value as Module['size'] })}>
-                      <option value="small">Small</option>
-                      <option value="medium">Medium</option>
-                      <option value="wide">Wide</option>
-                      <option value="full">Full</option>
-                    </select>
-                  </label>
-                )}
-                {module.id === 'tides' && module.installed && (
-                  <>
+                <div className="module-options">
+                  {module.installed && (
                     <label className="compact-field">
-                      Tide source
-                      <select
-                        value={String(module.options?.source ?? 'model')}
-                        onChange={(event) => onPatchModule(module, { options: { ...module.options, source: event.target.value } })}
-                      >
-                        <option value="model">Built-in estimate</option>
-                        <option value="api">API</option>
+                      Size
+                      <select value={module.size} onChange={(event) => onPatchModule(module, { size: event.target.value as Module['size'] })}>
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="wide">Wide</option>
+                        <option value="full">Full</option>
                       </select>
                     </label>
-                    {tideSource === 'api' && (
-                      <>
-                        <label className="compact-field">
-                          API key
-                          <input
-                            value={tideApiKeyDraft}
-                            onChange={(event) => setTideApiKeyDraft(event.target.value)}
-                            onBlur={() => onPatchModule(module, { options: { ...module.options, apiKey: tideApiKeyDraft.trim() } })}
-                            placeholder="Paste API key"
-                          />
-                        </label>
-                        <a className="plain-row compact-link" href="https://tidesatlas.com/api/register" target="_blank" rel="noreferrer">
-                          <strong>Get API key</strong>
-                          <span>Open TidesAtlas signup page</span>
-                        </a>
-                      </>
-                    )}
-                  </>
-                )}
+                  )}
+                  {module.id === 'tides' && module.installed && (
+                    <>
+                      <label className="compact-field">
+                        Tide source
+                        <select
+                          value={String(module.options?.source ?? 'model')}
+                          onChange={(event) => onPatchModule(module, { options: { ...module.options, source: event.target.value } })}
+                        >
+                          <option value="model">Built-in estimate</option>
+                          <option value="api">API</option>
+                        </select>
+                      </label>
+                      {tideSource === 'api' && (
+                        <>
+                          <label className="compact-field api-key-field">
+                            API key
+                            <input
+                              value={tideApiKeyDraft}
+                              onChange={(event) => setTideApiKeyDraft(event.target.value)}
+                              onBlur={() => onPatchModule(module, { options: { ...module.options, apiKey: tideApiKeyDraft.trim() } })}
+                              placeholder="Paste API key"
+                            />
+                          </label>
+                          <a className="plain-row compact-link api-key-link" href="https://tidesatlas.com/api/register" target="_blank" rel="noreferrer">
+                            <strong>Get API key</strong>
+                            <span>Open TidesAtlas signup page</span>
+                          </a>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
                 <div className="compact-field position-field">
                   <span className="position-label">Order</span>
                   <div className="reorder-bar">
                     <button type="button" className="icon-button" disabled={index === 0} onClick={() => moveModule(index, index - 1)} aria-label="Move up">▲</button>
-                    <span className="position-value" aria-label={`Position ${module.position}`}>{module.position}</span>
+                    <span className="position-value" aria-label={`Position ${index + 1}`}>{index + 1}</span>
                     <button type="button" className="icon-button" disabled={index === modules.length - 1} onClick={() => moveModule(index, index + 1)} aria-label="Move down">▼</button>
                   </div>
                 </div>
