@@ -104,12 +104,13 @@ const LOCATION_SETTING_KEYS: Array<keyof Settings> = ['locationName', 'locationR
 const LEGACY_THEME_KEY = 'colourTheme'
 
 export async function getDashboard(env: Env, request: Request) {
-  const [weather, tides, notes, lists, pages, settings, modules, appearance] = await Promise.all([
+  const [weather, tides, notes, lists, pages, network, settings, modules, appearance] = await Promise.all([
     optionalData('weather', () => getWeather(env)),
     optionalData('marine', () => getMarine(env)),
     listNotes(env, {}),
     listLists(env),
     listPageLinks(env, request),
+    optionalData('network', () => getNetworkOverview(env)),
     getPublicSettings(env),
     import('./modules').then(({ listModules }) => listModules(env)),
     getAppearance(env),
@@ -118,9 +119,10 @@ export async function getDashboard(env: Env, request: Request) {
   return {
     weather,
     tides,
-    notes: notes.slice(0, 6),
-    lists: lists.slice(0, 6),
-    pages: pages.slice(0, 10),
+    notes: notes.slice(0, 12),
+    lists: lists.slice(0, 12),
+    pages: pages.slice(0, 12),
+    network,
     settings,
     modules,
     appearance,
@@ -322,12 +324,12 @@ export async function listLists(env: Env) {
   return listRows.map((row) => ({ ...toList(row, users), items: itemMap.get(rowString(row, 'id')) ?? [] }))
 }
 
-export async function createList(env: Env, input: { name?: string; listType?: string }, userId?: string) {
+export async function createList(env: Env, input: { name?: string; listType?: string; metadata?: unknown }, userId?: string) {
   const stamp = nowIso()
   const listId = id('list')
   const listType = normaliseListType(input.listType ?? 'shopping')
   await env.DB.prepare('INSERT INTO lists (id, name, list_type, reset_key, metadata_json, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .bind(listId, String(input.name ?? '').trim() || defaultListName(listType), listType, resetKeyForListType(listType), '{}', userId ?? null, userId ?? null, stamp, stamp)
+    .bind(listId, String(input.name ?? '').trim() || defaultListName(listType), listType, resetKeyForListType(listType), safeJson(normaliseListMetadata(input.metadata)), userId ?? null, userId ?? null, stamp, stamp)
     .run()
   return getList(env, listId)
 }
@@ -336,12 +338,13 @@ export async function getList(env: Env, listId: string) {
   return (await listLists(env)).find((list) => list.id === listId) ?? null
 }
 
-export async function updateList(env: Env, listId: string, patch: { name?: string; listType?: string }, userId?: string) {
+export async function updateList(env: Env, listId: string, patch: { name?: string; listType?: string; metadata?: unknown }, userId?: string) {
   const existing = await getList(env, listId)
   if (!existing) return null
   const listType = patch.listType === undefined ? existing.listType : normaliseListType(patch.listType)
-  await env.DB.prepare('UPDATE lists SET name = ?, list_type = ?, reset_key = ?, updated_by = ?, updated_at = ? WHERE id = ?')
-    .bind(patch.name === undefined ? existing.name : String(patch.name).trim() || defaultListName(listType), listType, resetKeyForListType(listType), userId ?? existing.updatedBy ?? null, nowIso(), listId)
+  const metadata = patch.metadata === undefined ? existing.metadata : normaliseListMetadata(patch.metadata)
+  await env.DB.prepare('UPDATE lists SET name = ?, list_type = ?, reset_key = ?, metadata_json = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+    .bind(patch.name === undefined ? existing.name : String(patch.name).trim() || defaultListName(listType), listType, resetKeyForListType(listType), safeJson(metadata), userId ?? existing.updatedBy ?? null, nowIso(), listId)
     .run()
   return getList(env, listId)
 }
@@ -957,6 +960,11 @@ function parseJsonObject(value: string) {
   } catch {
     return {}
   }
+}
+
+function normaliseListMetadata(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return { ...(value as Record<string, unknown>) }
 }
 
 function safeJson(value: unknown) {

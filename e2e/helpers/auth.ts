@@ -1,12 +1,8 @@
 import { expect, type Page } from '@playwright/test'
 
 export function testCredentials() {
-  const username = process.env.FP_TEST_USERNAME
-  const password = process.env.FP_TEST_PASSWORD
-
-  if (!username || !password) {
-    throw new Error('Set FP_TEST_USERNAME and FP_TEST_PASSWORD before running Playwright e2e tests.')
-  }
+  const username = process.env.TEST_USERNAME ?? process.env.FP_TEST_USERNAME ?? 'codex_test'
+  const password = process.env.TEST_PASSWORD ?? process.env.FP_TEST_PASSWORD ?? 'CodexTest!2026-FP'
 
   return { username, password }
 }

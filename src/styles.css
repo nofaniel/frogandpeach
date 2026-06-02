@@ -1490,6 +1490,20 @@ body {
   font-weight: 800;
 }
 
+.weather-forecast-grid {
+  margin-top: 16px;
+}
+
+.weather-forecast-card {
+  display: grid;
+  gap: 4px;
+}
+
+.weather-forecast-card strong,
+.weather-forecast-card small {
+  color: var(--app-ink);
+}
+
 .home-dashboard + * {
   margin-top: 0;
 }
@@ -1736,6 +1750,46 @@ body {
 
 .network-panel .status-badge {
   align-self: start;
+}
+
+.launchpad-grid,
+.note-launchpad-grid,
+.network-summary-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.launchpad-grid,
+.note-launchpad-grid,
+.network-summary-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.launchpad-card {
+  min-width: 0;
+}
+
+.launchpad-card p,
+.launchpad-card small {
+  color: var(--color-muted);
+}
+
+.note-launchpad-card {
+  text-align: left;
+}
+
+.note-launchpad-head {
+  display: grid;
+  gap: 4px;
+}
+
+.note-launchpad-card p {
+  margin: 0;
+}
+
+.note-launchpad-card .tag-line {
+  margin-top: 4px;
 }
 
 @media (min-width: 821px) {

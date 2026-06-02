@@ -12,11 +12,27 @@ type Module = {
   title: string
   description: string
   category: string
+  homeWidget?: {
+    label: string
+    description: string
+    defaultEnabled: boolean
+    defaultMode: string
+    modes: Array<{
+      id: string
+      label: string
+      description: string
+    }>
+  }
   installed: boolean
   enabled: boolean
   position: number
   size: 'small' | 'medium' | 'wide' | 'full'
-  options: Record<string, unknown>
+  options: Record<string, unknown> & {
+    homeWidget?: {
+      enabled: boolean
+      mode: string
+    }
+  }
 }
 
 type ListType = {
@@ -52,6 +68,7 @@ type SharedList = {
   name: string
   listType: string
   resetKey: string
+  metadata: Record<string, unknown>
   createdByName: string | null
   updatedByName: string | null
   updatedAt: string
@@ -160,6 +177,7 @@ type HomeData = {
   notes: Note[]
   lists: SharedList[]
   pages: PageLink[]
+  network: NetworkOverview | null
   settings: Partial<Settings>
   modules: Module[]
   appearance: Appearance
@@ -367,14 +385,13 @@ function App() {
     setBusy(true)
     setError('')
     try {
-      const [homeData, listData, noteData, pageData, linkData, appearanceData, networkData] = await Promise.all([
+      const [homeData, listData, noteData, pageData, linkData, appearanceData] = await Promise.all([
         api<HomeData>('/api/home'),
         api<SharedList[]>('/api/lists'),
         api<Note[]>('/api/notes'),
         api<Page[]>('/api/pages'),
         api<PageLink[]>('/api/page-links'),
         api<Appearance>('/api/appearance'),
-        api<NetworkOverview>('/api/network'),
       ])
       setHome(homeData)
       setLists(listData)
@@ -383,7 +400,7 @@ function App() {
       setPageLinks(linkData)
       setModules(homeData.modules)
       setSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
-      setNetwork(networkData)
+      setNetwork(homeData.network)
       void setTheme(appearanceData.themeId)
       if (window.location.pathname.startsWith('/page/')) {
         const slug = window.location.pathname.replace(/^\/page\//, '')
@@ -507,6 +524,22 @@ function App() {
   async function removeList(id: string) {
     await run(async () => {
       await api(`/api/lists/${id}`, { method: 'DELETE' })
+      await refreshAll()
+    })
+  }
+
+  async function toggleListStar(list: SharedList) {
+    const starred = Boolean(list.metadata?.starred)
+    await run(async () => {
+      await api(`/api/lists/${list.id}`, {
+        method: 'PATCH',
+        body: {
+          metadata: {
+            ...list.metadata,
+            starred: !starred,
+          },
+        },
+      })
       await refreshAll()
     })
   }
@@ -885,7 +918,7 @@ function App() {
       {!viewedPage && !adminOpen && activeTab === 'home' && home && (
         <section className="dashboard-grid home-dashboard">
           {dashboardModules
-            .filter((module) => module.id === 'weather' || module.id === 'tides')
+            .filter((module) => module.homeWidget && module.options.homeWidget?.enabled !== false)
             .map((module) => renderModule(module, home, setActiveTab, locationConfigured, openAdmin, settings))}
         </section>
       )}
@@ -914,9 +947,12 @@ function App() {
               <div className="panel-heading">
                 <div>
                   <p className="kicker">{labelForListType(list.listType, listTypes)}{list.resetKey ? ` / ${list.resetKey}` : ''}{list.updatedByName ? ` / ${list.updatedByName}` : ''}</p>
-                  <h2>{list.name}</h2>
+                  <h2>{Boolean(list.metadata?.starred) ? '★ ' : ''}{list.name}</h2>
                 </div>
-                <button type="button" className="ghost danger" onClick={() => removeList(list.id)}>Delete</button>
+                <div className="button-row">
+                  <button type="button" className="ghost" onClick={() => toggleListStar(list)}>{Boolean(list.metadata?.starred) ? 'Unstar' : 'Star'}</button>
+                  <button type="button" className="ghost danger" onClick={() => removeList(list.id)}>Delete</button>
+                </div>
               </div>
               <form className="inline-form" onSubmit={(event) => createItem(event, list.id)}>
                 <input value={itemDrafts[list.id] ?? ''} onChange={(event) => setItemDrafts((drafts) => ({ ...drafts, [list.id]: event.target.value }))} placeholder="Add item" />
@@ -1043,11 +1079,14 @@ function renderModule(
   onOpenAdminSettings: () => void,
   settings?: Settings,
 ) {
-  const className = `panel module-${module.size}`
+  const className = 'panel module-' + module.size
+  const widget = resolveHomeWidgetState(module)
+  if (!widget) return null
+
   if (module.id === 'weather') {
     if (!locationConfigured) {
       return (
-        <article className={`${className} weather-panel`} key={module.id}>
+        <article className={className + ' weather-panel'} key={module.id}>
           <div className="weather-orb" aria-hidden="true" />
           <p className="kicker">Weather</p>
           <h2>Location not set</h2>
@@ -1059,7 +1098,7 @@ function renderModule(
 
     if (!home.weather) {
       return (
-        <article className={`${className} weather-panel`} key={module.id}>
+        <article className={className + ' weather-panel'} key={module.id}>
           <div className="weather-orb" aria-hidden="true" />
           <div className="weather-place">LOCAL WEATHER</div>
           <h2>Weather unavailable</h2>
@@ -1069,8 +1108,9 @@ function renderModule(
     }
 
     const weatherLocation = home.weather.location?.trim() || formatLocationLabel(settings)
+    const forecastDays = home.weather.daily.slice(0, 3)
     return (
-      <article className={`${className} weather-panel`} key={module.id}>
+      <article className={className + ' weather-panel'} key={module.id}>
         <div className="weather-orb" aria-hidden="true" />
         <div className="weather-place">{weatherLocation.toUpperCase()}</div>
         <div className="weather-current">
@@ -1081,26 +1121,38 @@ function renderModule(
           </div>
         </div>
         <div className="metric-row">
-          {home.weather.daily[0] && <span>↑ {formatTemperature(home.weather.daily[0].max)} ↓ {formatTemperature(home.weather.daily[0].min)}</span>}
-          <span>💨 {formatNumber(home.weather.current.windSpeed)} km/h</span>
-          <span>💧 {formatNumber(home.weather.daily[0]?.precipitationChance)}%</span>
-          <span>☂️ {formatNumber(home.weather.current.precipitation)}% rain</span>
+          {home.weather.daily[0] && <span>? {formatTemperature(home.weather.daily[0].max)} ? {formatTemperature(home.weather.daily[0].min)}</span>}
+          <span>?? {formatNumber(home.weather.current.windSpeed)} km/h</span>
+          <span>?? {formatNumber(home.weather.daily[0]?.precipitationChance)}%</span>
+          <span>?? {formatNumber(home.weather.current.precipitation)}% rain</span>
           <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
         </div>
+        {widget.mode === 'forecast' && (
+          <section className="day-grid weather-forecast-grid" aria-label="Forecast summary">
+            {forecastDays.map((day) => (
+              <div key={day.date} className="weather-forecast-card">
+                <span>{formatDate(day.date)}</span>
+                <strong>{day.label}</strong>
+                <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
+              </div>
+            ))}
+          </section>
+        )}
       </article>
     )
   }
+
   if (module.id === 'tides') {
     if (!locationConfigured) {
       return (
-        <article className={`${className} tide-panel`} key={module.id}>
+        <article className={className + ' tide-panel'} key={module.id}>
           <div className="panel-heading">
             <div>
-              <p className="kicker">Tides · Predicted</p>
+              <p className="kicker">Tides - Predicted</p>
               <h2>Location not set</h2>
               <p className="tide-panel-summary">Set latitude, longitude, and timezone in Admin settings before tides can load.</p>
             </div>
-            <span className="tide-mark" aria-hidden="true">🌊</span>
+            <span className="tide-mark" aria-hidden="true">??</span>
           </div>
           <button type="button" className="button-link" onClick={onOpenAdminSettings}>Open Admin settings</button>
         </article>
@@ -1111,14 +1163,14 @@ function renderModule(
     const featuredTides = tideEvents.slice(0, 2)
     const tideDays = groupTideDays(tideEvents, 5)
     return (
-      <article className={`${className} tide-panel`} key={module.id}>
+      <article className={className + ' tide-panel'} key={module.id}>
         <div className="panel-heading">
           <div>
-            <p className="kicker">Tides · Predicted</p>
+            <p className="kicker">Tides - Predicted</p>
             <h2>Local tides</h2>
-            <p className="tide-panel-summary">Next 2 tides first, then a 5-day tide timeline.</p>
+            <p className="tide-panel-summary">Next 2 tides first{widget.mode === 'timeline' ? ', then a 5-day tide timeline.' : '.'}</p>
           </div>
-          <span className="tide-mark" aria-hidden="true">🌊</span>
+          <span className="tide-mark" aria-hidden="true">??</span>
         </div>
         <section className="tide-section tide-feature-section" aria-labelledby="tide-feature-heading">
           <div className="tide-section-head">
@@ -1127,7 +1179,7 @@ function renderModule(
           </div>
           <div className="tide-feature-grid">
             {featuredTides.length > 0 ? featuredTides.map((event, index) => (
-              <article key={event.id} className={`tide-feature-card ${event.type}`}>
+              <article key={event.id} className={'tide-feature-card ' + event.type}>
                 <span className="tide-feature-badge">{index === 0 ? 'Next up' : 'Then'}</span>
                 <strong>{formatTideEventLabel(event.type)}</strong>
                 <div className="tide-feature-time">{formatTime(event.time)}</div>
@@ -1140,35 +1192,37 @@ function renderModule(
           </div>
         </section>
 
-        <section className="tide-section tide-timeline-section" aria-labelledby="tide-timeline-heading">
-          <div className="tide-section-head">
-            <p id="tide-timeline-heading" className="tide-section-title">Next 5 days</p>
-            <span className="tide-section-subtitle">Each day with its tide times and dates</span>
-          </div>
-          <div className="tide-day-list">
-            {tideDays.length > 0 ? tideDays.map((day, index) => (
-              <article key={day.key} className="tide-day-card">
-                <div className="tide-day-head">
-                  <div className="tide-day-title">
-                    <strong>{day.label}</strong>
-                    <span className="tide-day-badge">{formatTideDayBadge(index)}</span>
-                  </div>
-                </div>
-                <div className="tide-day-events">
-                  {day.events.map((event) => (
-                    <div key={event.id} className={`tide-day-event ${event.type}`}>
-                      <span>{event.type === 'high' ? 'High tide' : 'Low tide'}</span>
-                      <strong>{formatTime(event.time)}</strong>
-                      <small>{formatTideHeight(event.height)}</small>
+        {widget.mode === 'timeline' && (
+          <section className="tide-section tide-timeline-section" aria-labelledby="tide-timeline-heading">
+            <div className="tide-section-head">
+              <p id="tide-timeline-heading" className="tide-section-title">Next 5 days</p>
+              <span className="tide-section-subtitle">Each day with its tide times and dates</span>
+            </div>
+            <div className="tide-day-list">
+              {tideDays.length > 0 ? tideDays.map((day, index) => (
+                <article key={day.key} className="tide-day-card">
+                  <div className="tide-day-head">
+                    <div className="tide-day-title">
+                      <strong>{day.label}</strong>
+                      <span className="tide-day-badge">{formatTideDayBadge(index)}</span>
                     </div>
-                  ))}
-                </div>
-              </article>
-            )) : (
-              <div className="tide-empty-state">No tide timeline available.</div>
-            )}
-          </div>
-        </section>
+                  </div>
+                  <div className="tide-day-events">
+                    {day.events.map((event) => (
+                      <div key={event.id} className={'tide-day-event ' + event.type}>
+                        <span>{event.type === 'high' ? 'High tide' : 'Low tide'}</span>
+                        <strong>{formatTime(event.time)}</strong>
+                        <small>{formatTideHeight(event.height)}</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              )) : (
+                <div className="tide-empty-state">No tide timeline available.</div>
+              )}
+            </div>
+          </section>
+        )}
         <p className="tide-source-note">
           {home.tides?.note ?? 'Approximate tide trend from Open-Meteo marine model. Not for navigation.'}{' '}
           <span className="tide-source-label">Source: configured tide data</span>
@@ -1176,59 +1230,105 @@ function renderModule(
       </article>
     )
   }
+
   if (module.id === 'lists') {
+    const orderedLists = getHomeListEntries(home.lists, widget.mode).slice(0, 4)
+
     return (
       <article className={className} key={module.id}>
         <p className="kicker">Lists</p>
-        <h2>Active</h2>
+        <h2>{widget.mode === 'starred' ? 'Starred first' : 'Active lists'}</h2>
         <div className="stack-list">
-          {home.lists.map((list) => (
+          {orderedLists.map(({ list, starred, incompleteCount }) => (
             <button key={list.id} type="button" className="plain-row" onClick={() => setActiveTab('lists')}>
-              <strong>{list.name}</strong>
-              <span>{list.items.filter((item) => !item.done).length} left</span>
+              <strong>{starred ? '? ' : ''}{list.name}</strong>
+              <span>
+                {widget.mode === 'starred'
+                  ? `${incompleteCount} open`
+                  : `${incompleteCount} open, updated ${formatDate(list.updatedAt)}`}
+              </span>
             </button>
           ))}
+          {orderedLists.length === 0 && <div className="plain-row"><strong>No active lists</strong><span>Create or update a list to surface it here.</span></div>}
         </div>
       </article>
     )
   }
+
   if (module.id === 'notes') {
+    const visibleNotes = home.notes.slice(0, widget.mode === 'large' ? 6 : 3)
     return (
       <article className={className} key={module.id}>
         <p className="kicker">Notes</p>
-        <h2>Pinned & recent</h2>
-        <div className="stack-list">
-          {home.notes.map((note) => (
-            <button key={note.id} type="button" className="plain-row" onClick={() => setActiveTab('notes')}>
-              <strong>{note.pinned ? 'Pinned: ' : ''}{note.title}</strong>
-              <span>{note.tags || firstLine(note.body) || 'No detail yet'}</span>
-            </button>
+        <h2>{widget.mode === 'large' ? 'Pinned, recent, and detailed' : 'Pinned & recent'}</h2>
+        <div className={widget.mode === 'large' ? 'note-launchpad-grid' : 'stack-list'}>
+          {visibleNotes.map((note) => (
+            widget.mode === 'large' ? (
+              <button key={note.id} type="button" className="plain-row note-launchpad-card" onClick={() => setActiveTab('notes')}>
+                <div className="note-launchpad-head">
+                  <strong>{note.pinned ? 'Pinned: ' : ''}{note.title}</strong>
+                  <span>{note.updatedByName ? note.updatedByName + ' / ' : ''}{formatDate(note.updatedAt)}</span>
+                </div>
+                <p>{firstLine(note.body) || 'No detail yet'}</p>
+                {note.tags && <span className="tag-line">{note.tags}</span>}
+              </button>
+            ) : (
+              <button key={note.id} type="button" className="plain-row" onClick={() => setActiveTab('notes')}>
+                <strong>{note.pinned ? 'Pinned: ' : ''}{note.title}</strong>
+                <span>{note.tags || firstLine(note.body) || 'No detail yet'}</span>
+              </button>
+            )
           ))}
+          {visibleNotes.length === 0 && <div className="plain-row"><strong>No notes yet</strong><span>Create one in the Notes tab.</span></div>}
         </div>
       </article>
     )
   }
+
   if (module.id === 'pages') {
+    const visiblePages = home.pages.slice(0, widget.mode === 'launchpad' ? 6 : 10)
     return (
       <article className={className} key={module.id}>
         <p className="kicker">Pages</p>
-        <h2>Custom launchpad</h2>
-        <div className="page-chip-row">
-          {home.pages.map((page) => (
-            <a key={`${page.kind}-${page.id}`} href={page.href} className="page-chip">
-              <span>{page.kind}</span>
-              <strong>{page.title}</strong>
-            </a>
-          ))}
-        </div>
+        <h2>{widget.mode === 'launchpad' ? 'Launchpad cards' : 'Custom launchpad'}</h2>
+        {widget.mode === 'launchpad' ? (
+          <div className="launchpad-grid">
+            {visiblePages.map((page) => (
+              <article className="plain-row launchpad-card" key={page.kind + '-' + page.id}>
+                <div className="panel-heading">
+                  <div>
+                    <p className="kicker">{page.kind}</p>
+                    <h3>{page.title}</h3>
+                  </div>
+                  <a className="button-link ghost compact-link" href={page.href}>Open</a>
+                </div>
+                <p>{page.description || 'No description yet.'}</p>
+                <small>{page.href}</small>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="page-chip-row">
+            {visiblePages.map((page) => (
+              <a key={page.kind + '-' + page.id} href={page.href} className="page-chip">
+                <span>{page.kind}</span>
+                <strong>{page.title}</strong>
+              </a>
+            ))}
+          </div>
+        )}
       </article>
     )
   }
+
   if (module.id === 'network') {
-    const routerUrl = normaliseExternalUrl(settings?.routerUrl)
-    const adminUrl = normaliseExternalUrl(settings?.adminUrl)
+    const network = home.network
+    const routerUrl = normaliseExternalUrl(network?.routerUrl)
+    const adminUrl = normaliseExternalUrl(network?.adminUrl)
+    const connectedDevices = network?.devices ?? []
+    const onlineDevices = connectedDevices.filter((device) => device.status === 'online').length
     return (
-      <article className={`${className} network-panel`} key={module.id}>
+      <article className={className + ' network-panel'} key={module.id}>
         <div className="panel-heading">
           <div>
             <p className="kicker">Deployment</p>
@@ -1238,7 +1338,7 @@ function renderModule(
             {home.deployment.ready ? 'Connected' : 'Needs setup'}
           </span>
         </div>
-        <p>{home.deployment.note}</p>
+        <p>{widget.mode === 'details' && network?.usage.period ? home.deployment.note + ' ' + network.usage.period + ' usage and devices are shown below.' : home.deployment.note}</p>
         <div className="stack-list">
           <a className="plain-row" href={home.deployment.origin} target="_blank" rel="noreferrer">
             <strong>Open current host</strong>
@@ -1261,10 +1361,71 @@ function renderModule(
             <span>Functions + D1 setup and deploy steps</span>
           </a>
         </div>
+        {widget.mode === 'details' && network && (
+          <section className="network-summary-grid">
+            <div className="detail-box">
+              <strong>Usage</strong>
+              <span>{network.usage.period || 'Current period'}</span>
+              <small>{network.usage.monthlyGb === null ? 'No usage data yet' : formatNumber(network.usage.monthlyGb) + ' GB' + (network.usage.updatedAt ? ' / updated ' + formatDateTime(network.usage.updatedAt) : '')}</small>
+            </div>
+            <div className="detail-box">
+              <strong>Devices</strong>
+              <span>{connectedDevices.length} configured</span>
+              <small>{onlineDevices} online, {connectedDevices.length - onlineDevices} offline</small>
+            </div>
+          </section>
+        )}
       </article>
     )
   }
+
   return null
+}
+
+function resolveHomeWidgetState(module: Module) {
+  const definition = module.homeWidget
+  if (!definition) return null
+  const current = module.options.homeWidget
+  const validModes = new Set(definition.modes.map((mode) => mode.id))
+  const mode = typeof current?.mode === 'string' && validModes.has(current.mode) ? current.mode : definition.defaultMode
+  const enabled = typeof current?.enabled === 'boolean' ? current.enabled : definition.defaultEnabled
+  return { definition, mode, enabled }
+}
+
+type HomeListEntry = {
+  list: SharedList
+  starred: boolean
+  incompleteCount: number
+}
+
+function getHomeListEntries(lists: SharedList[], mode: string): HomeListEntry[] {
+  const entries = lists.map((list) => ({
+    list,
+    starred: isListStarred(list),
+    incompleteCount: list.items.filter((item) => !item.done).length,
+  }))
+
+  if (mode === 'starred') {
+    const starred = entries
+      .filter((entry) => entry.starred)
+      .sort((left, right) => Date.parse(right.list.updatedAt) - Date.parse(left.list.updatedAt))
+    const active = entries
+      .filter((entry) => !entry.starred && entry.incompleteCount > 0)
+      .sort((left, right) => Date.parse(right.list.updatedAt) - Date.parse(left.list.updatedAt))
+    if (starred.length > 0) return [...starred, ...active]
+    if (active.length > 0) return active
+    return entries.sort((left, right) => Date.parse(right.list.updatedAt) - Date.parse(left.list.updatedAt))
+  }
+
+  const active = entries
+    .filter((entry) => entry.incompleteCount > 0)
+    .sort((left, right) => Date.parse(right.list.updatedAt) - Date.parse(left.list.updatedAt))
+  if (active.length > 0) return active
+  return entries.sort((left, right) => Date.parse(right.list.updatedAt) - Date.parse(left.list.updatedAt))
+}
+
+function isListStarred(list: SharedList) {
+  return Boolean(list.metadata?.starred)
 }
 
 function AdminPanel({
@@ -1564,6 +1725,25 @@ function AdminPanel({
                 <div className="module-actions">
                   <button type="button" className="ghost" onClick={() => (module.installed ? setPendingUninstall(module) : onPatchModule(module, { installed: true, enabled: true }))}>{module.installed ? 'Uninstall' : 'Install'}</button>
                   {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
+                  {module.homeWidget && module.installed && (
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => onPatchModule(module, {
+                        options: {
+                          ...module.options,
+                          homeWidget: {
+                            enabled: !(module.options.homeWidget?.enabled ?? module.homeWidget!.defaultEnabled),
+                            mode: module.options.homeWidget?.mode && module.homeWidget!.modes.some((mode) => mode.id === module.options.homeWidget?.mode)
+                              ? module.options.homeWidget!.mode
+                              : module.homeWidget!.defaultMode,
+                          },
+                        },
+                      })}
+                    >
+                      {(module.options.homeWidget?.enabled ?? module.homeWidget!.defaultEnabled) ? 'Widget off' : 'Widget on'}
+                    </button>
+                  )}
                 </div>
                 <div className="module-options">
                   {module.installed && (
@@ -1575,6 +1755,32 @@ function AdminPanel({
                         <option value="wide">Wide</option>
                         <option value="full">Full</option>
                       </select>
+                    </label>
+                  )}
+                  {module.homeWidget && module.installed && (
+                    <label className="compact-field">
+                      Homepage mode
+                      <select
+                        value={
+                          module.options.homeWidget?.mode && module.homeWidget!.modes.some((mode) => mode.id === module.options.homeWidget?.mode)
+                            ? module.options.homeWidget!.mode
+                            : module.homeWidget!.defaultMode
+                        }
+                        onChange={(event) => onPatchModule(module, {
+                          options: {
+                            ...module.options,
+                            homeWidget: {
+                              enabled: module.options.homeWidget?.enabled ?? module.homeWidget!.defaultEnabled,
+                              mode: event.target.value,
+                            },
+                          },
+                        })}
+                      >
+                        {module.homeWidget!.modes.map((mode) => (
+                          <option key={mode.id} value={mode.id}>{mode.label}</option>
+                        ))}
+                      </select>
+                      <small>{module.homeWidget!.description}</small>
                     </label>
                   )}
                   {module.id === 'tides' && module.installed && (

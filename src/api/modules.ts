@@ -3,6 +3,25 @@ import type { DbRow, Env } from './types'
 
 export type ModuleSize = 'small' | 'medium' | 'wide' | 'full'
 
+export type HomeWidgetModeDefinition = {
+  id: string
+  label: string
+  description: string
+}
+
+export type HomeWidgetDefinition = {
+  label: string
+  description: string
+  defaultEnabled: boolean
+  defaultMode: string
+  modes: HomeWidgetModeDefinition[]
+}
+
+export type HomeWidgetState = {
+  enabled: boolean
+  mode: string
+}
+
 export type ModuleDefinition = {
   id: string
   title: string
@@ -12,6 +31,7 @@ export type ModuleDefinition = {
   defaultEnabled: boolean
   defaultInstalled: boolean
   defaultSize: ModuleSize
+  homeWidget?: HomeWidgetDefinition
 }
 
 export type ModuleState = ModuleDefinition & {
@@ -32,12 +52,126 @@ export type ModulePatch = {
 }
 
 export const moduleDefinitions: ModuleDefinition[] = [
-  { id: 'weather', title: 'Weather', description: 'Current weather and three-day forecast.', category: 'data', defaultPosition: 10, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
-  { id: 'tides', title: 'Tides', description: 'Approximate tide trends from Open-Meteo marine model data.', category: 'data', defaultPosition: 20, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
-  { id: 'lists', title: 'Lists', description: 'Shared household lists, shopping lists, goals, and checklists.', category: 'content', defaultPosition: 30, defaultEnabled: true, defaultInstalled: true, defaultSize: 'medium' },
-  { id: 'notes', title: 'Notes', description: 'Pinned and tagged shared notes with metadata for future note types.', category: 'content', defaultPosition: 40, defaultEnabled: true, defaultInstalled: true, defaultSize: 'medium' },
-  { id: 'pages', title: 'Pages', description: 'Editable markdown pages and discovered custom static pages.', category: 'content', defaultPosition: 50, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
-  { id: 'network', title: 'Network', description: 'Wi-Fi sharing, usage snapshots, and connected device overview.', category: 'system', defaultPosition: 60, defaultEnabled: true, defaultInstalled: true, defaultSize: 'wide' },
+  {
+    id: 'weather',
+    title: 'Weather',
+    description: 'Current weather and three-day forecast.',
+    category: 'data',
+    defaultPosition: 10,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'wide',
+    homeWidget: {
+      label: 'Homepage weather widget',
+      description: 'Controls whether weather appears on the home screen and which density is used.',
+      defaultEnabled: true,
+      defaultMode: 'current',
+      modes: [
+        { id: 'current', label: 'Current conditions', description: 'Compact current weather with today’s key metrics.' },
+        { id: 'forecast', label: 'Forecast', description: 'Current weather plus a short three-day forecast.' },
+      ],
+    },
+  },
+  {
+    id: 'tides',
+    title: 'Tides',
+    description: 'Approximate tide trends from Open-Meteo marine model data.',
+    category: 'data',
+    defaultPosition: 20,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'wide',
+    homeWidget: {
+      label: 'Homepage tides widget',
+      description: 'Controls whether tide events appear on the home screen and how much detail is shown.',
+      defaultEnabled: true,
+      defaultMode: 'next',
+      modes: [
+        { id: 'next', label: 'Next tides', description: 'Compact next-two tide overview.' },
+        { id: 'timeline', label: 'Timeline', description: 'Next tide events plus a short multi-day timeline.' },
+      ],
+    },
+  },
+  {
+    id: 'lists',
+    title: 'Lists',
+    description: 'Shared household lists, shopping lists, goals, and checklists.',
+    category: 'content',
+    defaultPosition: 30,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'medium',
+    homeWidget: {
+      label: 'Homepage lists widget',
+      description: 'Controls whether list shortcuts appear on the home screen and how they are ranked.',
+      defaultEnabled: true,
+      defaultMode: 'starred',
+      modes: [
+        { id: 'starred', label: 'Starred first', description: 'Pinned lists first, then recent active lists.' },
+        { id: 'active', label: 'Active lists', description: 'Recently updated active lists with incomplete counts.' },
+      ],
+    },
+  },
+  {
+    id: 'notes',
+    title: 'Notes',
+    description: 'Pinned and tagged shared notes with metadata for future note types.',
+    category: 'content',
+    defaultPosition: 40,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'medium',
+    homeWidget: {
+      label: 'Homepage notes widget',
+      description: 'Controls whether notes appear on the home screen and how much text is shown.',
+      defaultEnabled: true,
+      defaultMode: 'small',
+      modes: [
+        { id: 'small', label: 'Small', description: 'Three pinned or recent notes.' },
+        { id: 'large', label: 'Large', description: 'Six notes with snippets and tags.' },
+      ],
+    },
+  },
+  {
+    id: 'pages',
+    title: 'Pages',
+    description: 'Editable markdown pages and discovered custom static pages.',
+    category: 'content',
+    defaultPosition: 50,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'wide',
+    homeWidget: {
+      label: 'Homepage pages widget',
+      description: 'Controls whether page links appear on the home screen and whether they stay compact or expanded.',
+      defaultEnabled: true,
+      defaultMode: 'compact',
+      modes: [
+        { id: 'compact', label: 'Compact', description: 'Page chips for quick launch.' },
+        { id: 'launchpad', label: 'Launchpad', description: 'Richer cards with descriptions and quick-open links.' },
+      ],
+    },
+  },
+  {
+    id: 'network',
+    title: 'Network',
+    description: 'Wi-Fi sharing, usage snapshots, and connected device overview.',
+    category: 'system',
+    defaultPosition: 60,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'wide',
+    homeWidget: {
+      label: 'Homepage network widget',
+      description: 'Controls whether deployment and network information appears on the home screen.',
+      defaultEnabled: true,
+      defaultMode: 'status',
+      modes: [
+        { id: 'status', label: 'Status', description: 'Deployment, router, and admin links.' },
+        { id: 'details', label: 'Details', description: 'Status plus usage and device summary.' },
+      ],
+    },
+  },
   { id: 'settings', title: 'Admin tools', description: 'Users, modules, appearance, household settings, cache, and review tools.', category: 'admin', defaultPosition: 70, defaultEnabled: false, defaultInstalled: true, defaultSize: 'wide' },
 ]
 
@@ -54,13 +188,14 @@ export function normaliseModules(settings: Map<string, DbRow>) {
     .map((definition) => {
       const row = settings.get(definition.id)
       const installed = row ? rowNumber(row, 'installed') === 1 : definition.defaultInstalled
+      const options = normaliseModuleOptions(definition, parseOptions(rowString(row ?? {}, 'options_json')))
       return {
         ...definition,
         installed,
         enabled: installed && (row ? rowNumber(row, 'enabled') === 1 : definition.defaultEnabled),
         position: row ? rowNumber(row, 'position') : definition.defaultPosition,
         size: normaliseModuleSize(rowString(row ?? {}, 'size') || definition.defaultSize),
-        options: parseOptions(rowString(row ?? {}, 'options_json')),
+        options,
       }
     })
     .sort((left, right) => left.position - right.position || left.defaultPosition - right.defaultPosition)
@@ -80,7 +215,8 @@ export async function updateModules(env: Env, patch: ModulePatch[]) {
     const enabled = installed && (entry.enabled === undefined ? (existing?.enabled ?? true) : Boolean(entry.enabled))
     const position = Number.isFinite(entry.position) ? Number(entry.position) : existing?.position ?? 0
     const size = normaliseModuleSize(entry.size ?? existing?.size ?? 'medium')
-    const options = entry.options === undefined ? existing?.options ?? {} : entry.options
+    const definition = moduleDefinitions.find((module) => module.id === entry.id)
+    const options = normaliseModuleOptions(definition, entry.options === undefined ? existing?.options ?? {} : entry.options)
     await statement.bind(entry.id, installed ? 1 : 0, enabled ? 1 : 0, position, size, JSON.stringify(options ?? {}), nowIso()).run()
   }
 
@@ -97,5 +233,28 @@ function parseOptions(value: string) {
     return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
   } catch {
     return {}
+  }
+}
+
+function normaliseModuleOptions(definition: ModuleDefinition | undefined, options: Record<string, unknown>) {
+  if (!definition?.homeWidget) {
+    const { homeWidget: _homeWidget, ...rest } = options
+    return rest
+  }
+
+  const homeWidget = normaliseHomeWidgetState(definition.homeWidget, options.homeWidget)
+  return {
+    ...options,
+    homeWidget,
+  }
+}
+
+function normaliseHomeWidgetState(definition: HomeWidgetDefinition, value: unknown): HomeWidgetState {
+  const current = value && typeof value === 'object' && !Array.isArray(value) ? (value as Partial<HomeWidgetState>) : {}
+  const validModes = new Set(definition.modes.map((mode) => mode.id))
+
+  return {
+    enabled: typeof current.enabled === 'boolean' ? current.enabled : definition.defaultEnabled,
+    mode: typeof current.mode === 'string' && validModes.has(current.mode) ? current.mode : definition.defaultMode,
   }
 }

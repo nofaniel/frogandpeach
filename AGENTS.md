@@ -56,9 +56,9 @@ Do not edit files directly under `public/themes/` or `public/custom-pages/` — 
 
 **E2E tests default to production** (`https://frog-peach-home-hub.pages.dev`). To test locally:
 ```bash
-E2E_BASE_URL=http://localhost:8788 FP_TEST_USERNAME=admin FP_TEST_PASSWORD=yourpassword npm run test:e2e
+E2E_BASE_URL=http://localhost:8788 TEST_USERNAME=codex_test TEST_PASSWORD=CodexTest!2026-FP npm run test:e2e
 ```
-`FP_TEST_USERNAME` and `FP_TEST_PASSWORD` are always required.
+`TEST_USERNAME` and `TEST_PASSWORD` are the preferred test credentials. Legacy `FP_TEST_USERNAME`/`FP_TEST_PASSWORD` are still supported as fallbacks.
 
 ## No Linter, No CI, No Formatter
 

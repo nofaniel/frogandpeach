@@ -1,12 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getMarine, getSettings, getWeather, normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport, updateSettings } from './data'
+import { getMarine, getSettings, getWeather, normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport, updateList, updateSettings } from './data'
 
 type FakeDbState = {
   settings: Map<string, string>
   cache: Array<{ cache_key: string; payload: string; expires_at: string; updated_at: string }>
+  lists: Array<{
+    id: string
+    name: string
+    list_type: string
+    reset_key: string
+    metadata_json: string
+    created_by: string
+    updated_by: string
+    created_at: string
+    updated_at: string
+  }>
+  listItems: Array<Record<string, string | number | null>>
 }
 
-function createFakeEnv(initialSettings: Record<string, string> = {}, cacheKeys: string[] = []) {
+function createFakeEnv(
+  initialSettings: Record<string, string> = {},
+  cacheKeys: string[] = [],
+  initialLists: Array<Partial<FakeDbState['lists'][number]> & { id: string; name: string; list_type: string; reset_key?: string; metadata_json?: string }> = [],
+) {
   const state: FakeDbState = {
     settings: new Map(Object.entries(initialSettings)),
     cache: cacheKeys.map((cacheKey) => ({
@@ -15,6 +31,18 @@ function createFakeEnv(initialSettings: Record<string, string> = {}, cacheKeys: 
       expires_at: '2999-01-01T00:00:00.000Z',
       updated_at: '2999-01-01T00:00:00.000Z',
     })),
+    lists: initialLists.map((list) => ({
+      id: list.id,
+      name: list.name,
+      list_type: list.list_type,
+      reset_key: list.reset_key ?? '',
+      metadata_json: list.metadata_json ?? '{}',
+      created_by: list.created_by ?? '',
+      updated_by: list.updated_by ?? '',
+      created_at: list.created_at ?? '2999-01-01T00:00:00.000Z',
+      updated_at: list.updated_at ?? '2999-01-01T00:00:00.000Z',
+    })),
+    listItems: [],
   }
 
   const db = {
@@ -32,6 +60,15 @@ function createFakeEnv(initialSettings: Record<string, string> = {}, cacheKeys: 
           if (sql === 'SELECT * FROM cache ORDER BY updated_at DESC') {
             return { results: [...state.cache] }
           }
+          if (sql === 'SELECT * FROM lists ORDER BY updated_at DESC') {
+            return { results: [...state.lists] }
+          }
+          if (sql === 'SELECT * FROM list_items ORDER BY done ASC, created_at ASC') {
+            return { results: [...state.listItems] }
+          }
+          if (sql === 'SELECT id, list_type, reset_key, metadata_json FROM lists') {
+            return { results: [...state.lists] }
+          }
           return { results: [] }
         },
         async first() {
@@ -46,6 +83,19 @@ function createFakeEnv(initialSettings: Record<string, string> = {}, cacheKeys: 
           if (sql.startsWith('INSERT INTO settings')) {
             const [key, value] = statement.params as [string, string]
             state.settings.set(key, value)
+            return { success: true }
+          }
+          if (sql === 'UPDATE lists SET name = ?, list_type = ?, reset_key = ?, metadata_json = ?, updated_by = ?, updated_at = ? WHERE id = ?') {
+            const [name, listType, resetKey, metadataJson, updatedBy, updatedAt, id] = statement.params as [string, string, string, string, string, string, string]
+            const row = state.lists.find((entry) => entry.id === id)
+            if (row) {
+              row.name = name
+              row.list_type = listType
+              row.reset_key = resetKey
+              row.metadata_json = metadataJson
+              row.updated_by = updatedBy
+              row.updated_at = updatedAt
+            }
             return { success: true }
           }
           if (sql.startsWith('DELETE FROM cache')) {
@@ -172,6 +222,35 @@ describe('custom page manifest parsing', () => {
         { path: 'bad/page.json', message: 'page.json is not valid JSON.' },
         { path: 'unknown', message: 'Manifest page is missing title or href.' },
       ],
+    })
+  })
+})
+
+describe('list starring metadata', () => {
+  it('preserves existing metadata when toggling star state', async () => {
+    const env = createFakeEnv(
+      {},
+      [],
+      [
+        {
+          id: 'list-1',
+          name: 'Groceries',
+          list_type: 'shopping',
+          metadata_json: '{"note":"keep","starred":false}',
+        },
+      ],
+    )
+
+    const updated = await updateList(env, 'list-1', {
+      metadata: {
+        note: 'keep',
+        starred: true,
+      },
+    })
+
+    expect(updated?.metadata).toMatchObject({
+      note: 'keep',
+      starred: true,
     })
   })
 })
