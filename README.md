@@ -22,6 +22,7 @@ Create `.dev.vars`:
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=pbkdf2_sha256$...
 APP_ORIGIN=http://localhost:8788
+SETUP_TOKEN=
 ```
 
 Create and apply the local D1 database schema:
@@ -60,4 +61,4 @@ API calls need `wrangler pages dev` because they depend on Cloudflare bindings.
 
 ## Deployment Notes
 
-Set `ADMIN_USERNAME` as an environment variable and `ADMIN_PASSWORD_HASH` as a Cloudflare secret before publishing. Keep everything private unless you intentionally add public page behavior later.
+Set `APP_ORIGIN` to the deployed origin, for example `https://frog-peach-home-hub.pages.dev`. Set `SETUP_TOKEN` as a Cloudflare secret before first-run setup; production admin creation is blocked without it. Keep everything private unless you intentionally add public page behavior later.

@@ -12,6 +12,7 @@ type LoginBody = {
 
 type SetupBody = LoginBody & {
   displayName?: string
+  setupToken?: string
 }
 
 export type UserRole = 'admin' | 'member'
@@ -187,9 +188,26 @@ export function isAdminUnlockActive(value: string, now = Date.now()) {
 async function setupAdmin(request: Request, env: Env) {
   if (await hasAdmin(env)) throw new ApiError(409, 'Admin account already exists.')
   const body = await readJson<SetupBody>(request)
+  requireSetupToken(request, env, body)
   const created = await createUser(env, { ...body, role: 'admin' })
   if (!created) throw new ApiError(500, 'Admin account could not be created.')
   return createSessionResponse(request, env, created.id, created.username, created.role, true)
+}
+
+export function requireSetupToken(request: Request, env: Env, body: SetupBody) {
+  const expected = String(env.SETUP_TOKEN ?? '').trim()
+  const isLocal = isLocalRequest(request)
+
+  if (!expected && isLocal) return
+  if (!expected) throw new ApiError(403, 'First-run setup is disabled until SETUP_TOKEN is configured.')
+
+  const supplied = String(body.setupToken ?? request.headers.get('x-setup-token') ?? '').trim()
+  if (supplied !== expected) throw new ApiError(403, 'Invalid setup token.')
+}
+
+function isLocalRequest(request: Request) {
+  const hostname = new URL(request.url).hostname
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0'
 }
 
 async function login(request: Request, env: Env) {

@@ -10,7 +10,9 @@ Frog & Peach is designed for Cloudflare Pages with Pages Functions and D1.
 4. Apply migrations locally with `npm run cf:migrate:local`, or remotely with `npm run cf:migrate:remote`.
 5. Build with `npm run build`.
 6. Deploy with `npm run cf:deploy`.
-7. Open the deployed site and complete first-run admin setup.
+7. Set `APP_ORIGIN` to the deployed origin, for example `https://frog-peach-home-hub.pages.dev`.
+8. Set `SETUP_TOKEN` as a Cloudflare secret before first-run setup.
+9. Open the deployed site and complete first-run admin setup with that setup token.
 
 ## Required Binding
 

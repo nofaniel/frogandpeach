@@ -3,6 +3,7 @@ export type Env = {
   ADMIN_USERNAME?: string
   ADMIN_PASSWORD_HASH?: string
   APP_ORIGIN?: string
+  SETUP_TOKEN?: string
   SESSION_TTL_DAYS?: string
 }
 

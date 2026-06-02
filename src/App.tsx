@@ -285,7 +285,7 @@ function App() {
   const toastSeqRef = useRef(0)
   const warnedNearExpiryRef = useRef(false)
 
-  const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '', displayName: '' })
+  const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '', displayName: '', setupToken: '' })
   const [unlockDraft, setUnlockDraft] = useState({ username: 'admin', password: '' })
   const [userDraft, setUserDraft] = useState({ username: '', displayName: '', role: 'member', password: '' })
   const [listDraft, setListDraft] = useState({ name: '', listType: 'shopping' })
@@ -656,6 +656,12 @@ function App() {
               <label>
                 Display name
                 <input value={loginDraft.displayName} onChange={(event) => setLoginDraft((draft) => ({ ...draft, displayName: event.target.value }))} autoComplete="name" />
+              </label>
+            )}
+            {setupNeeded && (
+              <label>
+                Setup token
+                <input value={loginDraft.setupToken} onChange={(event) => setLoginDraft((draft) => ({ ...draft, setupToken: event.target.value }))} type="password" autoComplete="one-time-code" />
               </label>
             )}
             <label>

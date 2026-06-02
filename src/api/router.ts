@@ -46,6 +46,8 @@ import type { Session } from './auth'
 
 export async function handleApi(context: ApiContext): Promise<Response> {
   try {
+    requireTrustedOrigin(context)
+
     const url = new URL(context.request.url)
     const path = url.pathname.replace(/^\/api\/?/, '')
     const parts = path.split('/').filter(Boolean)
@@ -318,4 +320,23 @@ async function recordActivity(context: ApiContext, session: Session, action: str
     summary,
     metadata,
   })
+}
+
+export function requireTrustedOrigin(context: ApiContext) {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(context.request.method)) return
+
+  const origin = context.request.headers.get('origin')
+  if (!origin) return
+
+  const expectedOrigin = normaliseOrigin(context.env.APP_ORIGIN) ?? new URL(context.request.url).origin
+  if (origin !== expectedOrigin) throw new ApiError(403, 'Request origin is not allowed.')
+}
+
+function normaliseOrigin(value: string | undefined) {
+  if (!value) return null
+  try {
+    return new URL(value).origin
+  } catch {
+    return null
+  }
 }
