@@ -44,6 +44,8 @@ npm run hash-password -- "yourpassword"
 
 **`dev:worker` requires a prior build.** Wrangler serves `dist/`, not source. Running `npm run dev:worker` without building first serves stale or missing files.
 
+**Live-site iteration is the default in this stage.** After validating a change, commit, push, and deploy it straight away so the live Pages site reflects the latest work for review.
+
 **Pre-build sync scripts run automatically** via `predev`/`prebuild` hooks:
 - `scripts/sync-custom-pages.mjs` — syncs `custom-pages/` → `public/custom-pages/` and writes `manifest.json`
 - `scripts/sync-themes.mjs` — syncs `themes/` → `public/themes/` and writes `manifest.json`

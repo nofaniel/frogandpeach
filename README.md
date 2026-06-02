@@ -13,11 +13,11 @@ Frog & Peach is a private-by-default modular home hub built for Cloudflare Pages
 
 Captured locally with Playwright against the worker runtime.
 
+<img src="docs/readme-screenshots/frog-peach-preview.gif" alt="Animated preview of the main pages and modules" width="960" />
+
 | Home dashboard | Admin settings |
 | --- | --- |
 | <img src="docs/readme-screenshots/home-desktop.png" alt="Home dashboard" width="640" /> | <img src="docs/readme-screenshots/admin-desktop.png" alt="Admin settings" width="640" /> |
-
-A single shareable montage is available at [docs/readme-screenshots/frog-peach-shareable-montage.png](docs/readme-screenshots/frog-peach-shareable-montage.png).
 
 ## Local Setup
 

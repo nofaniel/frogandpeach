@@ -56,6 +56,9 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
 - Added a live admin-unlock countdown in the header plus warning toasts at the two-minute mark and on expiry.
 - Added inline display-name renaming for household users in the admin Users panel.
 - Returned a clear 409 conflict on duplicate usernames when creating or updating users.
+- Replaced manual position number input with a drag-and-drop module reorder control plus up/down arrow buttons for keyboard and mobile use.
+- Added batch module position updates via `batchPatchModules` with a single `PATCH /api/modules` call.
+- Added visual drag handle, dragging opacity, and drop-target highlight styles.
 
 ## Partially Complete
 
@@ -64,20 +67,19 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
 ## Deferred
 
 - Fully external third-party module/package runtime.
-- Drag-and-drop module reordering.
 - Dedicated deployment wizard beyond the readiness checklist.
 - Deeper mobile polish pass for dense admin module controls.
 
 ## Current Working Set
 
-- The admin UX/error-handling slice (activity log, toast notifications, unlock countdown, inline rename, duplicate-username handling) is complete and ready to commit.
-- Removed the stale `AGENTS.md` and `docs/handover.md` scratch files now that this plan is the single source of truth.
-- Next likely follow-up work is either a deeper mobile admin controls pass or a dedicated module reorder control, depending on priority.
+- The module reorder control with drag-and-drop and up/down buttons is complete.
+- Next likely follow-up work is either a deeper mobile admin controls pass or a dedicated deployment wizard, depending on priority.
 
 ## Verification
 
-- `npm test` passes.
+- `npm test` passes (unit tests; Playwright E2E skipped due to environment binding issue).
 - `npm run build` passes.
+- TypeScript strict mode compiles cleanly.
 - `npm run cf:migrate:local` applied `0002_modular_hub.sql` and `0003_activity_log.sql` successfully.
 - Worker smoke checks passed locally against `http://localhost:8788` for login, admin unlock, admin routes, appearance update/restore, module update/restore, list/item creation, note creation, and activity recording/listing.
 - Playwright browser checks captured admin desktop and mobile screenshots under `output/playwright/`.

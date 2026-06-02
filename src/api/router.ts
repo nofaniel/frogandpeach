@@ -98,8 +98,20 @@ async function routeUsers(context: ApiContext, parts: string[]) {
     return methodNotAllowed()
   }
   if (parts.length === 1 && context.request.method === 'PATCH') {
-    const user = await updateUser(context.env, parts[0], await readJson(context.request))
-    if (user) await recordActivity(context, session, 'updated', 'user', user.id, `Updated user ${user.displayName}`, { role: user.role, active: user.active })
+    const body = await readJson<{ username?: string; displayName?: string; role?: string; password?: string; active?: boolean; passwordResetRequired?: boolean }>(context.request)
+    const user = await updateUser(context.env, parts[0], body)
+    if (user) {
+      const summary = body.password && String(body.password).length > 0
+        ? `Changed password for ${user.displayName}`
+        : body.passwordResetRequired
+          ? `Enabled username-only login for ${user.displayName}`
+          : `Updated user ${user.displayName}`
+      await recordActivity(context, session, 'updated', 'user', user.id, summary, {
+        role: user.role,
+        active: user.active,
+        passwordResetRequired: user.passwordResetRequired,
+      })
+    }
     return user ? json(user) : json({ error: 'User not found' }, { status: 404 })
   }
   return methodNotAllowed()

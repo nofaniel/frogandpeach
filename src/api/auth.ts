@@ -10,6 +10,11 @@ type LoginBody = {
   password?: string
 }
 
+type PasswordBody = {
+  password?: string
+  currentPassword?: string
+}
+
 type SetupBody = LoginBody & {
   displayName?: string
   setupToken?: string
@@ -24,6 +29,7 @@ export type Session = {
   role: UserRole
   adminUnlocked: boolean
   adminUnlockedUntil: string | null
+  passwordSetupRequired: boolean
 }
 
 export type UserRecord = {
@@ -32,6 +38,7 @@ export type UserRecord = {
   displayName: string
   role: UserRole
   active: boolean
+  passwordResetRequired: boolean
   createdAt: string
   updatedAt: string
 }
@@ -46,6 +53,7 @@ export async function handleAuth(context: ApiContext, parts: string[]) {
   const { request, env } = context
 
   if (parts[0] === 'login' && request.method === 'POST') return login(request, env)
+  if (parts[0] === 'password' && request.method === 'POST') return updateOwnPassword(request, env)
   if (parts[0] === 'logout' && request.method === 'POST') return logout(request, env)
   if (parts[0] === 'me' && request.method === 'GET') {
     const session = await getSession(request, env)
@@ -57,6 +65,7 @@ export async function handleAuth(context: ApiContext, parts: string[]) {
       role: session?.role ?? null,
       adminUnlocked: session?.adminUnlocked ?? false,
       adminUnlockedUntil: session?.adminUnlockedUntil ?? null,
+      passwordSetupRequired: session?.passwordSetupRequired ?? false,
     })
   }
 
@@ -89,7 +98,7 @@ export async function requireAdminUnlock(request: Request, env: Env) {
 }
 
 export async function listUsers(env: Env) {
-  const rows = (await env.DB.prepare('SELECT id, username, display_name, role, active, created_at, updated_at FROM users ORDER BY role, username').all<DbRow>()).results ?? []
+  const rows = (await env.DB.prepare('SELECT id, username, display_name, role, active, password_reset_required, created_at, updated_at FROM users ORDER BY role, username').all<DbRow>()).results ?? []
   return rows.map(toUser)
 }
 
@@ -104,7 +113,7 @@ export async function createUser(env: Env, input: { username?: string; displayNa
   const stamp = nowIso()
   const userId = id('user')
   try {
-    await env.DB.prepare('INSERT INTO users (id, username, display_name, role, password_hash, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)')
+    await env.DB.prepare('INSERT INTO users (id, username, display_name, role, password_hash, active, password_reset_required, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)')
       .bind(userId, username, displayName, role, await hashPassword(password), stamp, stamp)
       .run()
   } catch (err) {
@@ -117,7 +126,7 @@ export async function createUser(env: Env, input: { username?: string; displayNa
   return getUserById(env, userId)
 }
 
-export async function updateUser(env: Env, userId: string, patch: { username?: string; displayName?: string; role?: string; password?: string; active?: boolean }) {
+export async function updateUser(env: Env, userId: string, patch: { username?: string; displayName?: string; role?: string; password?: string; active?: boolean; passwordResetRequired?: boolean }) {
   const row = await getUserRowById(env, userId)
   if (!row) return null
 
@@ -125,12 +134,13 @@ export async function updateUser(env: Env, userId: string, patch: { username?: s
   const displayName = patch.displayName === undefined ? rowString(row, 'display_name') : String(patch.displayName).trim() || username
   const role = patch.role === undefined ? rowString(row, 'role') : normaliseRole(patch.role)
   const active = patch.active === undefined ? rowNumber(row, 'active') === 1 : Boolean(patch.active)
+  const passwordResetRequired = patch.passwordResetRequired === undefined ? rowNumber(row, 'password_reset_required') === 1 : Boolean(patch.passwordResetRequired)
   if (!username) throw new ApiError(400, 'Username is required.')
 
   if (patch.password !== undefined && String(patch.password).length > 0) {
     if (String(patch.password).length < 8) throw new ApiError(400, 'Password must be at least 8 characters.')
     try {
-      await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, password_hash = ?, updated_at = ? WHERE id = ?')
+      await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, password_hash = ?, password_reset_required = 0, updated_at = ? WHERE id = ?')
         .bind(username, displayName, role, active ? 1 : 0, await hashPassword(String(patch.password)), nowIso(), userId)
         .run()
     } catch (err) {
@@ -140,8 +150,8 @@ export async function updateUser(env: Env, userId: string, patch: { username?: s
     }
   } else {
     try {
-      await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, updated_at = ? WHERE id = ?')
-        .bind(username, displayName, role, active ? 1 : 0, nowIso(), userId)
+      await env.DB.prepare('UPDATE users SET username = ?, display_name = ?, role = ?, active = ?, password_reset_required = ?, updated_at = ? WHERE id = ?')
+        .bind(username, displayName, role, active ? 1 : 0, passwordResetRequired ? 1 : 0, nowIso(), userId)
         .run()
     } catch (err) {
       const msg = String((err as { message?: string }).message ?? err)
@@ -171,6 +181,7 @@ export async function getSession(request: Request, env: Env): Promise<Session | 
   if (!user || rowNumber(user, 'active') !== 1) return null
 
   const adminUnlockedUntil = rowString(row, 'admin_unlocked_until')
+  const passwordSetupRequired = rowNumber(user, 'password_reset_required') === 1
   return {
     userId: rowString(user, 'id'),
     userName: rowString(user, 'username'),
@@ -178,6 +189,7 @@ export async function getSession(request: Request, env: Env): Promise<Session | 
     role: normaliseRole(rowString(user, 'role')),
     adminUnlocked: isAdminUnlockActive(adminUnlockedUntil),
     adminUnlockedUntil: adminUnlockedUntil || null,
+    passwordSetupRequired,
   }
 }
 
@@ -215,12 +227,21 @@ async function login(request: Request, env: Env) {
   const username = cleanUsername(body.username)
   const password = String(body.password ?? '')
   const user = await getUserRowByUsername(env, username)
+  const passwordSetupRequired = Boolean(user && rowNumber(user, 'password_reset_required') === 1)
 
-  if (!user || rowNumber(user, 'active') !== 1 || !(await verifyPassword(password, rowString(user, 'password_hash')))) {
+  if (!user || rowNumber(user, 'active') !== 1) {
     throw new ApiError(401, 'Invalid username or password.')
   }
 
-  return createSessionResponse(request, env, rowString(user, 'id'), rowString(user, 'username'), normaliseRole(rowString(user, 'role')), false)
+  if (passwordSetupRequired) {
+    if (password.length > 0) {
+      throw new ApiError(401, 'Use your username only, then set a new password.')
+    }
+  } else if (!(await verifyPassword(password, rowString(user, 'password_hash')))) {
+    throw new ApiError(401, 'Invalid username or password.')
+  }
+
+  return createSessionResponse(request, env, rowString(user, 'id'), rowString(user, 'username'), normaliseRole(rowString(user, 'role')), false, passwordSetupRequired)
 }
 
 async function unlockAdmin(request: Request, env: Env) {
@@ -241,6 +262,32 @@ async function unlockAdmin(request: Request, env: Env) {
   return json({ adminUnlocked: true, unlockedUntil })
 }
 
+async function updateOwnPassword(request: Request, env: Env) {
+  const session = await requireSession(request, env)
+  const body = await readJson<PasswordBody>(request)
+  const password = String(body.password ?? '')
+  if (password.length < 8) throw new ApiError(400, 'Password must be at least 8 characters.')
+
+  const user = await getUserRowById(env, session.userId)
+  if (!user) throw new ApiError(404, 'User not found.')
+
+  const passwordResetRequired = rowNumber(user, 'password_reset_required') === 1
+  if (!passwordResetRequired) {
+    const currentPassword = String(body.currentPassword ?? '')
+    if (!currentPassword || !(await verifyPassword(currentPassword, rowString(user, 'password_hash')))) {
+      throw new ApiError(401, 'Current password is required.')
+    }
+  }
+
+  await env.DB.prepare('UPDATE users SET password_hash = ?, password_reset_required = 0, updated_at = ? WHERE id = ?')
+    .bind(await hashPassword(password), nowIso(), session.userId)
+    .run()
+
+  const updatedSession = await getSession(request, env)
+  if (!updatedSession) throw new ApiError(500, 'Password could not be updated.')
+  return json({ authenticated: true, ...updatedSession })
+}
+
 async function logout(request: Request, env: Env) {
   const raw = getCookie(request.headers.get('cookie') || '', COOKIE_NAME)
   if (raw) {
@@ -257,7 +304,7 @@ async function logout(request: Request, env: Env) {
   )
 }
 
-async function createSessionResponse(request: Request, env: Env, userId: string, username: string, role: UserRole, unlockAdminNow: boolean) {
+async function createSessionResponse(request: Request, env: Env, userId: string, username: string, role: UserRole, unlockAdminNow: boolean, passwordSetupRequired = false) {
   const rawSession = crypto.randomUUID()
   const sessionId = await sha256Hex(rawSession)
   const createdAt = nowIso()
@@ -271,7 +318,7 @@ async function createSessionResponse(request: Request, env: Env, userId: string,
 
   const user = await getUserById(env, userId)
   return json(
-    { authenticated: true, userId, userName: username, displayName: user?.displayName ?? username, role, adminUnlocked: Boolean(adminUnlockedUntil), adminUnlockedUntil },
+    { authenticated: true, userId, userName: username, displayName: user?.displayName ?? username, role, adminUnlocked: Boolean(adminUnlockedUntil), adminUnlockedUntil, passwordSetupRequired },
     {
       headers: {
         'set-cookie': buildCookie(request, rawSession, maxAge),
@@ -306,6 +353,7 @@ function toUser(row: DbRow): UserRecord {
     displayName: rowString(row, 'display_name'),
     role: normaliseRole(rowString(row, 'role')),
     active: rowNumber(row, 'active') === 1,
+    passwordResetRequired: rowNumber(row, 'password_reset_required') === 1,
     createdAt: rowString(row, 'created_at'),
     updatedAt: rowString(row, 'updated_at'),
   }

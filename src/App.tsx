@@ -206,6 +206,7 @@ type Session = {
   role: 'admin' | 'member' | null
   adminUnlocked: boolean
   adminUnlockedUntil: string | null
+  passwordSetupRequired: boolean
 }
 
 type UserRecord = {
@@ -214,6 +215,11 @@ type UserRecord = {
   displayName: string
   role: 'admin' | 'member'
   active: boolean
+  passwordResetRequired: boolean
+}
+
+type UserPatch = Partial<UserRecord> & {
+  password?: string
 }
 
 type Toast = {
@@ -257,6 +263,17 @@ const emptySettings: Settings = {
   themeId: 'base',
 }
 
+const loggedOutSession: Session = {
+  authenticated: false,
+  userId: null,
+  userName: null,
+  displayName: null,
+  role: null,
+  adminUnlocked: false,
+  adminUnlockedUntil: null,
+  passwordSetupRequired: false,
+}
+
 function App() {
   const [setupNeeded, setSetupNeeded] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
@@ -288,6 +305,7 @@ function App() {
   const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '', displayName: '', setupToken: '' })
   const [unlockDraft, setUnlockDraft] = useState({ username: 'admin', password: '' })
   const [userDraft, setUserDraft] = useState({ username: '', displayName: '', role: 'member', password: '' })
+  const [passwordSetupDraft, setPasswordSetupDraft] = useState({ password: '', confirmPassword: '' })
   const [listDraft, setListDraft] = useState({ name: '', listType: 'shopping' })
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({})
   const [noteDraft, setNoteDraft] = useState({ title: '', body: '', tags: '' })
@@ -337,9 +355,9 @@ function App() {
       setSetupNeeded(setup.needsSetup)
       const current = await api<Session>('/api/auth/me', {}, false)
       setSession(current)
-      if (current.authenticated) await refreshAll()
+      if (current.authenticated && !current.passwordSetupRequired) await refreshAll()
     } catch (caught) {
-      setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false, adminUnlockedUntil: null })
+      setSession(loggedOutSession)
       setError(caught instanceof Error ? caught.message : 'Unable to reach API. Run `npm run dev:worker` for full local development.')
     }
   }
@@ -405,8 +423,12 @@ function App() {
       const next = await api<Session>(path, { method: 'POST', body: loginDraft }, false)
       setSession(next)
       setSetupNeeded(false)
-      await refreshAll()
-      if (next.adminUnlocked) {
+      setLoginDraft((draft) => ({ ...draft, password: '' }))
+      setPasswordSetupDraft({ password: '', confirmPassword: '' })
+      if (!next.passwordSetupRequired) {
+        await refreshAll()
+      }
+      if (next.adminUnlocked && !next.passwordSetupRequired) {
         setAdminOpen(true)
         await refreshAdmin()
       }
@@ -417,9 +439,11 @@ function App() {
 
   async function logout() {
     await api('/api/auth/logout', { method: 'POST' }, false)
-    setSession({ authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false, adminUnlockedUntil: null })
+    setSession(loggedOutSession)
     setHome(null)
     setAdminOpen(false)
+    setLoginDraft((draft) => ({ ...draft, password: '' }))
+    setPasswordSetupDraft({ password: '', confirmPassword: '' })
   }
 
   async function openAdmin() {
@@ -571,11 +595,32 @@ function App() {
     })
   }
 
-  async function patchUser(user: UserRecord, patch: Partial<UserRecord>) {
+  async function patchUser(user: UserRecord, patch: UserPatch) {
     await run(async () => {
       await api(`/api/users/${user.id}`, { method: 'PATCH', body: patch })
       await refreshAdmin()
     })
+  }
+
+  async function setOwnPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError('')
+    if (passwordSetupDraft.password !== passwordSetupDraft.confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    try {
+      const next = await api<Session>('/api/auth/password', {
+        method: 'POST',
+        body: { password: passwordSetupDraft.password },
+      })
+      setSession(next)
+      setPasswordSetupDraft({ password: '', confirmPassword: '' })
+      await refreshAll()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Password update failed')
+    }
   }
 
   async function patchModule(module: Module, patch: Partial<Module> & { deleteData?: boolean }) {
@@ -648,13 +693,51 @@ function App() {
     return <main className="loading-screen">Opening Frog & Peach...</main>
   }
 
+  if (session.passwordSetupRequired) {
+    return (
+      <main className="login-screen">
+        <section className="login-panel">
+          <p className="kicker">Password setup</p>
+          <h1>Set a new password</h1>
+          <p>{session.displayName || session.userName ? `Welcome back, ${session.displayName || session.userName}. Your admin has reset this account, so choose a new password to continue.` : 'Choose a new password to continue.'}</p>
+          <form onSubmit={setOwnPassword}>
+            <label>
+              New password
+              <input
+                value={passwordSetupDraft.password}
+                onChange={(event) => setPasswordSetupDraft((draft) => ({ ...draft, password: event.target.value }))}
+                type="password"
+                autoComplete="new-password"
+                autoFocus
+              />
+            </label>
+            <label>
+              Confirm password
+              <input
+                value={passwordSetupDraft.confirmPassword}
+                onChange={(event) => setPasswordSetupDraft((draft) => ({ ...draft, confirmPassword: event.target.value }))}
+                type="password"
+                autoComplete="new-password"
+              />
+            </label>
+            {error && <div className="form-error">{error}</div>}
+            <div className="button-row">
+              <button type="submit">Save password</button>
+              <button type="button" className="ghost" onClick={logout}>Log out</button>
+            </div>
+          </form>
+        </section>
+      </main>
+    )
+  }
+
   if (!session.authenticated) {
     return (
       <main className="login-screen">
         <section className="login-panel">
           <p className="kicker">{setupNeeded ? 'First run setup' : 'Private home hub'}</p>
           <h1>Frog & Peach</h1>
-          <p>{setupNeeded ? 'Create the first administrator account. After this, household members can sign in with their own accounts.' : 'Sign in with your household account.'}</p>
+          <p>{setupNeeded ? 'Create the first administrator account. After this, household members can sign in with their own accounts.' : 'Sign in with your household account. If your admin has reset your account, leave the password blank and you will be prompted to set a new one.'}</p>
           <form onSubmit={login}>
             <label>
               Username
@@ -1147,7 +1230,7 @@ function AdminPanel({
   onAppearanceChange: (appearance: Appearance) => void
   onUserDraftChange: (draft: { username: string; displayName: string; role: string; password: string }) => void
   onCreateUser: (event: FormEvent<HTMLFormElement>) => void
-  onPatchUser: (user: UserRecord, patch: Partial<UserRecord>) => void
+  onPatchUser: (user: UserRecord, patch: UserPatch) => void
   onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
   onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
   onClearCache: (key?: string) => void
@@ -1159,6 +1242,8 @@ function AdminPanel({
   const [activityFilter, setActivityFilter] = useState({ entityType: '', search: '' })
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
   const [editingDisplayName, setEditingDisplayName] = useState('')
+  const [editingPasswordUserId, setEditingPasswordUserId] = useState<string | null>(null)
+  const [editingPassword, setEditingPassword] = useState('')
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dropOverIndex, setDropOverIndex] = useState<number | null>(null)
   const editablePages = pageLinks.filter((page) => page.kind === 'editable')
@@ -1276,14 +1361,57 @@ function AdminPanel({
                     <button type="button" className="ghost" onClick={() => setEditingUserId(null)}>Cancel</button>
                   </div>
                 </>
+              ) : editingPasswordUserId === user.id ? (
+                <>
+                  <input
+                    className="inline-edit user-edit-input"
+                    type="password"
+                    value={editingPassword}
+                    onChange={(e) => setEditingPassword(e.target.value)}
+                    placeholder="New password"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { onPatchUser(user, { password: editingPassword }); setEditingPasswordUserId(null); setEditingPassword('') }
+                      if (e.key === 'Escape') {
+                        setEditingPasswordUserId(null)
+                        setEditingPassword('')
+                      }
+                    }}
+                  />
+                  <div className="user-actions">
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        onPatchUser(user, { password: editingPassword })
+                        setEditingPasswordUserId(null)
+                        setEditingPassword('')
+                      }}
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => {
+                        setEditingPasswordUserId(null)
+                        setEditingPassword('')
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="user-meta">
                     <strong>{user.displayName}</strong>
-                    <span>{user.username} / {user.role}{user.active ? '' : ' / disabled'}</span>
+                    <span>{user.username} / {user.role}{user.active ? '' : ' / disabled'}{user.passwordResetRequired ? ' / username login' : ''}</span>
                   </div>
                   <div className="user-actions">
                     <button type="button" className="ghost" onClick={() => { setEditingUserId(user.id); setEditingDisplayName(user.displayName) }}>Rename</button>
+                    <button type="button" className="ghost" onClick={() => { setEditingPasswordUserId(user.id); setEditingPassword('') }}>Change password</button>
+                    <button type="button" className="ghost" onClick={() => onPatchUser(user, { passwordResetRequired: true })}>Allow username login</button>
                     <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
                   </div>
                 </>
@@ -1789,7 +1917,7 @@ async function api<T>(path: string, options: { method?: string; body?: unknown }
     if (response.status === 404 && path.startsWith('/api/')) {
       throw new Error('API not found in Vite-only mode. Use `npm run dev:worker` and open http://localhost:8788.')
     }
-    if (!requireOk && response.status === 401) return { authenticated: false, userId: null, userName: null, displayName: null, role: null, adminUnlocked: false, adminUnlockedUntil: null } as T
+    if (!requireOk && response.status === 401) return { ...loggedOutSession } as T
     const payload = (await response.json().catch(() => ({}))) as { error?: string }
     throw new Error(payload.error || `Request failed: ${response.status}`)
   }
