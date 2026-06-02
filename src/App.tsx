@@ -2,6 +2,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import QRCode from 'qrcode'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { formatLocationLabel, isLocationConfigured, resolveBrowserTimeZone } from './shared/location'
 import { useTheme } from './theme/ThemeProvider'
 
 type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network'
@@ -255,11 +256,11 @@ const emptySettings: Settings = {
   wifiDevicesJson: '[]',
   binDay: '',
   flatNotes: '',
-  locationName: 'Newquay',
-  locationRegion: 'Cornwall',
-  latitude: '50.4155',
-  longitude: '-5.0737',
-  timezone: 'Europe/London',
+  locationName: '',
+  locationRegion: '',
+  latitude: '',
+  longitude: '',
+  timezone: '',
   themeId: 'base',
 }
 
@@ -1004,7 +1005,14 @@ function App() {
   )
 }
 
-function renderModule(module: Module, home: HomeData, setActiveTab: (tab: Tab) => void, settings?: Settings) {
+function renderModule(
+  module: Module,
+  home: HomeData,
+  setActiveTab: (tab: Tab) => void,
+  locationConfigured: boolean,
+  onOpenAdminSettings: () => void,
+  settings?: Settings,
+) {
   const className = `panel module-${module.size}`
   if (module.id === 'weather') {
     return (

@@ -78,11 +78,11 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('adminUrl', ''),
   ('binDay', ''),
   ('flatNotes', 'Frog & Peach is private by default. Keep admin credentials out of shared notes.'),
-  ('locationName', 'Newquay'),
-  ('locationRegion', 'Cornwall'),
-  ('latitude', '50.4155'),
-  ('longitude', '-5.0737'),
-  ('timezone', 'Europe/London');
+  ('locationName', ''),
+  ('locationRegion', ''),
+  ('latitude', ''),
+  ('longitude', ''),
+  ('timezone', '');
 
 INSERT OR IGNORE INTO module_settings (id, enabled, position) VALUES
   ('weather', 1, 10),

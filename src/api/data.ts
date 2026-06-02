@@ -1,5 +1,6 @@
 import { listTypes, normaliseListType, resetKeyForListType, shouldRefreshList, type ListTypeId } from '../shared/lists'
 import { deriveTideEvents, extractTideSeries, numericOrNull } from '../shared/tide'
+import { formatLocationLabel, isLocationConfigured } from '../shared/location'
 import { id, normaliseTags, nowIso, rowNumber, rowString, slugify } from './http'
 import type { DbRow, Env } from './types'
 
@@ -88,16 +89,17 @@ const settingDefaults: Settings = {
   wifiDevicesJson: '[]',
   binDay: '',
   flatNotes: 'Frog & Peach is private by default. Keep admin credentials out of shared notes.',
-  locationName: 'Newquay',
-  locationRegion: 'Cornwall',
-  latitude: '50.4155',
-  longitude: '-5.0737',
-  timezone: 'Europe/London',
+  locationName: '',
+  locationRegion: '',
+  latitude: '',
+  longitude: '',
+  timezone: '',
   themeId: 'base',
 }
 
 const settingKeys = Object.keys(settingDefaults) as Array<keyof Settings>
 const publicSettingKeys: Array<keyof Settings> = ['binDay', 'flatNotes', 'locationName', 'locationRegion', 'latitude', 'longitude', 'timezone', 'themeId']
+const LOCATION_SETTING_KEYS: Array<keyof Settings> = ['locationName', 'locationRegion', 'latitude', 'longitude', 'timezone']
 // Legacy appearance keys retained only so existing databases migrate their look.
 const LEGACY_THEME_KEY = 'colourTheme'
 
@@ -179,6 +181,7 @@ export async function getNetworkOverview(env: Env): Promise<NetworkOverview> {
 }
 
 export async function updateSettings(env: Env, patch: Partial<Settings>) {
+  const before = await getSettings(env)
   const statement = env.DB.prepare('INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
   for (const key of settingKeys) {
     if (Object.hasOwn(patch, key)) {
@@ -186,7 +189,11 @@ export async function updateSettings(env: Env, patch: Partial<Settings>) {
       await statement.bind(key, value).run()
     }
   }
-  return getSettings(env)
+  const after = await getSettings(env)
+  if (locationSettingsChanged(before, after)) {
+    await clearWeatherAndMarineCache(env)
+  }
+  return after
 }
 
 export async function getAppearance(env: Env): Promise<Appearance> {
@@ -472,11 +479,15 @@ export async function deletePageLink(env: Env, linkId: string) {
 }
 
 export async function getWeather(env: Env) {
-  return cached(env, 'weather-v4', 45 * 60, async () => {
-    const settings = await getSettings(env)
+  const settings = await getSettings(env)
+  if (!isLocationConfigured(settings)) return null
+
+  return cached(env, 'weather-v5', 45 * 60, async () => {
     const url = new URL('https://api.open-meteo.com/v1/forecast')
     url.searchParams.set('latitude', settings.latitude)
     url.searchParams.set('longitude', settings.longitude)
+    url.searchParams.set('temperature_unit', 'celsius')
+    url.searchParams.set('wind_speed_unit', 'kmh')
     url.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,precipitation')
     url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset')
     url.searchParams.set('hourly', 'precipitation_probability,temperature_2m,weather_code')
@@ -490,7 +501,7 @@ export async function getWeather(env: Env) {
     const now = Date.now()
 
     return {
-      location: `${settings.locationName}, ${settings.locationRegion}`,
+      location: formatLocationLabel(settings),
       current: {
         temperature: numericOrNull(current.temperature_2m),
         feelsLike: numericOrNull(current.apparent_temperature),
@@ -528,9 +539,11 @@ export async function getWeather(env: Env) {
 export async function getMarine(env: Env) {
   const options = await getTidesModuleOptions(env)
   const source = normaliseTideSource(options.source)
-  const cacheKey = source === 'api' ? 'marine-v4-api' : 'marine-v4-model'
+  const settings = await getSettings(env)
+  if (!isLocationConfigured(settings)) return null
+
+  const cacheKey = source === 'api' ? 'marine-v5-api' : 'marine-v5-model'
   return cached(env, cacheKey, 6 * 60 * 60, async () => {
-    const settings = await getSettings(env)
     if (source === 'api') {
       const fromApi = await getMarineFromApi(settings, options.apiKey)
       if (fromApi) return fromApi
@@ -559,8 +572,8 @@ export async function getMarine(env: Env) {
       forecastUntil: lastPoint?.time ?? null,
       events,
       note: source === 'api'
-        ? 'API mode selected but unavailable (missing/invalid key or upstream issue), so built-in estimate is shown. Not for navigation.'
-        : 'Approximate tide trend from Open-Meteo marine model, not official tide-table data. Not for navigation.',
+        ? 'API mode selected but unavailable (missing/invalid key or upstream issue), so the model estimate is shown instead. Not for navigation.'
+        : 'Approximate tide trend from Open-Meteo marine model. Not for navigation.',
     }
   })
 }
@@ -697,6 +710,14 @@ async function cached<T>(env: Env, key: string, ttlSeconds: number, producer: ()
     .bind(key, JSON.stringify(payload), expiresAt, nowIso())
     .run()
   return payload
+}
+
+async function clearWeatherAndMarineCache(env: Env) {
+  await env.DB.prepare("DELETE FROM cache WHERE cache_key LIKE 'weather-%' OR cache_key LIKE 'marine-%' OR cache_key LIKE 'weather-v%' OR cache_key LIKE 'marine-v%'").run()
+}
+
+function locationSettingsChanged(before: Settings, after: Settings) {
+  return LOCATION_SETTING_KEYS.some((key) => before[key] !== after[key])
 }
 
 async function fetchJson<T>(url: URL): Promise<T> {
