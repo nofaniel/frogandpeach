@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { api, loggedOutSession } from './api-client/client'
 import { Markdown } from './components/Markdown'
 import { ToastTray } from './components/ToastTray'
@@ -909,7 +909,8 @@ function renderModule(
     }
 
     const weatherLocation = home.weather.location?.trim() || formatLocationLabel(settings)
-    const forecastDays = home.weather.daily.slice(0, 3)
+    const forecastDays = home.weather.daily.slice(1, 6)
+    const showForecast = widget.mode === 'forecast' || module.options.showExtendedForecast === true
     const weatherIconStyle = module.options.iconStyle === 'icons' ? 'icons' : 'emoji'
     return (
       <article className={className + ' weather-panel'} key={module.id}>
@@ -943,35 +944,37 @@ function renderModule(
           </span>
           <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
         </div>
-        {widget.mode === 'forecast' && (
-          <section className="day-grid weather-forecast-grid" aria-label="Forecast summary">
-            {forecastDays.map((day) => (
-              <div key={day.date} className="weather-forecast-card">
-                <span>{formatDate(day.date)}</span>
-                <strong>{day.label}</strong>
-                <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
-              </div>
-            ))}
-          </section>
-        )}
-        {module.options.showExtendedForecast === true && (
+        {showForecast && (
           <section className="weather-extended-forecast" aria-label="5-day forecast">
-            <p className="kicker">Next 5 days</p>
-            <div className="day-grid weather-forecast-grid">
-              {home.weather.daily.slice(1, 6).map((day) => (
-                <div key={day.date} className="weather-forecast-card">
-                  <span>{formatDate(day.date)}</span>
-                  <div className="weather-extended-icon" aria-hidden="true">{weatherIcon(day.label)}</div>
-                  <strong>{day.label}</strong>
-                  <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
-                  {day.precipitationChance !== null && (
-                    <span className="weather-extended-precip">
-                      <WeatherMetricSymbol name="precipitationChance" style={weatherIconStyle} />
-                      {formatNumber(day.precipitationChance)}%
-                    </span>
-                  )}
-                </div>
-              ))}
+            <div className="weather-forecast-heading">
+              <p className="kicker">Next 5 days</p>
+              <span>Rain outlook</span>
+            </div>
+            <div className="weather-forecast-grid">
+              {forecastDays.map((day) => {
+                const precip = day.precipitationChance === null ? null : Math.max(0, Math.min(100, day.precipitationChance))
+                return (
+                  <div
+                    key={day.date}
+                    className="weather-forecast-card"
+                    style={{ '--precip': `${precip ?? 0}%` } as CSSProperties}
+                  >
+                    <div className="weather-forecast-date">{formatDate(day.date)}</div>
+                    <div className="weather-extended-icon" aria-hidden="true">{weatherIcon(day.label)}</div>
+                    <strong>{day.label}</strong>
+                    <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
+                    <div className="weather-precip-track" aria-hidden="true">
+                      <span />
+                    </div>
+                    {precip !== null && (
+                      <span className="weather-extended-precip">
+                        <WeatherMetricSymbol name="precipitationChance" style={weatherIconStyle} />
+                        {formatNumber(precip)}%
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}
