@@ -22,23 +22,22 @@
     "cf:deploy": "npm run build && node node_modules/wrangler/bin/wrangler.js pages deploy dist"
   },
   "dependencies": {
-    "@rolldown/binding-linux-x64-gnu": "^1.0.3",
-    "@types/qrcode": "^1.5.6",
-    "@vitejs/plugin-react": "^6.0.1",
     "dompurify": "^3.3.0",
     "marked": "^17.0.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6",
-    "typescript": "~6.0.2",
-    "vite": "^8.0.12"
+    "react-dom": "^19.2.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260523.0",
     "@playwright/test": "^1.60.0",
     "@types/node": "^24.12.3",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12",
     "vitest": "^4.0.14",
     "wrangler": "^4.48.0"
   }
