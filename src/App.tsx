@@ -1434,7 +1434,7 @@ function AdminPanel({
                       <span className="user-role">
                         {user.role}
                         {user.active ? '' : ' / disabled'}
-                        {user.passwordResetRequired ? ' / username login' : ''}
+                        {user.passwordResetRequired ? ' / password change required' : ''}
                       </span>
                     </span>
                   </div>

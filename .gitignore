@@ -4,7 +4,7 @@ tsconfig.tsbuildinfo
 .wrangler/
 .mf/
 .playwright-cli/
-output/playwright/
+output/
 .env
 .dev.vars
 .env.local
