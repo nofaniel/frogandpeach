@@ -976,7 +976,8 @@ function renderModule(
     }
 
     const tideEvents = home.tides?.events ?? []
-    const featuredTides = tideEvents.slice(0, 2)
+    const now = Date.now()
+    const featuredTides = tideEvents.filter(e => new Date(e.time).getTime() > now).slice(0, 2)
     const tideDays = groupTideDays(tideEvents, 5)
     return (
       <article className={className + ' tide-panel'} key={module.id}>
