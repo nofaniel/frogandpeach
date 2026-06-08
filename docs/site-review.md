@@ -9,6 +9,7 @@
 
 ## Visual Improvements
 
+- Live visual audit notes were captured on 2026-06-08 in `docs/live-site-visual-audit-2026-06-08.md`. Prioritise the literal question-mark symbols, fixed bottom-nav desktop layout, and hardcoded typography overrides before broader redesign work.
 - The dashboard now respects module size, but cards still use a simple two-column grid. A future pass could add drag handles and denser compact layouts.
 - Admin settings are functional and sectioned, but not yet a fully tabbed control surface.
 - The current typography intentionally stays close to the existing Frog & Peach style. A later redesign can make each appearance style more distinct.

@@ -1482,12 +1482,26 @@ body {
 }
 
 .weather-panel .metric-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 0;
   border: 0;
   background: transparent;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.weather-metric-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .weather-forecast-grid {

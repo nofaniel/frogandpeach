@@ -922,10 +922,24 @@ function renderModule(
           </div>
         </div>
         <div className="metric-row">
-          {home.weather.daily[0] && <span>? {formatTemperature(home.weather.daily[0].max)} ? {formatTemperature(home.weather.daily[0].min)}</span>}
-          <span>?? {formatNumber(home.weather.current.windSpeed)} km/h</span>
-          <span>?? {formatNumber(home.weather.daily[0]?.precipitationChance)}%</span>
-          <span>?? {formatCurrentPrecipitationMm(home.weather.current.precipitationMm)}</span>
+          {home.weather.daily[0] && (
+            <span>
+              <WeatherMetricIcon name="temperature" />
+              {formatTemperature(home.weather.daily[0].max)} / {formatTemperature(home.weather.daily[0].min)}
+            </span>
+          )}
+          <span>
+            <WeatherMetricIcon name="wind" />
+            {formatNumber(home.weather.current.windSpeed)} km/h
+          </span>
+          <span>
+            <WeatherMetricIcon name="precipitationChance" />
+            {formatNumber(home.weather.daily[0]?.precipitationChance)}%
+          </span>
+          <span>
+            <WeatherMetricIcon name="precipitation" />
+            {formatCurrentPrecipitationMm(home.weather.current.precipitationMm)}
+          </span>
           <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
         </div>
         {widget.mode === 'forecast' && (
@@ -1165,6 +1179,43 @@ function renderModule(
   }
 
   return null
+}
+
+function WeatherMetricIcon({ name }: { name: 'temperature' | 'wind' | 'precipitationChance' | 'precipitation' }) {
+  if (name === 'temperature') {
+    return (
+      <svg className="weather-metric-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 14.76V5a4 4 0 0 0-8 0v9.76a6 6 0 1 0 8 0Z" />
+        <path d="M10 5v10" />
+        <path d="M10 18h.01" />
+      </svg>
+    )
+  }
+
+  if (name === 'wind') {
+    return (
+      <svg className="weather-metric-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 8h11a3 3 0 1 0-3-3" />
+        <path d="M3 12h15a3 3 0 1 1-3 3" />
+        <path d="M3 16h7" />
+      </svg>
+    )
+  }
+
+  if (name === 'precipitationChance') {
+    return (
+      <svg className="weather-metric-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 4a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7Z" />
+        <path d="M12 11v6a3 3 0 0 0 6 0" />
+      </svg>
+    )
+  }
+
+  return (
+    <svg className="weather-metric-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 3.5S6.5 10 6.5 14a5.5 5.5 0 0 0 11 0C17.5 10 12 3.5 12 3.5Z" />
+    </svg>
+  )
 }
 
 function resolveHomeWidgetState(module: Module) {
