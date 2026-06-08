@@ -71,6 +71,10 @@ npm run dev
 
 API calls need `wrangler pages dev` because they depend on Cloudflare bindings.
 
+## Automated Checks
+
+GitHub Actions runs `npm ci`, `npm test`, and `npm run build` on pull requests and pushes to `main`. E2E tests are intentionally not part of CI because they modify app data and must be run only against an explicit local or staging target with `E2E_BASE_URL`, `TEST_USERNAME`, and `TEST_PASSWORD` set.
+
 ## Deployment Notes
 
 Set `APP_ORIGIN` to the deployed origin, for example `https://frog-peach-home-hub.pages.dev`. Set `SETUP_TOKEN` as a Cloudflare secret before first-run setup; production admin creation is blocked without it. Keep everything private unless you intentionally add public page behavior later.
