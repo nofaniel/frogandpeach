@@ -1,5 +1,6 @@
 import { hashPassword, sha256Hex, verifyPassword } from './crypto'
 import { ApiError, id, json, nowIso, readJson, rowNumber, rowString } from './http'
+import { assertAuthNotRateLimited, clearAuthFailures, recordAuthFailure } from './rate-limit'
 import type { ApiContext, DbRow, Env } from './types'
 
 const COOKIE_NAME = 'fp_session'
@@ -226,21 +227,23 @@ async function login(request: Request, env: Env) {
   const body = await readJson<LoginBody>(request)
   const username = cleanUsername(body.username)
   const password = String(body.password ?? '')
+
+  await assertAuthNotRateLimited(env, request, 'login', username)
+
   const user = await getUserRowByUsername(env, username)
   const passwordSetupRequired = Boolean(user && rowNumber(user, 'password_reset_required') === 1)
 
   if (!user || rowNumber(user, 'active') !== 1) {
+    await recordAuthFailure(env, request, 'login', username)
     throw new ApiError(401, 'Invalid username or password.')
   }
 
-  if (passwordSetupRequired) {
-    if (password.length > 0) {
-      throw new ApiError(401, 'Use your username only, then set a new password.')
-    }
-  } else if (!(await verifyPassword(password, rowString(user, 'password_hash')))) {
+  if (!(await verifyPassword(password, rowString(user, 'password_hash')))) {
+    await recordAuthFailure(env, request, 'login', username)
     throw new ApiError(401, 'Invalid username or password.')
   }
 
+  await clearAuthFailures(env, request, 'login', username)
   return createSessionResponse(request, env, rowString(user, 'id'), rowString(user, 'username'), normaliseRole(rowString(user, 'role')), false, passwordSetupRequired)
 }
 
@@ -249,11 +252,22 @@ async function unlockAdmin(request: Request, env: Env) {
   const body = await readJson<LoginBody>(request)
   const username = cleanUsername(body.username || session.userName)
   const password = String(body.password ?? '')
-  const user = await getUserRowByUsername(env, username)
 
-  if (!user || normaliseRole(rowString(user, 'role')) !== 'admin' || rowNumber(user, 'active') !== 1 || !(await verifyPassword(password, rowString(user, 'password_hash')))) {
+  await assertAuthNotRateLimited(env, request, 'unlock', username)
+
+  const user = await getUserRowByUsername(env, username)
+  const valid =
+    user !== null &&
+    normaliseRole(rowString(user, 'role')) === 'admin' &&
+    rowNumber(user, 'active') === 1 &&
+    (await verifyPassword(password, rowString(user, 'password_hash')))
+
+  if (!valid) {
+    await recordAuthFailure(env, request, 'unlock', username)
     throw new ApiError(401, 'Invalid admin credentials.')
   }
+
+  await clearAuthFailures(env, request, 'unlock', username)
 
   const raw = getCookie(request.headers.get('cookie') || '', COOKIE_NAME)
   if (!raw) throw new ApiError(401, 'Login required.')

@@ -1,6 +1,7 @@
 import { listTypes, normaliseListType, resetKeyForListType, shouldRefreshList, type ListTypeId } from '../shared/lists'
 import { deriveTideEvents, extractTideSeries, numericOrNull } from '../shared/tide'
 import { formatLocationLabel, isLocationConfigured } from '../shared/location'
+import { sha256Hex } from './crypto'
 import { id, normaliseTags, nowIso, rowNumber, rowString, slugify } from './http'
 import type { DbRow, Env } from './types'
 
@@ -77,6 +78,17 @@ export type NetworkOverview = {
   devices: NetworkDevice[]
 }
 
+export type NetworkSummary = {
+  wifiName: string
+  wifiSecurity: string
+  deviceCount: number
+  usage: {
+    period: string
+    monthlyGb: number | null
+    updatedAt: string | null
+  }
+}
+
 const settingDefaults: Settings = {
   wifiName: '',
   wifiPassword: '',
@@ -110,7 +122,7 @@ export async function getDashboard(env: Env, request: Request) {
     listNotes(env, {}),
     listLists(env),
     listPageLinks(env, request),
-    optionalData('network', () => getNetworkOverview(env)),
+    optionalData('network', () => getNetworkSummary(env)),
     getPublicSettings(env),
     import('./modules').then(({ listModules }) => listModules(env)),
     getAppearance(env),
@@ -179,6 +191,21 @@ export async function getNetworkOverview(env: Env): Promise<NetworkOverview> {
       updatedAt: settings.wifiUsageUpdatedAt.trim() || null,
     },
     devices: parseNetworkDevices(settings.wifiDevicesJson),
+  }
+}
+
+export async function getNetworkSummary(env: Env): Promise<NetworkSummary> {
+  const settings = await getSettings(env)
+  const devices = parseNetworkDevices(settings.wifiDevicesJson)
+  return {
+    wifiName: settings.wifiName,
+    wifiSecurity: normaliseWifiSecurity(settings.wifiSecurity),
+    deviceCount: devices.length,
+    usage: {
+      period: settings.wifiUsagePeriod.trim(),
+      monthlyGb: parseOptionalNumber(settings.wifiUsageMonthlyGb),
+      updatedAt: settings.wifiUsageUpdatedAt.trim() || null,
+    },
   }
 }
 
@@ -510,7 +537,7 @@ export async function getWeather(env: Env) {
         feelsLike: numericOrNull(current.apparent_temperature),
         windSpeed: numericOrNull(current.wind_speed_10m),
         windGusts: numericOrNull(current.wind_gusts_10m),
-        precipitation: numericOrNull(current.precipitation),
+        precipitationMm: numericOrNull(current.precipitation),
         code: numericOrNull(current.weather_code),
         label: weatherLabel(current.weather_code),
         time: typeof current.time === 'string' ? current.time : null,
@@ -545,7 +572,7 @@ export async function getMarine(env: Env) {
   const settings = await getSettings(env)
   if (!isLocationConfigured(settings)) return null
 
-  const cacheKey = source === 'api' ? 'marine-v5-api' : 'marine-v5-model'
+  const cacheKey = await buildMarineCacheKey(source, options.apiKey)
   return cached(env, cacheKey, 6 * 60 * 60, async () => {
     if (source === 'api') {
       const fromApi = await getMarineFromApi(settings, options.apiKey)
@@ -579,6 +606,13 @@ export async function getMarine(env: Env) {
         : 'Approximate tide trend from Open-Meteo marine model. Not for navigation.',
     }
   })
+}
+
+export async function buildMarineCacheKey(source: 'model' | 'api', apiKey: string) {
+  if (source !== 'api') return 'marine-v6-model'
+
+  const fingerprint = await sha256Hex(String(apiKey ?? '').trim())
+  return `marine-v6-api-${fingerprint}`
 }
 
 async function getMarineFromApi(settings: Settings, apiKey: string) {

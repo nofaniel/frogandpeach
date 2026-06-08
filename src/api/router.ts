@@ -70,7 +70,10 @@ export async function handleApi(context: ApiContext): Promise<Response> {
     if (resource === 'page-manifest-report') return await routePageManifestReport(context)
     if (resource === 'weather' && context.request.method === 'GET') return json(await getWeather(context.env))
     if ((resource === 'tides' || resource === 'marine') && context.request.method === 'GET') return json(await getMarine(context.env))
-    if (resource === 'network' && context.request.method === 'GET') return json(await getNetworkOverview(context.env))
+    if (resource === 'network' && context.request.method === 'GET') {
+      await requireAdminUnlock(context.request, context.env)
+      return json(await getNetworkOverview(context.env))
+    }
     if (resource === 'notes') return await routeNotes(context, parts.slice(1), url, session)
     if (resource === 'lists') return await routeLists(context, parts.slice(1), session)
     if (resource === 'items') return await routeItems(context, parts.slice(1), session)
@@ -104,7 +107,7 @@ async function routeUsers(context: ApiContext, parts: string[]) {
       const summary = body.password && String(body.password).length > 0
         ? `Changed password for ${user.displayName}`
         : body.passwordResetRequired
-          ? `Enabled username-only login for ${user.displayName}`
+          ? `Required password change for ${user.displayName}`
           : `Updated user ${user.displayName}`
       await recordActivity(context, session, 'updated', 'user', user.id, summary, {
         role: user.role,

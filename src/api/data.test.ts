@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getMarine, getSettings, getWeather, normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport, updateList, updateSettings } from './data'
+import { buildMarineCacheKey, getMarine, getNetworkSummary, getSettings, getWeather, normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport, updateList, updateSettings } from './data'
 
 type FakeDbState = {
   settings: Map<string, string>
@@ -189,6 +189,64 @@ describe('location-gated weather and tides', () => {
   })
 })
 
+describe('weather precipitation mapping', () => {
+  it('keeps current precipitation as an amount and daily precipitation as a chance', async () => {
+    const env = createFakeEnv({
+      locationName: 'Newquay',
+      locationRegion: 'Cornwall',
+      latitude: '50.4155',
+      longitude: '-5.0737',
+      timezone: 'Europe/London',
+    })
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        current: {
+          temperature_2m: 13.2,
+          apparent_temperature: 12.1,
+          wind_speed_10m: 18.4,
+          wind_gusts_10m: 26.7,
+          precipitation: 1.75,
+          weather_code: 61,
+          time: '2026-06-08T12:00:00Z',
+        },
+        daily: {
+          time: ['2026-06-08', '2026-06-09', '2026-06-10'],
+          weather_code: [61, 3, 2],
+          temperature_2m_max: [15.2, 16.4, 17.1],
+          temperature_2m_min: [9.8, 10.1, 11.3],
+          precipitation_probability_max: [42, 18, 7],
+          sunrise: ['2026-06-08T05:00:00Z', '2026-06-09T05:00:00Z', '2026-06-10T05:00:00Z'],
+          sunset: ['2026-06-08T20:00:00Z', '2026-06-09T20:00:00Z', '2026-06-10T20:00:00Z'],
+        },
+        hourly: { time: [], precipitation_probability: [], temperature_2m: [], weather_code: [] },
+      }),
+    } as Response)
+
+    const weather = await getWeather(env)
+
+    expect(weather?.current.precipitationMm).toBe(1.75)
+    expect(weather?.daily[0]?.precipitationChance).toBe(42)
+    expect(weather?.daily[1]?.precipitationChance).toBe(18)
+  })
+})
+
+describe('marine cache keying', () => {
+  it('keeps tide API keys out of cache keys and separates different API options', async () => {
+    const modelKey = await buildMarineCacheKey('model', 'ignored-secret')
+    const apiKeyA = await buildMarineCacheKey('api', 'alpha-secret')
+    const apiKeyB = await buildMarineCacheKey('api', 'beta-secret')
+
+    expect(modelKey).toBe('marine-v6-model')
+    expect(apiKeyA).toMatch(/^marine-v6-api-[0-9a-f]{64}$/)
+    expect(apiKeyA).not.toContain('alpha-secret')
+    expect(apiKeyB).not.toContain('beta-secret')
+    expect(apiKeyA).not.toBe(apiKeyB)
+    expect(await buildMarineCacheKey('model', 'another-secret')).toBe(modelKey)
+  })
+})
+
 describe('custom page manifest parsing', () => {
   it('keeps valid pages and normalises relative hrefs', () => {
     expect(
@@ -223,6 +281,53 @@ describe('custom page manifest parsing', () => {
         { path: 'unknown', message: 'Manifest page is missing title or href.' },
       ],
     })
+  })
+})
+
+describe('getNetworkSummary', () => {
+  it('returns only safe fields and never includes wifiPassword, routerUrl, adminUrl, or devices', async () => {
+    const env = createFakeEnv({
+      wifiName: 'HomeNet',
+      wifiPassword: 'supersecret',
+      wifiSecurity: 'WPA',
+      routerUrl: 'http://192.168.1.1',
+      adminUrl: 'http://192.168.1.1/admin',
+      wifiUsagePeriod: 'June 2026',
+      wifiUsageMonthlyGb: '45.5',
+      wifiUsageUpdatedAt: '2026-06-01T00:00:00Z',
+      wifiDevicesJson: JSON.stringify([
+        { name: 'Laptop', type: 'computer', ip: '192.168.1.10', mac: 'AA:BB:CC:DD:EE:FF', connection: 'wifi', status: 'online' },
+        { name: 'Phone', type: 'mobile', ip: '192.168.1.11', mac: '11:22:33:44:55:66', connection: 'wifi', status: 'offline' },
+      ]),
+    })
+
+    const summary = await getNetworkSummary(env)
+
+    expect(summary.wifiName).toBe('HomeNet')
+    expect(summary.wifiSecurity).toBe('WPA')
+    expect(summary.deviceCount).toBe(2)
+    expect(summary.usage.period).toBe('June 2026')
+    expect(summary.usage.monthlyGb).toBe(45.5)
+    expect(summary.usage.updatedAt).toBe('2026-06-01T00:00:00Z')
+
+    expect(summary).not.toHaveProperty('wifiPassword')
+    expect(summary).not.toHaveProperty('routerUrl')
+    expect(summary).not.toHaveProperty('adminUrl')
+    expect(summary).not.toHaveProperty('devices')
+  })
+
+  it('returns deviceCount zero and null usage values on a fresh database', async () => {
+    const env = createFakeEnv()
+
+    const summary = await getNetworkSummary(env)
+
+    expect(summary.deviceCount).toBe(0)
+    expect(summary.usage.monthlyGb).toBeNull()
+    expect(summary.usage.updatedAt).toBeNull()
+    expect(summary).not.toHaveProperty('wifiPassword')
+    expect(summary).not.toHaveProperty('routerUrl')
+    expect(summary).not.toHaveProperty('adminUrl')
+    expect(summary).not.toHaveProperty('devices')
   })
 })
 

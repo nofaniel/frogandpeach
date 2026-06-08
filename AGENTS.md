@@ -1,130 +1,195 @@
-# AGENTS.md — Frog & Peach Home Hub
+# AGENTS.md - Frog & Peach Home Hub
 
-Compact orientation for AI agents. Every item here is something easy to get wrong.
+This file is the fast orientation for agents working in this repo. For the current hardening/refactor sequence, read `FROG_AND_PEACH_IMPLEMENTATION_PLAN.md` and work only on the phase the user names.
+
+## Current Priority
+
+Follow `FROG_AND_PEACH_IMPLEMENTATION_PLAN.md` in order:
+
+1. E2E safety
+2. Password reset hardening
+3. Auth rate limiting
+4. Network privacy boundary
+5. Weather/tide correctness
+6. Safe frontend refactor
+7. Tooling and CI
+
+Do not jump to refactors before the security and test-safety phases are complete. If the user points at a single phase, keep the change set limited to that phase.
 
 ## Stack
 
-- **Frontend:** React 19 + Vite 8, single-page (`src/App.tsx` — one large file, no router library, no component library)
-- **Backend:** Cloudflare Pages Functions (`functions/`) + D1 SQLite
-- **API logic** (`src/api/`) is shared: imported by `functions/` (Cloudflare Worker) and directly by Vitest unit tests
-- **Single package** — not a monorepo. One `package.json`, one `tsconfig.json`.
+- Frontend: React 19 + Vite 8, single-page app in `src/App.tsx`.
+- Backend: Cloudflare Pages Functions in `functions/`, backed by D1 SQLite.
+- Shared API logic: `src/api/` is imported by Cloudflare Functions and by Vitest unit tests.
+- Shared pure logic: `src/shared/`.
+- Theme runtime: `src/theme/`.
+- Single package only: one `package.json`, one `tsconfig.json`, no monorepo.
+- No router library and no component library.
 
 ## Commands
 
-```bash
-# Full local dev (frontend + API + D1)
-npm run build          # must run first — wrangler serves dist/
-npm run dev:worker     # starts on :8788
+```powershell
+# Install
+npm install
 
-# Frontend-only dev (no API/D1)
-npm run dev            # Vite only, :5173
+# Full local dev. Build first because wrangler serves dist/.
+npm run build
+npm run dev:worker
 
-# Unit tests (vitest)
-npm test               # or: npm run test:watch
+# Frontend-only dev. API/D1 calls will not work here.
+npm run dev
 
-# E2E tests (Playwright)
-npm run test:e2e       # headless
-npm run test:e2e:headed
+# Unit tests
+npm test
+npm run test:watch
 
-# Build for production
-npm run build          # tsc -b && vite build
+# Focused build checks without prebuild sync hooks
+node node_modules/typescript/bin/tsc -b --pretty false
+node node_modules/vite/bin/vite.js build
 
-# Deploy
-npm run cf:deploy      # builds then wrangler pages deploy dist
+# Production build, including prebuild sync scripts
+npm run build
 
-# D1 migrations (manual — never auto-applied)
+# E2E, only with explicit non-production target and credentials
+$env:E2E_BASE_URL = "http://localhost:8788"
+$env:TEST_USERNAME = "<local-test-username>"
+$env:TEST_PASSWORD = "<local-test-password>"
+npm run test:e2e
+
+# D1 migrations. Manual only.
 npm run cf:migrate:local
 npm run cf:migrate:remote
 
-# First-time password hash
+# Password hash generation
 npm run hash-password -- "yourpassword"
 ```
 
-## Critical Gotchas
+## Critical Guardrails
 
-**`dev:worker` requires a prior build.** Wrangler serves `dist/`, not source. Running `npm run dev:worker` without building first serves stale or missing files.
+- `dev:worker` requires a prior build. Wrangler serves `dist/`, not source.
+- Do not run E2E against production. `E2E_BASE_URL` must be explicit.
+- Do not use or add real-looking default test credentials. Use placeholders in docs.
+- Do not commit `.dev.vars`, cookies, local Wrangler state, Playwright output, generated secrets, or built `dist`.
+- Do not edit `public/themes/` or `public/custom-pages/` directly. They are generated from `themes/` and `custom-pages/`.
+- Prebuild hooks run `scripts/sync-custom-pages.mjs` and `scripts/sync-themes.mjs`; they can rewrite tracked generated manifests.
+- Migrations are manual. Adding a file under `migrations/` is fine; applying it requires an explicit migration command.
+- Do not run `npm run cf:migrate:remote` without explicit user confirmation. It applies all pending remote migrations, including `migrations/0007_codex_test_admin.sql`, which seeds or updates `codex_test` as an admin.
+- Preserve Cloudflare Pages + D1. Do not add Express, Next.js API routes, a separate Node backend, or SaaS auth unless explicitly requested.
+- Keep production deployment assumptions unchanged unless the phase explicitly says otherwise.
 
-**Live-site iteration is the default in this stage.** After validating a change, commit, push, and deploy it straight away so the live Pages site reflects the latest work for review.
+## Verification Expectations
 
-**Pre-build sync scripts run automatically** via `predev`/`prebuild` hooks:
-- `scripts/sync-custom-pages.mjs` — syncs `custom-pages/` → `public/custom-pages/` and writes `manifest.json`
-- `scripts/sync-themes.mjs` — syncs `themes/` → `public/themes/` and writes `manifest.json`
+For most code phases, run:
 
-Do not edit files directly under `public/themes/` or `public/custom-pages/` — they are overwritten on every build.
-
-**Migrations are manual.** There is no auto-migration on startup. New `.sql` files in `migrations/` must be explicitly applied with `cf:migrate:local` or `cf:migrate:remote`.
-
-**E2E tests default to production** (`https://frog-peach-home-hub.pages.dev`). To test locally:
-```bash
-E2E_BASE_URL=http://localhost:8788 TEST_USERNAME=codex_test TEST_PASSWORD=CodexTest!2026-FP npm run test:e2e
-```
-`TEST_USERNAME` and `TEST_PASSWORD` are the preferred test credentials. Legacy `FP_TEST_USERNAME`/`FP_TEST_PASSWORD` are still supported as fallbacks.
-
-## No Linter, No CI, No Formatter
-
-- No ESLint, Prettier, or Biome configured.
-- No `.github/workflows/`, no pre-commit hooks.
-- **TypeScript strict mode is the only static check.** Run `npm run build` to verify.
-- `vitest/globals` is declared in `tsconfig.json` — test files use `describe`/`test`/`expect` without imports.
-
-## Environment / Secrets
-
-Local dev requires `.dev.vars` (gitignored):
-```
-ADMIN_USERNAME=admin
-ADMIN_PASSWORD_HASH=pbkdf2_sha256$...   # from: npm run hash-password
-APP_ORIGIN=http://localhost:8788
-SESSION_TTL_DAYS=14
+```powershell
+npm test
+node node_modules/typescript/bin/tsc -b --pretty false
+node node_modules/vite/bin/vite.js build
 ```
 
-`APP_ORIGIN` must match the actual request origin — it is used for session cookie validation and CORS. Wrong value → all API requests fail auth.
+Use `npm run build` when validating the exact production build path or when a phase touches synced assets, theme manifests, custom pages, scripts, or package scripts.
 
-Production: `ADMIN_USERNAME` as a Pages env var, `ADMIN_PASSWORD_HASH` as a Cloudflare secret.
+E2E should be local or staging only:
 
-## Password Hash Format
+First shell:
 
-Format: `pbkdf2_sha256$ITERATIONS$BASE64_SALT$BASE64_HASH`
+```powershell
+npm run cf:migrate:local
+npm run build
+npm run dev:worker
+```
 
-- CLI script (`scripts/generate-password-hash.mjs`): 210,000 iterations
-- Runtime verification (`src/api/crypto.ts`): 150,000 iterations
+Second shell:
 
-These differ by design — the app verifies against whatever iteration count is stored in the hash string. The CLI generates hashes with the higher count; the runtime reads the count from the stored hash.
+```powershell
+$env:E2E_BASE_URL = "http://localhost:8788"
+$env:TEST_USERNAME = "<local-test-username>"
+$env:TEST_PASSWORD = "<local-test-password>"
+npm run test:e2e
+```
+
+If tests fail before your edits, record the baseline failure separately from introduced failures.
 
 ## Auth Model
 
-- Cookie-based sessions (`fp_session`, HttpOnly, SameSite=Lax)
-- Session token stored as SHA-256 hash in D1
-- **Two-tier auth:** regular session (1–90 day TTL, default 14 days) + 15-minute admin re-unlock for destructive operations
-- Admin unlock is a separate `POST /api/admin/unlock` step — required before `/api/modules`, `/api/users`, `/api/settings`, `/api/activity`, `/api/cache`
+- Cookie session name: `fp_session`, HttpOnly, SameSite=Lax.
+- Session token is stored as a SHA-256 hash in D1.
+- Auth has two tiers:
+  - normal session, default 14-day TTL;
+  - 15-minute admin re-unlock for destructive/admin operations.
+- Admin unlock is `POST /api/admin/unlock`.
+- Admin unlock is required for `/api/modules`, `/api/users`, `/api/settings`, `/api/activity`, and `/api/cache`.
+- Password hash format: `pbkdf2_sha256$ITERATIONS$BASE64_SALT$BASE64_HASH`.
+- Runtime verification reads the iteration count from the stored hash.
 
-## Theme System
+## E2E And Test Safety
 
-- Source themes: `themes/<id>/theme.json` (+ optional `theme.css`)
-- **Never edit** `public/themes/` directly — overwritten on every build
-- `theme.json` supports `"extends": "<other-id>"` — resolved at runtime by `ThemeProvider.tsx`
-- Active theme stored in D1 settings as `themeId`; also cached in `localStorage` for flash-free paint
-- Applied as CSS custom properties and `data-nav`, `data-density`, `data-surface` attributes on `<html>`
-- Full token/layout reference: `docs/theming.md`
+- Current hardening work starts by making `E2E_BASE_URL` mandatory.
+- Tests create and modify app data, so never let them default to the deployed Pages site.
+- Preferred env vars are `TEST_USERNAME` and `TEST_PASSWORD`.
+- Legacy fallbacks `FP_TEST_USERNAME` and `FP_TEST_PASSWORD` may remain supported, but should not have default values.
 
 ## Project Structure
 
+```text
+src/api/          API logic shared by worker and tests
+functions/        Cloudflare Pages Functions wrappers
+functions/_middleware.ts
+functions/api/[[path]].ts
+src/shared/       Pure business logic
+src/theme/        Theme loading, inheritance, CSS application
+themes/           Source theme definitions
+public/themes/    Generated theme output; do not edit directly
+migrations/       Manual D1 migrations
+scripts/          Sync and utility scripts
+e2e/              Playwright tests
+docs/             Project docs
 ```
-src/api/          # All API logic (router, auth, data, crypto, modules) — shared frontend + backend
-functions/        # Cloudflare Pages Functions (thin wrappers — delegate to src/api/)
-  _middleware.ts  # Auth guard for /pages/ and /custom-pages/ paths
-  api/[[path]].ts # Catch-all: delegates /api/* to src/api/router.ts
-src/shared/       # Pure business logic (lists, tide derivation) — no platform deps
-src/theme/        # Theme loading, inheritance, CSS application
-themes/           # Source theme definitions (synced to public/themes/ on build)
-migrations/       # D1 SQL migrations (applied manually)
-scripts/          # Pre-build sync scripts (run automatically via predev/prebuild)
-e2e/              # Playwright tests
-```
 
-## D1 Database
+## Data And Generated Files
 
-Binding name: `DB`. Local preview DB name: `frog-peach-db`.
+- D1 binding name: `DB`.
+- Local preview DB name: `frog-peach-db`.
+- Main data access lives in `src/api/data.ts`.
+- Module registry and module option normalization live in `src/api/modules.ts`.
+- Router and route-level auth boundaries live in `src/api/router.ts`.
+- Auth/session/user logic lives in `src/api/auth.ts`.
+- Origin/CSRF trust checks live in `requireTrustedOrigin()` in `src/api/router.ts`.
+- Protected static paths are only `/pages/` and `/custom-pages/` in `functions/_middleware.ts`.
+- Destructive module data deletion is `deleteModuleData()` in `src/api/data.ts`.
+- `public/themes/manifest.json` and `public/custom-pages/manifest.json` are generated.
+- `scripts/sync-themes.mjs` deletes and recopies public theme folders.
+- `scripts/sync-custom-pages.mjs` syncs custom pages into `public/custom-pages/`.
+- Do not change generated `manifest.json` behavior casually; it intentionally uses stable generated metadata.
 
-Tables: `sessions`, `settings`, `module_settings`, `users`, `notes`, `lists`, `list_items`, `shopping_lists`, `shopping_items`, `pages`, `page_links`, `page_manifests`, `cache`, `activity_log`.
+## Sub-Agent Use
 
-All data access is in `src/api/data.ts`.
+Use sub-agents only when the user asks for parallel/delegated work or when executing the implementation plan explicitly benefits from a sidecar review.
+
+Good patterns:
+
+- Ask a read-only explorer to map a narrow area while the main agent edits a disjoint area.
+- Use a worker only with clear ownership of files and no overlap with other workers.
+- Instruct workers that other edits may exist and they must not revert them.
+- Give each sub-agent a fixed phase goal and file list. Do not ask it to rediscover the whole repo.
+
+Phase-specific guidance:
+
+- Phase 1: keep local; the file set is small.
+- Phase 2: keep implementation local; optionally use a read-only explorer to review auth tests.
+- Phase 3: an explorer can review rate-limit edge cases while the main agent implements helpers.
+- Phase 4: an explorer can map frontend network-field usage while the main agent changes API shape.
+- Phase 6: split extractions only when write sets are disjoint.
+- Never use sub-agents for overlapping edits in `src/App.tsx` or parallel migration edits.
+
+## Coding Style
+
+- Follow existing TypeScript style. There is currently no ESLint, Prettier, or Biome.
+- Do not run broad formatters unless a phase explicitly adds formatting.
+- Prefer small testable helpers for auth and data behavior.
+- Keep public DTOs separate from server-only DB row types when adding shared contracts.
+- Avoid unrelated cleanup in security phases.
+
+## Live-Site Workflow
+
+The project often uses live-site iteration after validation, but do not deploy unless the user explicitly asks. If asked to deploy, build first, then use `npm run cf:deploy`.

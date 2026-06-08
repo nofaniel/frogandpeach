@@ -3,6 +3,7 @@ import { marked } from 'marked'
 import QRCode from 'qrcode'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { formatLocationLabel, isLocationConfigured, resolveBrowserTimeZone } from './shared/location'
+import { formatCurrentPrecipitationMm } from './shared/weather'
 import { useTheme } from './theme/ThemeProvider'
 
 type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network'
@@ -148,7 +149,7 @@ type WeatherSummary = {
     feelsLike: number | null
     windSpeed: number | null
     windGusts: number | null
-    precipitation: number | null
+    precipitationMm: number | null
     label: string
     time: string | null
   }
@@ -177,7 +178,7 @@ type HomeData = {
   notes: Note[]
   lists: SharedList[]
   pages: PageLink[]
-  network: NetworkOverview | null
+  network: NetworkSummary | null
   settings: Partial<Settings>
   modules: Module[]
   appearance: Appearance
@@ -215,6 +216,17 @@ type NetworkOverview = {
     updatedAt: string | null
   }
   devices: NetworkDevice[]
+}
+
+type NetworkSummary = {
+  wifiName: string
+  wifiSecurity: string
+  deviceCount: number
+  usage: {
+    period: string
+    monthlyGb: number | null
+    updatedAt: string | null
+  }
 }
 
 type Session = {
@@ -400,7 +412,7 @@ function App() {
       setPageLinks(linkData)
       setModules(homeData.modules)
       setSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
-      setNetwork(homeData.network)
+      setNetwork(null)
       void setTheme(appearanceData.themeId)
       if (window.location.pathname.startsWith('/page/')) {
         const slug = window.location.pathname.replace(/^\/page\//, '')
@@ -459,9 +471,15 @@ function App() {
     await api('/api/auth/logout', { method: 'POST' }, false)
     setSession(loggedOutSession)
     setHome(null)
+    setNetwork(null)
     setAdminOpen(false)
     setLoginDraft((draft) => ({ ...draft, password: '' }))
     setPasswordSetupDraft({ password: '', confirmPassword: '' })
+  }
+
+  async function loadFullNetwork() {
+    const data = await api<NetworkOverview>('/api/network')
+    setNetwork(data)
   }
 
   async function openAdmin() {
@@ -800,7 +818,7 @@ function App() {
         <section className="login-panel">
           <p className="kicker">{setupNeeded ? 'First run setup' : 'Private home hub'}</p>
           <h1>Frog & Peach</h1>
-          <p>{setupNeeded ? 'Create the first administrator account. After this, household members can sign in with their own accounts.' : 'Sign in with your household account. If your admin has reset your account, leave the password blank and you will be prompted to set a new one.'}</p>
+          <p>{setupNeeded ? 'Create the first administrator account. After this, household members can sign in with their own accounts.' : 'Sign in with your household account. If your admin has reset your password, use the temporary password they set for you.'}</p>
           <form onSubmit={login}>
             <label>
               Username
@@ -1062,7 +1080,11 @@ function App() {
 
       {!viewedPage && !adminOpen && activeTab === 'network' && (
         <NetworkWorkspace
-          network={network}
+          networkSummary={home?.network ?? null}
+          fullNetwork={network}
+          adminUnlocked={session?.adminUnlocked ?? false}
+          onLoadFullNetwork={loadFullNetwork}
+          onUnlockAdmin={openAdmin}
           deployment={home?.deployment ?? null}
         />
       )}
@@ -1124,7 +1146,7 @@ function renderModule(
           {home.weather.daily[0] && <span>? {formatTemperature(home.weather.daily[0].max)} ? {formatTemperature(home.weather.daily[0].min)}</span>}
           <span>?? {formatNumber(home.weather.current.windSpeed)} km/h</span>
           <span>?? {formatNumber(home.weather.daily[0]?.precipitationChance)}%</span>
-          <span>?? {formatNumber(home.weather.current.precipitation)}% rain</span>
+          <span>?? {formatCurrentPrecipitationMm(home.weather.current.precipitationMm)}</span>
           <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
         </div>
         {widget.mode === 'forecast' && (
@@ -1323,10 +1345,6 @@ function renderModule(
 
   if (module.id === 'network') {
     const network = home.network
-    const routerUrl = normaliseExternalUrl(network?.routerUrl)
-    const adminUrl = normaliseExternalUrl(network?.adminUrl)
-    const connectedDevices = network?.devices ?? []
-    const onlineDevices = connectedDevices.filter((device) => device.status === 'online').length
     return (
       <article className={className + ' network-panel'} key={module.id}>
         <div className="panel-heading">
@@ -1338,24 +1356,12 @@ function renderModule(
             {home.deployment.ready ? 'Connected' : 'Needs setup'}
           </span>
         </div>
-        <p>{widget.mode === 'details' && network?.usage.period ? home.deployment.note + ' ' + network.usage.period + ' usage and devices are shown below.' : home.deployment.note}</p>
+        <p>{widget.mode === 'details' && network?.usage.period ? home.deployment.note + ' ' + network.usage.period + ' usage shown below.' : home.deployment.note}</p>
         <div className="stack-list">
           <a className="plain-row" href={home.deployment.origin} target="_blank" rel="noreferrer">
             <strong>Open current host</strong>
             <span>{home.deployment.origin}</span>
           </a>
-          {routerUrl && (
-            <a className="plain-row" href={routerUrl} target="_blank" rel="noreferrer">
-              <strong>Router</strong>
-              <span>{routerUrl}</span>
-            </a>
-          )}
-          {adminUrl && (
-            <a className="plain-row" href={adminUrl} target="_blank" rel="noreferrer">
-              <strong>Admin panel</strong>
-              <span>{adminUrl}</span>
-            </a>
-          )}
           <a className="plain-row" href="/docs/cloudflare-hosting.md">
             <strong>Cloudflare hosting guide</strong>
             <span>Functions + D1 setup and deploy steps</span>
@@ -1370,8 +1376,8 @@ function renderModule(
             </div>
             <div className="detail-box">
               <strong>Devices</strong>
-              <span>{connectedDevices.length} configured</span>
-              <small>{onlineDevices} online, {connectedDevices.length - onlineDevices} offline</small>
+              <span>{network.deviceCount} configured</span>
+              <small>Open Network tab for details</small>
             </div>
           </section>
         )}
@@ -1656,7 +1662,7 @@ function AdminPanel({
                   <div className="user-actions">
                     <button type="button" className="ghost" onClick={() => { setEditingUserId(user.id); setEditingDisplayName(user.displayName) }}>Rename</button>
                     <button type="button" className="ghost" onClick={() => { setEditingPasswordUserId(user.id); setEditingPassword('') }}>Change password</button>
-                    <button type="button" className="ghost" onClick={() => onPatchUser(user, { passwordResetRequired: true })}>Username login</button>
+                     <button type="button" className="ghost" onClick={() => onPatchUser(user, { passwordResetRequired: true })}>Require password change</button>
                     <button type="button" className="ghost" onClick={() => onPatchUser(user, { active: !user.active })}>{user.active ? 'Disable' : 'Enable'}</button>
                   </div>
                 </>
@@ -2048,14 +2054,30 @@ function AdminPanel({
   )
 }
 
-function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | null; deployment: HomeData['deployment'] | null }) {
+function NetworkWorkspace({
+  networkSummary,
+  fullNetwork,
+  adminUnlocked,
+  onLoadFullNetwork,
+  onUnlockAdmin,
+  deployment,
+}: {
+  networkSummary: NetworkSummary | null
+  fullNetwork: NetworkOverview | null
+  adminUnlocked: boolean
+  onLoadFullNetwork: () => Promise<void>
+  onUnlockAdmin: () => void
+  deployment: HomeData['deployment'] | null
+}) {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [copyState, setCopyState] = useState('')
-  const hasWifi = Boolean(network?.wifiName)
+  const [loadingNetwork, setLoadingNetwork] = useState(false)
+  const [loadError, setLoadError] = useState('')
+  const hasWifi = Boolean(fullNetwork?.wifiName)
   const wifiPayload = useMemo(() => {
-    if (!network || !network.wifiName) return ''
-    return toWifiPayload(network.wifiName, network.wifiPassword, network.wifiSecurity)
-  }, [network])
+    if (!fullNetwork?.wifiName) return ''
+    return toWifiPayload(fullNetwork.wifiName, fullNetwork.wifiPassword, fullNetwork.wifiSecurity)
+  }, [fullNetwork])
 
   useEffect(() => {
     let cancelled = false
@@ -2087,11 +2109,23 @@ function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | 
     }
   }
 
-  const routerUrl = normaliseExternalUrl(network?.routerUrl)
-  const adminUrl = normaliseExternalUrl(network?.adminUrl)
-  const devices = network?.devices ?? []
-  const usagePeriod = network?.usage.period || 'Current period'
-  const usageValue = network?.usage.monthlyGb
+  async function handleLoadNetwork() {
+    setLoadingNetwork(true)
+    setLoadError('')
+    try {
+      await onLoadFullNetwork()
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Failed to load network details')
+    } finally {
+      setLoadingNetwork(false)
+    }
+  }
+
+  const routerUrl = normaliseExternalUrl(fullNetwork?.routerUrl)
+  const adminUrl = normaliseExternalUrl(fullNetwork?.adminUrl)
+  const devices = fullNetwork?.devices ?? []
+  const usagePeriod = networkSummary?.usage.period || 'Current period'
+  const usageValue = networkSummary?.usage.monthlyGb
 
   return (
     <section className="workspace-grid network-grid">
@@ -2103,39 +2137,53 @@ function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | 
           </div>
           {copyState && <span className="status-badge ok">{copyState}</span>}
         </div>
-        {hasWifi ? (
-          <div className="network-share-grid">
-            <div className="network-credentials">
-              <div className="plain-row">
-                <strong>SSID</strong>
-                <span>{network?.wifiName}</span>
-              </div>
-              <div className="plain-row">
-                <strong>Password</strong>
-                <span>{network?.wifiPassword || '(none)'}</span>
-              </div>
-              <div className="plain-row">
-                <strong>Security</strong>
-                <span>{network?.wifiSecurity}</span>
-              </div>
-              <div className="button-row">
-                <button type="button" className="ghost" onClick={() => void copyValue(network?.wifiName ?? '', 'SSID')}>Copy SSID</button>
-                <button type="button" className="ghost" onClick={() => void copyValue(network?.wifiPassword ?? '', 'Password')}>Copy password</button>
-              </div>
-            </div>
-            <div className="network-qr-wrap">
-              {qrDataUrl ? (
-                <img className="network-qr" src={qrDataUrl} alt="Wi-Fi join QR code" />
-              ) : (
+        {fullNetwork ? (
+          hasWifi ? (
+            <div className="network-share-grid">
+              <div className="network-credentials">
                 <div className="plain-row">
-                  <strong>QR unavailable</strong>
-                  <span>Add SSID/security details in Admin settings.</span>
+                  <strong>SSID</strong>
+                  <span>{fullNetwork.wifiName}</span>
                 </div>
-              )}
+                <div className="plain-row">
+                  <strong>Password</strong>
+                  <span>{fullNetwork.wifiPassword || '(none)'}</span>
+                </div>
+                <div className="plain-row">
+                  <strong>Security</strong>
+                  <span>{fullNetwork.wifiSecurity}</span>
+                </div>
+                <div className="button-row">
+                  <button type="button" className="ghost" onClick={() => void copyValue(fullNetwork.wifiName, 'SSID')}>Copy SSID</button>
+                  <button type="button" className="ghost" onClick={() => void copyValue(fullNetwork.wifiPassword, 'Password')}>Copy password</button>
+                </div>
+              </div>
+              <div className="network-qr-wrap">
+                {qrDataUrl ? (
+                  <img className="network-qr" src={qrDataUrl} alt="Wi-Fi join QR code" />
+                ) : (
+                  <div className="plain-row">
+                    <strong>QR unavailable</strong>
+                    <span>Add SSID/security details in Admin settings.</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <p>Set Wi-Fi details in Admin settings to enable one-scan join sharing.</p>
+          )
         ) : (
-          <p>Set Wi-Fi details in Admin settings to enable one-scan join sharing.</p>
+          <div className="network-locked">
+            <p>Admin unlock required to view Wi-Fi credentials and device details.</p>
+            {loadError && <p className="small-note">{loadError}</p>}
+            {adminUnlocked ? (
+              <button type="button" className="button-link" onClick={() => void handleLoadNetwork()} disabled={loadingNetwork}>
+                {loadingNetwork ? 'Loading...' : 'Load network details'}
+              </button>
+            ) : (
+              <button type="button" className="button-link" onClick={onUnlockAdmin}>Unlock admin to view</button>
+            )}
+          </div>
         )}
       </article>
 
@@ -2144,7 +2192,7 @@ function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | 
         <h2>{usageValue === null || usageValue === undefined ? '--' : `${usageValue.toFixed(1)} GB`}</h2>
         <p>{usagePeriod}</p>
         <p className="small-note">
-          {network?.usage.updatedAt ? `Updated ${formatDateTime(network.usage.updatedAt)}` : 'Add usage values in Admin settings.'}
+          {networkSummary?.usage.updatedAt ? `Updated ${formatDateTime(networkSummary.usage.updatedAt)}` : 'Add usage values in Admin settings.'}
         </p>
       </article>
 
@@ -2152,8 +2200,9 @@ function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | 
         <p className="kicker">Quick links</p>
         <h2>Router access</h2>
         <div className="stack-list">
-          {routerUrl && <a className="plain-row" href={routerUrl} target="_blank" rel="noreferrer"><strong>Router</strong><span>{routerUrl}</span></a>}
-          {adminUrl && <a className="plain-row" href={adminUrl} target="_blank" rel="noreferrer"><strong>Admin</strong><span>{adminUrl}</span></a>}
+          {fullNetwork && routerUrl && <a className="plain-row" href={routerUrl} target="_blank" rel="noreferrer"><strong>Router</strong><span>{routerUrl}</span></a>}
+          {fullNetwork && adminUrl && <a className="plain-row" href={adminUrl} target="_blank" rel="noreferrer"><strong>Admin</strong><span>{adminUrl}</span></a>}
+          {!fullNetwork && <p className="small-note">{adminUnlocked ? 'Load network details to see router links.' : 'Unlock admin to see router links.'}</p>}
           <a className="plain-row" href={deployment?.origin ?? '/'}><strong>Current app host</strong><span>{deployment?.origin ?? 'No host loaded'}</span></a>
         </div>
       </article>
@@ -2162,22 +2211,28 @@ function NetworkWorkspace({ network, deployment }: { network: NetworkOverview | 
         <div className="panel-heading">
           <div>
             <p className="kicker">Connected devices</p>
-            <h2>{devices.length} known</h2>
+            <h2>{fullNetwork ? `${devices.length} known` : `${networkSummary?.deviceCount ?? '--'} configured`}</h2>
           </div>
         </div>
-        <div className="stack-list">
-          {devices.map((device) => (
-            <div className="device-row" key={device.id}>
-              <div>
-                <strong>{device.name}</strong>
-                <span>{device.type} / {device.connection} / {device.status}</span>
+        {fullNetwork ? (
+          <div className="stack-list">
+            {devices.map((device) => (
+              <div className="device-row" key={device.id}>
+                <div>
+                  <strong>{device.name}</strong>
+                  <span>{device.type} / {device.connection} / {device.status}</span>
+                </div>
+                <small>{device.ip || device.mac || 'No address'}</small>
+                <small>{device.usageGb === null ? '--' : `${device.usageGb.toFixed(1)} GB`}</small>
               </div>
-              <small>{device.ip || device.mac || 'No address'}</small>
-              <small>{device.usageGb === null ? '--' : `${device.usageGb.toFixed(1)} GB`}</small>
-            </div>
-          ))}
-          {devices.length === 0 && <p>No devices configured yet. Add JSON entries in Admin settings.</p>}
-        </div>
+            ))}
+            {devices.length === 0 && <p>No devices configured yet. Add JSON entries in Admin settings.</p>}
+          </div>
+        ) : (
+          <p className="small-note">
+            {adminUnlocked ? "Click 'Load network details' above to view connected devices with IP and MAC addresses." : 'Admin unlock required to view device details including IP and MAC addresses.'}
+          </p>
+        )}
       </article>
     </section>
   )
