@@ -250,6 +250,7 @@ function normaliseModuleOptions(definition: ModuleDefinition | undefined, option
 
   if (definition.id === 'weather') {
     normalised.iconStyle = options.iconStyle === 'icons' ? 'icons' : 'emoji'
+    normalised.showExtendedForecast = options.showExtendedForecast === true
   }
 
   return normalised

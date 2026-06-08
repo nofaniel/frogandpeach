@@ -954,6 +954,27 @@ function renderModule(
             ))}
           </section>
         )}
+        {module.options.showExtendedForecast === true && (
+          <section className="weather-extended-forecast" aria-label="5-day forecast">
+            <p className="kicker">Next 5 days</p>
+            <div className="day-grid weather-forecast-grid">
+              {home.weather.daily.slice(1, 6).map((day) => (
+                <div key={day.date} className="weather-forecast-card">
+                  <span>{formatDate(day.date)}</span>
+                  <div className="weather-extended-icon" aria-hidden="true">{weatherIcon(day.label)}</div>
+                  <strong>{day.label}</strong>
+                  <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
+                  {day.precipitationChance !== null && (
+                    <span className="weather-extended-precip">
+                      <WeatherMetricSymbol name="precipitationChance" style={weatherIconStyle} />
+                      {formatNumber(day.precipitationChance)}%
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </article>
     )
   }
@@ -1647,6 +1668,18 @@ function AdminPanel({
                       >
                         <option value="emoji">Emoji</option>
                         <option value="icons">Line icons</option>
+                      </select>
+                    </label>
+                  )}
+                  {module.id === 'weather' && module.installed && (
+                    <label className="compact-field">
+                      5-day forecast
+                      <select
+                        value={module.options.showExtendedForecast ? 'on' : 'off'}
+                        onChange={(event) => onPatchModule(module, { options: { ...module.options, showExtendedForecast: event.target.value === 'on' } })}
+                      >
+                        <option value="off">Hidden</option>
+                        <option value="on">Show below weather</option>
                       </select>
                     </label>
                   )}

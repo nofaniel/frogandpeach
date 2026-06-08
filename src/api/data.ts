@@ -512,7 +512,7 @@ export async function getWeather(env: Env) {
   const settings = await getSettings(env)
   if (!isLocationConfigured(settings)) return null
 
-  return cached(env, 'weather-v5', 45 * 60, async () => {
+  return cached(env, 'weather-v6', 45 * 60, async () => {
     const url = new URL('https://api.open-meteo.com/v1/forecast')
     url.searchParams.set('latitude', settings.latitude)
     url.searchParams.set('longitude', settings.longitude)
@@ -522,7 +522,7 @@ export async function getWeather(env: Env) {
     url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset')
     url.searchParams.set('hourly', 'precipitation_probability,temperature_2m,weather_code')
     url.searchParams.set('timezone', settings.timezone)
-    url.searchParams.set('forecast_days', '3')
+    url.searchParams.set('forecast_days', '7')
 
     const raw = await fetchJson<Record<string, any>>(url)
     const current = raw.current ?? {}
@@ -542,7 +542,7 @@ export async function getWeather(env: Env) {
         label: weatherLabel(current.weather_code),
         time: typeof current.time === 'string' ? current.time : null,
       },
-      daily: (daily.time ?? []).slice(0, 3).map((date: string, index: number) => ({
+      daily: (daily.time ?? []).map((date: string, index: number) => ({
         date,
         label: weatherLabel(daily.weather_code?.[index]),
         code: numericOrNull(daily.weather_code?.[index]),

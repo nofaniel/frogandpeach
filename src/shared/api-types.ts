@@ -22,6 +22,7 @@ export type Module = {
   size: 'small' | 'medium' | 'wide' | 'full'
   options: Record<string, unknown> & {
     iconStyle?: 'emoji' | 'icons'
+    showExtendedForecast?: boolean
     homeWidget?: {
       enabled: boolean
       mode: string

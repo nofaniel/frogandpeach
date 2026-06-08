@@ -1529,6 +1529,29 @@ body {
   color: var(--app-ink);
 }
 
+.weather-extended-forecast {
+  border-top: 1px solid var(--app-border);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+.weather-extended-forecast .kicker {
+  margin-bottom: 12px;
+}
+
+.weather-extended-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.weather-extended-precip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
 .home-dashboard + * {
   margin-top: 0;
 }
