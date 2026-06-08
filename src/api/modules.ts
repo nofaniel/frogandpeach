@@ -55,7 +55,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
   {
     id: 'weather',
     title: 'Weather',
-    description: 'Current weather and three-day forecast.',
+    description: 'Current weather and 5-day forecast.',
     category: 'data',
     defaultPosition: 10,
     defaultEnabled: true,
@@ -68,7 +68,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
       defaultMode: 'current',
       modes: [
         { id: 'current', label: 'Current conditions', description: 'Compact current weather with today’s key metrics.' },
-        { id: 'forecast', label: 'Forecast', description: 'Current weather plus a short three-day forecast.' },
+        { id: 'forecast', label: 'Forecast', description: 'Current weather plus the next 5 days.' },
       ],
     },
   },

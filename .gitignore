@@ -17,3 +17,5 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .DS_Store
+Notes/
+notes.md
