@@ -1,8 +1,16 @@
 import { expect, type Page } from '@playwright/test'
 
 export function testCredentials() {
-  const username = process.env.TEST_USERNAME ?? process.env.FP_TEST_USERNAME ?? 'codex_test'
-  const password = process.env.TEST_PASSWORD ?? process.env.FP_TEST_PASSWORD ?? 'CodexTest!2026-FP'
+  const username = process.env.TEST_USERNAME ?? process.env.FP_TEST_USERNAME
+  const password = process.env.TEST_PASSWORD ?? process.env.FP_TEST_PASSWORD
+
+  if (!username) {
+    throw new Error('Set TEST_USERNAME (or legacy FP_TEST_USERNAME) explicitly for E2E runs')
+  }
+
+  if (!password) {
+    throw new Error('Set TEST_PASSWORD (or legacy FP_TEST_PASSWORD) explicitly for E2E runs')
+  }
 
   return { username, password }
 }

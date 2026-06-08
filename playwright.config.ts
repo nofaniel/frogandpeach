@@ -1,6 +1,10 @@
 import { defineConfig, devices } from '@playwright/test'
 
-const baseURL = process.env.E2E_BASE_URL ?? 'https://frog-peach-home-hub.pages.dev'
+const baseURL = process.env.E2E_BASE_URL
+if (!baseURL) {
+  throw new Error('Set E2E_BASE_URL explicitly, e.g. http://localhost:8788')
+}
+
 const isCi = Boolean(process.env.CI)
 
 export default defineConfig({

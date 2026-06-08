@@ -33,8 +33,8 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=pbkdf2_sha256$...
 APP_ORIGIN=http://localhost:8788
 SETUP_TOKEN=
-TEST_USERNAME=codex_test
-TEST_PASSWORD=CodexTest!2026-FP
+TEST_USERNAME=<local-test-username>
+TEST_PASSWORD=<local-test-password>
 ```
 
 Create and apply the local D1 database schema:
