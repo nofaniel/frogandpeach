@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#366b4a"/>
+      <stop offset="100%" stop-color="#1b2e22"/>
+    </linearGradient>
+  </defs>
+  <!-- Background rounded square -->
+  <rect width="32" height="32" rx="7" fill="url(#bg)"/>
+  <!-- Home/house silhouette (roof + walls + door opening) -->
+  <path d="M16,7 L5,16 L8,16 L8,26 L14,26 L14,21 L18,21 L18,26 L24,26 L24,16 L27,16 Z"
+        fill="rgba(255,255,255,0.90)"/>
+  <!-- Peach accent circle (upper right, above roofline) -->
+  <circle cx="25.5" cy="7.5" r="3.5" fill="#f0a060"/>
+</svg>

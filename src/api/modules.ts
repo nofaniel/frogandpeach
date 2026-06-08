@@ -243,10 +243,16 @@ function normaliseModuleOptions(definition: ModuleDefinition | undefined, option
   }
 
   const homeWidget = normaliseHomeWidgetState(definition.homeWidget, options.homeWidget)
-  return {
+  const normalised: Record<string, unknown> = {
     ...options,
     homeWidget,
   }
+
+  if (definition.id === 'weather') {
+    normalised.iconStyle = options.iconStyle === 'icons' ? 'icons' : 'emoji'
+  }
+
+  return normalised
 }
 
 function normaliseHomeWidgetState(definition: HomeWidgetDefinition, value: unknown): HomeWidgetState {

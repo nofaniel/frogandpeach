@@ -24,6 +24,10 @@ export function formatTime(value: string) {
   return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' }).format(new Date(value))
 }
 
+export function formatTideTime(value: string) {
+  return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(value))
+}
+
 export function formatDayDate(value: string) {
   return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', month: 'short' }).format(new Date(value))
 }
@@ -94,11 +98,13 @@ export function formatDuration(milliseconds: number) {
 
 export function weatherIcon(label: string | undefined) {
   const value = label?.toLowerCase() ?? ''
-  if (value.includes('rain') || value.includes('drizzle')) return '\u{1F327}\uFE0F'
-  if (value.includes('clear') || value.includes('sun')) return '\u2600\uFE0F'
-  if (value.includes('cloud')) return '\u{1F325}\uFE0F'
-  if (value.includes('snow')) return '\u2744\uFE0F'
-  return '\u{1F324}\uFE0F'
+  if (value.includes('rain') || value.includes('drizzle')) return '\u{1F327}\uFE0F'   // 🌧️
+  if (value.includes('thunder') || value.includes('storm')) return '\u26C8\uFE0F'     // ⛈️
+  if (value.includes('snow') || value.includes('blizzard')) return '\u2744\uFE0F'     // ❄️
+  if (value.includes('fog') || value.includes('mist')) return '\u{1F32B}\uFE0F'       // 🌫️
+  if (value.includes('clear') || value.includes('sun')) return '\u2600\uFE0F'         // ☀️
+  if (value.includes('cloud')) return '\u{1F325}\uFE0F'                               // 🌥️
+  return '\u{1F324}\uFE0F'                                                            // 🌤️ (default)
 }
 
 export function firstLine(value: string) {

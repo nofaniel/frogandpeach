@@ -54,6 +54,30 @@ describe('module registry normalisation', () => {
     })
   })
 
+  it('defaults weather icon display to emoji and preserves the line icon option', () => {
+    const defaults = normaliseModules(new Map()).find((module) => module.id === 'weather')
+    expect(defaults?.options['iconStyle']).toBe('emoji')
+
+    const modules = normaliseModules(
+      new Map([
+        ['weather', { id: 'weather', installed: 1, enabled: 1, position: 10, size: 'wide', options_json: '{"iconStyle":"icons"}' }],
+      ]),
+    )
+    const weather = modules.find((module) => module.id === 'weather')
+    expect(weather?.options['iconStyle']).toBe('icons')
+  })
+
+  it('normalises invalid weather icon display to emoji', () => {
+    const modules = normaliseModules(
+      new Map([
+        ['weather', { id: 'weather', installed: 1, enabled: 1, position: 10, size: 'wide', options_json: '{"iconStyle":"bogus"}' }],
+      ]),
+    )
+
+    const weather = modules.find((module) => module.id === 'weather')
+    expect(weather?.options['iconStyle']).toBe('emoji')
+  })
+
   it('guards invalid sizes', () => {
     expect(normaliseModuleSize('giant')).toBe('medium')
   })

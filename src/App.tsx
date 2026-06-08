@@ -38,7 +38,7 @@ import {
   formatTideDayBadge,
   formatTideEventLabel,
   formatTideHeight,
-  formatTime,
+  formatTideTime,
   greetingForNow,
   groupTideDays,
   labelForListType,
@@ -910,6 +910,7 @@ function renderModule(
 
     const weatherLocation = home.weather.location?.trim() || formatLocationLabel(settings)
     const forecastDays = home.weather.daily.slice(0, 3)
+    const weatherIconStyle = module.options.iconStyle === 'icons' ? 'icons' : 'emoji'
     return (
       <article className={className + ' weather-panel'} key={module.id}>
         <div className="weather-orb" aria-hidden="true" />
@@ -924,20 +925,20 @@ function renderModule(
         <div className="metric-row">
           {home.weather.daily[0] && (
             <span>
-              <WeatherMetricIcon name="temperature" />
+              <WeatherMetricSymbol name="temperature" style={weatherIconStyle} />
               {formatTemperature(home.weather.daily[0].max)} / {formatTemperature(home.weather.daily[0].min)}
             </span>
           )}
           <span>
-            <WeatherMetricIcon name="wind" />
+            <WeatherMetricSymbol name="wind" style={weatherIconStyle} />
             {formatNumber(home.weather.current.windSpeed)} km/h
           </span>
           <span>
-            <WeatherMetricIcon name="precipitationChance" />
+            <WeatherMetricSymbol name="precipitationChance" style={weatherIconStyle} />
             {formatNumber(home.weather.daily[0]?.precipitationChance)}%
           </span>
           <span>
-            <WeatherMetricIcon name="precipitation" />
+            <WeatherMetricSymbol name="precipitation" style={weatherIconStyle} />
             {formatCurrentPrecipitationMm(home.weather.current.precipitationMm)}
           </span>
           <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
@@ -967,7 +968,7 @@ function renderModule(
               <h2>Location not set</h2>
               <p className="tide-panel-summary">Set latitude, longitude, and timezone in Admin settings before tides can load.</p>
             </div>
-            <span className="tide-mark" aria-hidden="true">??</span>
+            <span className="tide-mark" aria-hidden="true">🌊</span>
           </div>
           <button type="button" className="button-link" onClick={onOpenAdminSettings}>Open Admin settings</button>
         </article>
@@ -985,7 +986,7 @@ function renderModule(
             <h2>Local tides</h2>
             <p className="tide-panel-summary">Next 2 tides first{widget.mode === 'timeline' ? ', then a 5-day tide timeline.' : '.'}</p>
           </div>
-          <span className="tide-mark" aria-hidden="true">??</span>
+          <span className="tide-mark" aria-hidden="true">🌊</span>
         </div>
         <section className="tide-section tide-feature-section" aria-labelledby="tide-feature-heading">
           <div className="tide-section-head">
@@ -997,7 +998,7 @@ function renderModule(
               <article key={event.id} className={'tide-feature-card ' + event.type}>
                 <span className="tide-feature-badge">{index === 0 ? 'Next up' : 'Then'}</span>
                 <strong>{formatTideEventLabel(event.type)}</strong>
-                <div className="tide-feature-time">{formatTime(event.time)}</div>
+                <div className="tide-feature-time">{formatTideTime(event.time)}</div>
                 <em>{formatDayDate(event.time)}</em>
                 <small>{formatTideHeight(event.height)}</small>
               </article>
@@ -1026,7 +1027,7 @@ function renderModule(
                     {day.events.map((event) => (
                       <div key={event.id} className={'tide-day-event ' + event.type}>
                         <span>{event.type === 'high' ? 'High tide' : 'Low tide'}</span>
-                        <strong>{formatTime(event.time)}</strong>
+                        <strong>{formatTideTime(event.time)}</strong>
                         <small>{formatTideHeight(event.height)}</small>
                       </div>
                     ))}
@@ -1181,7 +1182,24 @@ function renderModule(
   return null
 }
 
-function WeatherMetricIcon({ name }: { name: 'temperature' | 'wind' | 'precipitationChance' | 'precipitation' }) {
+type WeatherMetricName = 'temperature' | 'wind' | 'precipitationChance' | 'precipitation'
+
+const weatherMetricEmoji: Record<WeatherMetricName, string> = {
+  temperature: '\u{1F321}\uFE0F',
+  wind: '\u{1F4A8}',
+  precipitationChance: '\u2614',
+  precipitation: '\u{1F4A7}',
+}
+
+function WeatherMetricSymbol({ name, style }: { name: WeatherMetricName; style: 'emoji' | 'icons' }) {
+  if (style === 'emoji') {
+    return <span className="weather-metric-emoji" aria-hidden="true">{weatherMetricEmoji[name]}</span>
+  }
+
+  return <WeatherMetricIcon name={name} />
+}
+
+function WeatherMetricIcon({ name }: { name: WeatherMetricName }) {
   if (name === 'temperature') {
     return (
       <svg className="weather-metric-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -1617,6 +1635,18 @@ function AdminPanel({
                         ))}
                       </select>
                       <small>{module.homeWidget!.description}</small>
+                    </label>
+                  )}
+                  {module.id === 'weather' && module.installed && (
+                    <label className="compact-field">
+                      Weather icons
+                      <select
+                        value={module.options.iconStyle === 'icons' ? 'icons' : 'emoji'}
+                        onChange={(event) => onPatchModule(module, { options: { ...module.options, iconStyle: event.target.value as Module['options']['iconStyle'] } })}
+                      >
+                        <option value="emoji">Emoji</option>
+                        <option value="icons">Line icons</option>
+                      </select>
                     </label>
                   )}
                   {module.id === 'tides' && module.installed && (
