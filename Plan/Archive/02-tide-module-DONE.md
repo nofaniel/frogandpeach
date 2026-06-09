@@ -419,3 +419,10 @@ npm run test:e2e
 - Should the `next` and `timeline` homepage modes remain after this change, or should `timeline` be repurposed to mean "show current tide plus next 5 events"? This should not block implementation; keep both modes for compatibility unless product direction says otherwise.
 - Should time-until-next update live every minute without a full home data refresh? This should not block implementation; a static value at render time is acceptable for the first pass.
 - Should the app expose exact current sea level from API sources that do not provide it? This should not block implementation; show unavailable/interpolated height where possible and keep the "Not for navigation" note.
+
+## Implementation Completed
+
+- Work done: Added `getTideWindow` and `getCurrentTideState` helpers to `src/shared/tide.ts`. Expanded `TideSummary` with `current` and `forecastUntil` fields. Added 5 tide display settings (`showCurrentTide`, `showTimeUntilNext`, `showNextTides`, `showTideSourceNote`, `nextTideCount`) with generic normalization in `src/api/modules.ts`. Rewrote `TidesWidget.tsx` with current tide scale/needle, countdown, N-event list, and display toggles. Added admin controls via generic `SettingControl`. Added `.tide-current-*` and `.tide-countdown-*` CSS. Added `formatTideCountdown` helper.
+- Implementation result: All acceptance criteria met. Tide event window starts at next upcoming tide, current tide scale shows rising/falling with progress needle, countdown shows due now/minutes/hours/days, admin can toggle all sections independently, existing behavior preserved.
+- Setup and verification: `npm test` and `npm run build` pass. 14 tide helper tests, 4 countdown tests, 11 module normalization tests all pass.
+- Remaining notes: None.

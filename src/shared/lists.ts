@@ -8,13 +8,31 @@ export type ListTypeDefinition = {
 }
 
 export const listTypes: ListTypeDefinition[] = [
-  { id: 'basic', title: 'Basic list', description: 'A simple shared list.', reset: 'never' },
-  { id: 'shopping', title: 'Shopping list', description: 'Reusable shopping or supply list.', reset: 'never' },
-  { id: 'life_goal', title: 'Life goal list', description: 'Longer-running goals and milestones.', reset: 'never' },
-  { id: 'daily_checklist', title: 'Daily checklist', description: 'Tasks that clear down each day.', reset: 'daily' },
-  { id: 'weekly_chore', title: 'Weekly chore checklist', description: 'Tasks that reset at the start of each ISO week.', reset: 'weekly' },
-  { id: 'deadline', title: 'Deadline list', description: 'Tasks with due dates and target dates.', reset: 'never' },
+  { id: 'basic', title: 'Basic list', description: 'Quick shared list for anything the household needs to remember.', reset: 'never' },
+  { id: 'shopping', title: 'Shopping list', description: 'Groceries and supplies with quantity and optional category.', reset: 'never' },
+  { id: 'life_goal', title: 'Life goal list', description: 'Longer-running goals with optional target date and progress tracking.', reset: 'never' },
+  { id: 'daily_checklist', title: 'Daily checklist', description: 'Must-do tasks that reset each day. Missed items show a warning after reset.', reset: 'daily' },
+  { id: 'weekly_chore', title: 'Weekly chore checklist', description: 'Household chores that reset each ISO week. Missed items show a warning after reset.', reset: 'weekly' },
+  { id: 'deadline', title: 'Deadline list', description: 'Tasks with due dates. Overdue and due-soon status shown automatically.', reset: 'never' },
 ]
+
+export const LIST_TYPE_EXAMPLES: Partial<Record<ListTypeId, string>> = {
+  basic: 'Keys, medication, anything the household needs',
+  shopping: 'Milk x2, Bread, Chicken 1kg',
+  life_goal: 'Paint hallway, Learn guitar, Save for holiday',
+  daily_checklist: 'Exercise, Meditate, Tidy kitchen',
+  weekly_chore: 'Vacuum, Change sheets, Clean bathroom',
+  deadline: 'Council tax by Friday, Passport renewal, Dentist appointment',
+}
+
+export const LIST_TYPE_EMPTY_MESSAGES: Partial<Record<ListTypeId, string>> = {
+  basic: 'Add anything the household needs to remember.',
+  shopping: 'Add groceries, household supplies, or things to pick up.',
+  daily_checklist: 'Add tasks that should be done every day.',
+  weekly_chore: 'Add chores that should be done each week.',
+  deadline: 'Add tasks with due dates.',
+  life_goal: 'Add milestones or next steps.',
+}
 
 const listTypeIds = new Set(listTypes.map((type) => type.id))
 

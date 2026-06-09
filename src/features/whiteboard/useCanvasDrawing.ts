@@ -4,10 +4,6 @@ import type { WhiteboardSurface } from './rendering'
 import { drawWhiteboardStroke, paintWhiteboardSurface } from './rendering'
 
 const POINT_SAMPLING_DISTANCE = 5
-const DEFAULT_BOARD_SIZE = { width: 2400, height: 1700 }
-const BOARD_PADDING = 360
-const BOARD_EXPAND_MARGIN = 180
-const BOARD_EXPAND_BY = 700
 
 type DrawingTool = 'pen' | 'eraser'
 type Tool = DrawingTool | 'pan'
@@ -48,11 +44,11 @@ export function useCanvasDrawing(
   onAddStroke: (stroke: WhiteboardStrokeInput) => Promise<WhiteboardStroke>,
   onRemoveStroke: (id: string) => Promise<void>,
 ) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const isDrawing = useRef(false)
   const isPanningRef = useRef(false)
-  const panStart = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null)
+  const panStartRef = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
+  const activePointerIdsRef = useRef<Set<number>>(new Set())
   const currentPoints = useRef<Point[]>([])
   const lastPoint = useRef<Point | null>(null)
   const hiddenServerStrokeIdsRef = useRef<Set<string>>(new Set())
@@ -61,8 +57,10 @@ export function useCanvasDrawing(
   const clearEpochRef = useRef(0)
   const [optimisticStrokes, setOptimisticStrokes] = useState<LocalStroke[]>([])
   const [version, setVersion] = useState(0)
-  const [boardSize, setBoardSize] = useState(DEFAULT_BOARD_SIZE)
+  const [viewportOffset, setViewportOffset] = useState<Point>({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
+  const [isTouchDevice, setIsTouchDevice] = useState(false)
 
   const renderStrokes = useMemo(
     () => [
@@ -74,14 +72,24 @@ export function useCanvasDrawing(
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
     const dpr = window.devicePixelRatio || 1
+    const vw = canvas.width / dpr
+    const vh = canvas.height / dpr
+    const vx = viewportOffset.x
+    const vy = viewportOffset.y
+
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.save()
     ctx.scale(dpr, dpr)
+
+    paintWhiteboardSurface(ctx, vw, vh, 'plain')
+
+    ctx.save()
+    ctx.translate(-vx, -vy)
 
     for (const stroke of renderStrokes) {
       drawWhiteboardStroke(ctx, stroke)
@@ -98,19 +106,26 @@ export function useCanvasDrawing(
     }
 
     ctx.restore()
-  }, [options.color, options.opacity, options.tool, options.width, renderStrokes])
+    ctx.restore()
+  }, [options.color, options.opacity, options.tool, options.width, renderStrokes, viewportOffset])
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current
     if (!canvas) return
 
-    const rect = canvas.getBoundingClientRect()
+    const parent = canvas.parentElement
+    if (!parent) return
+
+    const rect = parent.getBoundingClientRect()
     const dpr = window.devicePixelRatio || 1
     const nextWidth = Math.max(1, Math.round(rect.width * dpr))
     const nextHeight = Math.max(1, Math.round(rect.height * dpr))
 
-    if (canvas.width !== nextWidth) canvas.width = nextWidth
-    if (canvas.height !== nextHeight) canvas.height = nextHeight
+    if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
+      canvas.width = nextWidth
+      canvas.height = nextHeight
+      setCanvasSize({ width: rect.width, height: rect.height })
+    }
     redrawCanvas()
   }, [redrawCanvas])
 
@@ -120,53 +135,27 @@ export function useCanvasDrawing(
 
   useEffect(() => {
     handleResize()
-  }, [boardSize, handleResize])
+  }, [handleResize])
 
   useEffect(() => {
-    let maxX = DEFAULT_BOARD_SIZE.width
-    let maxY = DEFAULT_BOARD_SIZE.height
-
-    for (const stroke of renderStrokes) {
-      for (const point of stroke.points) {
-        maxX = Math.max(maxX, point.x + BOARD_PADDING)
-        maxY = Math.max(maxY, point.y + BOARD_PADDING)
-      }
+    const checkTouch = () => {
+      setIsTouchDevice('ontouchstart' in window || navigator.maxTouchPoints > 0)
     }
-
-    setBoardSize((current) => {
-      const nextWidth = Math.ceil(Math.max(DEFAULT_BOARD_SIZE.width, maxX))
-      const nextHeight = Math.ceil(Math.max(DEFAULT_BOARD_SIZE.height, maxY))
-      return nextWidth === current.width && nextHeight === current.height
-        ? current
-        : { width: nextWidth, height: nextHeight }
-    })
-  }, [renderStrokes])
-
-  const expandBoardIfNeeded = useCallback((point: Point) => {
-    setBoardSize((current) => {
-      const nextWidth = point.x > current.width - BOARD_EXPAND_MARGIN
-        ? current.width + BOARD_EXPAND_BY
-        : current.width
-      const nextHeight = point.y > current.height - BOARD_EXPAND_MARGIN
-        ? current.height + BOARD_EXPAND_BY
-        : current.height
-
-      return nextWidth === current.width && nextHeight === current.height
-        ? current
-        : { width: nextWidth, height: nextHeight }
-    })
+    checkTouch()
+    window.addEventListener('touchstart', checkTouch, { once: true, passive: true })
+    return () => window.removeEventListener('touchstart', checkTouch)
   }, [])
 
-  const getCanvasPoint = useCallback((event: PointerEvent): Point => {
+  const getWorldPoint = useCallback((event: PointerEvent): Point => {
     const canvas = canvasRef.current!
     const rect = canvas.getBoundingClientRect()
-    const scaleX = boardSize.width / Math.max(rect.width, 1)
-    const scaleY = boardSize.height / Math.max(rect.height, 1)
+    const screenX = event.clientX - rect.left
+    const screenY = event.clientY - rect.top
     return {
-      x: (event.clientX - rect.left) * scaleX,
-      y: (event.clientY - rect.top) * scaleY,
+      x: screenX + viewportOffset.x,
+      y: screenY + viewportOffset.y,
     }
-  }, [boardSize.height, boardSize.width])
+  }, [viewportOffset])
 
   const queueStrokePersistence = useCallback(async (entry: HistoryEntry, localStroke: LocalStroke) => {
     try {
@@ -212,62 +201,88 @@ export function useCanvasDrawing(
 
     event.preventDefault()
     canvas.setPointerCapture(event.pointerId)
+    activePointerIdsRef.current.add(event.pointerId)
 
-    if (options.tool === 'pan') {
-      const container = containerRef.current
-      if (!container) return
-
+    if (isTouchDevice && activePointerIdsRef.current.size >= 2) {
+      isDrawing.current = false
+      currentPoints.current = []
+      lastPoint.current = null
       isPanningRef.current = true
       setIsPanning(true)
-      panStart.current = {
-        x: event.clientX,
-        y: event.clientY,
-        scrollLeft: container.scrollLeft,
-        scrollTop: container.scrollTop,
-      }
+      const midX = (event.clientX + event.clientX) / 2
+      const midY = (event.clientY + event.clientY) / 2
+      panStartRef.current = { x: midX, y: midY, vx: viewportOffset.x, vy: viewportOffset.y }
+      return
+    }
+
+    if (options.tool === 'pan' || (isTouchDevice && activePointerIdsRef.current.size >= 2)) {
+      isPanningRef.current = true
+      setIsPanning(true)
+      panStartRef.current = { x: event.clientX, y: event.clientY, vx: viewportOffset.x, vy: viewportOffset.y }
       return
     }
 
     isDrawing.current = true
-    const point = getCanvasPoint(event)
+    const point = getWorldPoint(event)
     currentPoints.current = [point]
     lastPoint.current = point
-    expandBoardIfNeeded(point)
     redrawCanvas()
-  }, [expandBoardIfNeeded, getCanvasPoint, options.tool, redrawCanvas])
+  }, [getWorldPoint, isTouchDevice, options.tool, viewportOffset, redrawCanvas])
 
   const handlePointerMove = useCallback((event: PointerEvent) => {
     if (isPanningRef.current) {
-      const container = containerRef.current
-      const start = panStart.current
-      if (!container || !start) return
+      const start = panStartRef.current
+      if (!start) return
 
       event.preventDefault()
-      container.scrollLeft = start.scrollLeft - (event.clientX - start.x)
-      container.scrollTop = start.scrollTop - (event.clientY - start.y)
+
+      if (isTouchDevice && activePointerIdsRef.current.size >= 2) {
+        const pointers = Array.from(activePointerIdsRef.current)
+        if (pointers.length >= 2) {
+          const canvas = canvasRef.current
+          if (!canvas) return
+          const rect = canvas.getBoundingClientRect()
+          const midClientX = event.clientX
+          const midClientY = event.clientY
+          const newMidX = midClientX
+          const newMidY = midClientY
+          setViewportOffset({
+            x: start.vx - (newMidX - start.x),
+            y: start.vy - (newMidY - start.y),
+          })
+          return
+        }
+      }
+
+      setViewportOffset({
+        x: start.vx - (event.clientX - start.x),
+        y: start.vy - (event.clientY - start.y),
+      })
       return
     }
 
     if (!isDrawing.current || !isDrawingTool(options.tool)) return
 
     event.preventDefault()
-    const point = getCanvasPoint(event)
+    const point = getWorldPoint(event)
     const previous = lastPoint.current
     if (previous && distance(previous, point) < POINT_SAMPLING_DISTANCE) return
 
     currentPoints.current.push(point)
     lastPoint.current = point
-    expandBoardIfNeeded(point)
     redrawCanvas()
-  }, [expandBoardIfNeeded, getCanvasPoint, options.tool, redrawCanvas])
+  }, [getWorldPoint, isTouchDevice, options.tool, redrawCanvas])
 
   const finishPointerInteraction = useCallback((event: PointerEvent) => {
     const canvas = canvasRef.current
+    activePointerIdsRef.current.delete(event.pointerId)
 
     if (isPanningRef.current) {
-      isPanningRef.current = false
-      setIsPanning(false)
-      panStart.current = null
+      if (activePointerIdsRef.current.size === 0) {
+        isPanningRef.current = false
+        setIsPanning(false)
+        panStartRef.current = null
+      }
       if (canvas?.hasPointerCapture(event.pointerId)) {
         canvas.releasePointerCapture(event.pointerId)
       }
@@ -382,7 +397,7 @@ export function useCanvasDrawing(
     setOptimisticStrokes([])
     undoStackRef.current = []
     redoStackRef.current = []
-    setBoardSize(DEFAULT_BOARD_SIZE)
+    setViewportOffset({ x: 0, y: 0 })
     setVersion((current) => current + 1)
 
     return () => {
@@ -391,28 +406,66 @@ export function useCanvasDrawing(
     }
   }, [serverStrokes])
 
+  const setZoomAtPoint = useCallback((newZoom: number, clientX: number, clientY: number) => {
+    setViewportOffset((prev) => {
+      const canvas = canvasRef.current
+      if (!canvas) return prev
+      const rect = canvas.getBoundingClientRect()
+      const screenX = clientX - rect.left
+      const screenY = clientY - rect.top
+      return {
+        x: prev.x + screenX * (1 - 1),
+        y: prev.y + screenY * (1 - 1),
+      }
+    })
+  }, [])
+
   const exportPng = useCallback((surface: WhiteboardSurface) => {
+    let minX = 0
+    let minY = 0
+    let maxX = canvasSize.width || 800
+    let maxY = canvasSize.height || 600
+
+    for (const stroke of renderStrokes) {
+      for (const point of stroke.points) {
+        minX = Math.min(minX, point.x)
+        minY = Math.min(minY, point.y)
+        maxX = Math.max(maxX, point.x)
+        maxY = Math.max(maxY, point.y)
+      }
+    }
+
+    const padding = 48
+    const exportWidth = Math.ceil(maxX - minX + padding * 2)
+    const exportHeight = Math.ceil(maxY - minY + padding * 2)
+    const offsetX = -minX + padding
+    const offsetY = -minY + padding
+
     const offscreen = document.createElement('canvas')
-    offscreen.width = boardSize.width
-    offscreen.height = boardSize.height
+    offscreen.width = exportWidth
+    offscreen.height = exportHeight
     const ctx = offscreen.getContext('2d')
     if (!ctx) return ''
 
-    paintWhiteboardSurface(ctx, boardSize.width, boardSize.height, surface)
+    paintWhiteboardSurface(ctx, exportWidth, exportHeight, surface)
+    ctx.save()
+    ctx.translate(offsetX, offsetY)
     for (const stroke of renderStrokes) {
       drawWhiteboardStroke(ctx, stroke)
     }
+    ctx.restore()
     return offscreen.toDataURL('image/png')
-  }, [boardSize.height, boardSize.width, renderStrokes])
+  }, [canvasSize.height, canvasSize.width, renderStrokes])
 
   return {
-    containerRef,
     canvasRef,
-    boardSize,
+    viewportOffset,
     isPanning,
+    canvasSize,
+    isTouchDevice,
     undo,
     redo,
-    clearAll,
+    clearAll: clearAll,
     exportPng,
     handleResize,
     canUndo: undoStackRef.current.length > 0,

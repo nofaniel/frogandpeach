@@ -26,6 +26,8 @@ export function ListsWidget({
           const listType = list.listType as ListTypeId
           const overdueCount = list.items.filter((item) => !item.done && computeListStatus(item, listType) === 'overdue').length
           const dueSoonCount = list.items.filter((item) => !item.done && computeListStatus(item, listType) === 'due_soon').length
+          const missedCount = list.items.filter((item) => !item.done && computeListStatus(item, listType) === 'missed').length
+          const totalCount = list.items.length
           return (
             <button key={list.id} type="button" className="plain-row" onClick={() => onSetActiveTab('lists')}>
               {starred && <span aria-label="Starred" className="star-marker" aria-hidden="true">★ </span>}
@@ -33,9 +35,12 @@ export function ListsWidget({
               <span>
                 {widget.mode === 'starred'
                   ? `${incompleteCount} open`
-                  : `${incompleteCount} open, updated ${formatDate(list.updatedAt)}`}
+                  : list.listType === 'shopping'
+                    ? `${totalCount} items, updated ${formatDate(list.updatedAt)}`
+                    : `${incompleteCount} open, updated ${formatDate(list.updatedAt)}`}
                 {overdueCount > 0 && <span className="home-status-overdue"> {overdueCount} overdue</span>}
                 {dueSoonCount > 0 && <span className="home-status-due-soon"> {dueSoonCount} due soon</span>}
+                {missedCount > 0 && <span className="home-status-missed"> {missedCount} missed</span>}
               </span>
             </button>
           )

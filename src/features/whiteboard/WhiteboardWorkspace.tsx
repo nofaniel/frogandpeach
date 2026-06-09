@@ -1,9 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WhiteboardStroke, WhiteboardStrokeInput } from '../../shared/api-types'
-import { formatDuration } from '../../shared/format'
-import { getWhiteboardPreviewStrokes } from '../../shared/whiteboard'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
-import { WhiteboardPreview } from './WhiteboardPreview'
 import { WhiteboardToolbar } from './WhiteboardToolbar'
 import type { WhiteboardSurface } from './rendering'
 import { useCanvasDrawing } from './useCanvasDrawing'
@@ -40,16 +37,16 @@ export function WhiteboardWorkspace({
   const [opacity, setOpacity] = useState(savedPrefs.opacity ?? 1)
   const [surface, setSurface] = useState<WhiteboardSurface>(savedPrefs.surface ?? 'grid')
   const [zoom, setZoom] = useState(1)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastSyncedAt, setLastSyncedAt] = useState(() => Date.now())
-  const [syncIssue, setSyncIssue] = useState('')
+  const [toolbarVisible, setToolbarVisible] = useState(true)
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const drawingOptions = useMemo(() => ({ tool, color, width, opacity }), [tool, color, width, opacity])
 
   const {
-    containerRef,
     canvasRef,
-    boardSize,
+    viewportOffset,
     isPanning,
+    canvasSize,
+    isTouchDevice,
     undo,
     redo,
     clearAll: clearCanvasHistory,
@@ -63,56 +60,61 @@ export function WhiteboardWorkspace({
     writeWhiteboardPrefs({ tool, color, width, opacity, surface })
   }, [color, opacity, surface, tool, width])
 
+  const resetHideTimer = useCallback(() => {
+    if (isTouchDevice) return
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    setToolbarVisible(true)
+    hideTimerRef.current = setTimeout(() => {
+      setToolbarVisible(false)
+    }, 3500)
+  }, [isTouchDevice])
+
   useEffect(() => {
-    const newestStroke = strokes.at(-1)
-    if (!newestStroke) return
-    setLastSyncedAt(Date.now())
-  }, [strokes])
+    if (isTouchDevice) {
+      setToolbarVisible(true)
+      return
+    }
+    resetHideTimer()
+    return () => {
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
+    }
+  }, [isTouchDevice, resetHideTimer])
 
-  const previewStrokes = useMemo(() => getWhiteboardPreviewStrokes(strokes, 18), [strokes])
-  const recentStrokes = useMemo(() => [...strokes].slice(-5).reverse(), [strokes])
-  const contributors = useMemo(
-    () => Array.from(new Set(strokes.map((stroke) => stroke.createdByName || 'Someone'))).slice(0, 6),
-    [strokes],
-  )
-  const lastStroke = strokes.at(-1) ?? null
-  const lastDrawnAgo = lastStroke ? formatDuration(Date.now() - Date.parse(lastStroke.createdAt)) : null
+  const handleCanvasInteraction = useCallback(() => {
+    resetHideTimer()
+  }, [resetHideTimer])
 
-  const refreshWhiteboard = useCallback(async (showError: boolean) => {
-    setIsRefreshing(true)
-    try {
-      await onRefresh()
-      setLastSyncedAt(Date.now())
-      setSyncIssue('')
-    } catch (error) {
-      if (showError) {
-        setSyncIssue(error instanceof Error ? error.message : 'Unable to refresh the whiteboard.')
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setToolbarVisible((v) => !v)
       }
-    } finally {
-      setIsRefreshing(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    async function refresh() {
+      if (document.hidden) return
+      try {
+        await onRefresh()
+      } catch {
+        // silent
+      }
+    }
+    const timer = window.setInterval(() => {
+      if (!cancelled) void refresh()
+    }, 15000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
     }
   }, [onRefresh])
 
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (document.hidden) return
-      void refreshWhiteboard(false)
-    }, 15000)
-
-    return () => window.clearInterval(timer)
-  }, [refreshWhiteboard])
-
   function clampZoom(next: number) {
-    return Math.min(1.8, Math.max(0.45, Number(next.toFixed(2))))
-  }
-
-  function fitBoard() {
-    const container = containerRef.current
-    if (!container) return
-    const availableWidth = Math.max(container.clientWidth - 48, 320)
-    const availableHeight = Math.max(container.clientHeight - 48, 320)
-    const nextZoom = Math.min(1.15, availableWidth / boardSize.width, availableHeight / boardSize.height)
-    setZoom(clampZoom(nextZoom))
+    return Math.min(3, Math.max(0.1, Number(next.toFixed(2))))
   }
 
   async function handleClearAll() {
@@ -120,8 +122,6 @@ export function WhiteboardWorkspace({
     const restore = clearCanvasHistory()
     try {
       await onClearAll()
-      setLastSyncedAt(Date.now())
-      setSyncIssue('')
     } catch {
       restore()
     }
@@ -136,132 +136,44 @@ export function WhiteboardWorkspace({
     link.click()
   }
 
-  function applyPreset(preset: { color: string; width: number; opacity: number; tool: 'pen' }) {
-    setTool(preset.tool)
-    setColor(preset.color)
-    setWidth(preset.width)
-    setOpacity(preset.opacity)
-  }
-
   return (
-    <section className="whiteboard-workspace">
-      <header className="wb-hero">
-        <div className="wb-hero-copy">
-          <p className="kicker">Whiteboard</p>
-          <h2>Shared household canvas</h2>
-          <p>Sketch, annotate, erase, zoom, export, and keep the board open while everyone adds to it.</p>
-        </div>
-        <div className="wb-stat-strip">
-          <div className="wb-stat-card">
-            <span>Strokes</span>
-            <strong>{strokes.length}</strong>
-          </div>
-          <div className="wb-stat-card">
-            <span>Contributors</span>
-            <strong>{contributors.length || 0}</strong>
-          </div>
-          <div className="wb-stat-card">
-            <span>Board size</span>
-            <strong>{Math.round(boardSize.width)} × {Math.round(boardSize.height)}</strong>
-          </div>
-          <div className="wb-stat-card">
-            <span>Last draw</span>
-            <strong>{lastDrawnAgo ? `${lastDrawnAgo} ago` : 'Nothing yet'}</strong>
-          </div>
-        </div>
-      </header>
+    <section
+      className="whiteboard-workspace"
+      onMouseMove={handleCanvasInteraction}
+      onTouchStart={handleCanvasInteraction}
+    >
+      <WhiteboardCanvas
+        canvasRef={canvasRef}
+        tool={tool}
+        isPanning={isPanning}
+        surface={surface}
+        handleResize={handleResize}
+        empty={strokes.length === 0}
+      />
 
-      <div className="wb-layout">
-        <aside className="wb-sidebar">
-          <WhiteboardToolbar
-            tool={tool}
-            setTool={setTool}
-            color={color}
-            setColor={setColor}
-            width={width}
-            setWidth={setWidth}
-            opacity={opacity}
-            setOpacity={setOpacity}
-            surface={surface}
-            setSurface={setSurface}
-            zoom={zoom}
-            onZoomOut={() => setZoom((current) => clampZoom(current - 0.12))}
-            onZoomIn={() => setZoom((current) => clampZoom(current + 0.12))}
-            onResetZoom={() => setZoom(1)}
-            onFitBoard={fitBoard}
-            onUndo={() => void undo()}
-            onRedo={() => void redo()}
-            onRefresh={() => void refreshWhiteboard(true)}
-            onExport={handleExport}
-            onClearAll={() => void handleClearAll()}
-            onApplyPreset={applyPreset}
-            canUndo={canUndo}
-            canRedo={canRedo}
-            isRefreshing={isRefreshing}
-          />
-
-          <section className="wb-side-panel">
-            <div className="wb-side-panel-header">
-              <div>
-                <p className="wb-panel-kicker">Preview</p>
-                <h3>Board snapshot</h3>
-              </div>
-              <span>{Math.round(zoom * 100)}%</span>
-            </div>
-            <WhiteboardPreview strokes={previewStrokes} surface={surface} className="wb-preview-large" emptyLabel="Nothing on the board yet" />
-          </section>
-
-          <section className="wb-side-panel">
-            <div className="wb-side-panel-header">
-              <div>
-                <p className="wb-panel-kicker">Activity</p>
-                <h3>Recent marks</h3>
-              </div>
-              <span>{contributors.join(' • ') || 'No contributors yet'}</span>
-            </div>
-            <ul className="wb-activity-list">
-              {recentStrokes.length === 0 && <li className="wb-activity-empty">The board is clear.</li>}
-              {recentStrokes.map((stroke) => (
-                <li key={stroke.id} className="wb-activity-item">
-                  <span className={`wb-activity-swatch${stroke.tool === 'eraser' ? ' eraser' : ''}`} style={{ backgroundColor: stroke.tool === 'eraser' ? '#ffffff' : stroke.color }} />
-                  <div>
-                    <strong>{stroke.createdByName || 'Someone'} {stroke.tool === 'eraser' ? 'erased' : 'drew'}</strong>
-                    <span>{formatDuration(Date.now() - Date.parse(stroke.createdAt))} ago • {stroke.width}px • {Math.round(stroke.opacity * 100)}%</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="wb-side-panel wb-side-note">
-            <p className="wb-panel-kicker">Shortcuts</p>
-            <p><strong>Undo</strong> with Ctrl/Cmd+Z, <strong>redo</strong> with Ctrl/Cmd+Shift+Z or Ctrl/Cmd+Y, and switch to <strong>Pan</strong> to move around larger sketches.</p>
-          </section>
-        </aside>
-
-        <div className="wb-board-column">
-          <div className="wb-board-bar">
-            <span>Surface: {surface}</span>
-            <span>Zoom: {Math.round(zoom * 100)}%</span>
-            <span>{isRefreshing ? 'Syncing with the board…' : `Last synced ${formatDuration(Date.now() - lastSyncedAt)} ago`}</span>
-          </div>
-          <WhiteboardCanvas
-            containerRef={containerRef}
-            canvasRef={canvasRef}
-            tool={tool}
-            boardSize={boardSize}
-            isPanning={isPanning}
-            zoom={zoom}
-            surface={surface}
-            handleResize={handleResize}
-            empty={strokes.length === 0}
-          />
-          <div className="wb-board-footer">
-            <span>The canvas expands automatically when you draw near the edge.</span>
-            <span>{syncIssue || 'Open this tab on another device to see the board refresh every 15 seconds.'}</span>
-          </div>
-        </div>
-      </div>
+      <WhiteboardToolbar
+        tool={tool}
+        setTool={setTool}
+        color={color}
+        setColor={setColor}
+        width={width}
+        setWidth={setWidth}
+        opacity={opacity}
+        setOpacity={setOpacity}
+        surface={surface}
+        setSurface={setSurface}
+        zoom={zoom}
+        onZoomOut={() => setZoom((c) => clampZoom(c - 0.15))}
+        onZoomIn={() => setZoom((c) => clampZoom(c + 0.15))}
+        onResetZoom={() => setZoom(1)}
+        onUndo={() => void undo()}
+        onRedo={() => void redo()}
+        onExport={handleExport}
+        onClearAll={() => void handleClearAll()}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        visible={toolbarVisible}
+      />
     </section>
   )
 }

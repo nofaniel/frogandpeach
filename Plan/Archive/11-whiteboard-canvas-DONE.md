@@ -285,3 +285,10 @@ type WhiteboardStrokePatch = {
 2. **Canvas resolution on HiDPI**: Use `devicePixelRatio` to scale canvas for sharp rendering on retina displays. **Assumption**: Yes, implement HiDPI scaling.
 3. **Stroke point density**: Sample points every ~5px of mouse movement to balance smoothness vs. data size. **Assumption**: 5px sampling interval.
 4. **Home widget**: Show stroke count + last drawn time rather than canvas thumbnail (thumbnail requires offscreen rendering, more complex). **Assumption**: Text-based widget for v1.
+
+## Implementation Completed
+
+- Work done: Removed card-based whiteboard (WhiteboardCard.tsx, WhiteboardModal.tsx, migration 0011, card CRUD, card types, card CSS). Created canvas-based whiteboard with migration 0012 (whiteboard_strokes table), stroke CRUD in data.ts, GET/POST/DELETE/clear routes in router.ts, WhiteboardCanvas.tsx, WhiteboardToolbar.tsx, WhiteboardWorkspace.tsx, useCanvasDrawing.ts hook (413 lines with quadratic bezier smoothing, undo/redo, HiDPI, pointer events, board auto-expansion). Text-based home widget showing stroke count and last drawn time.
+- Implementation result: All acceptance criteria met. Canvas fills workspace, pen/eraser/pan tools work, 8 colors + custom + 3 widths, undo/redo with keyboard shortcuts, strokes persist to D1, clear with confirmation, touch support on mobile, module installable/uninstallable via Admin.
+- Setup and verification: `npm test` and `npm run build` pass. Migration 0012 exists and is correct. No card-based remnants remain.
+- Remaining notes: None.

@@ -37,23 +37,23 @@ This folder stores implementation plans for Frog & Peach Home Hub. Each markdown
 
 ## Active Entries
 
-1. `02-tide-module.md`
-2. `05-ui-display-modes.md`
-3. `09-list-module.md`
-4. `11-little-notes.md`
-5. `12-brainstorm.md`
-6. `13-repo-update.md`
+1. `05-ui-display-modes.md` — Dark/light mode + wide desktop display
+2. `09-list-module.md` — Enhanced list types with metadata and status (~90% done, minor gaps)
+3. `12-brainstorm.md` — Placeholder, needs scoping
+4. `13-repo-update.md` — Placeholder, needs scoping
 
 ## Archived Completed Entries
 
 Completed plans live in `Archive/`.
 
 1. `Archive/01-hover-tooltips-weather-info-DONE.md`
-2. `Archive/03-module-settings-customisation-DONE.md`
-3. `Archive/04-project-goals-aims-purpose-DONE.md`
-4. `Archive/06-admin-mode-DONE.md`
-5. `Archive/07-site-text-content-cleanup-DONE.md`
-6. `Archive/08-notes-module-DONE.md`
-7. `Archive/10-network-module-DONE.md`
-8. `Archive/11-settings-DONE.md`
-9. `Archive/14-break-monolith-DONE.md`
+2. `Archive/02-tide-module-DONE.md`
+3. `Archive/03-module-settings-customisation-DONE.md`
+4. `Archive/04-project-goals-aims-purpose-DONE.md`
+5. `Archive/06-admin-mode-DONE.md`
+6. `Archive/07-site-text-content-cleanup-DONE.md`
+7. `Archive/08-notes-module-DONE.md`
+8. `Archive/10-network-module-DONE.md`
+9. `Archive/11-settings-DONE.md`
+10. `Archive/11-whiteboard-canvas-DONE.md`
+11. `Archive/14-break-monolith-DONE.md`

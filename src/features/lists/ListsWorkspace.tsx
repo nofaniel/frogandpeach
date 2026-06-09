@@ -1,6 +1,7 @@
 import { useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import type { ListItem, ListType, SharedList } from '../../shared/api-types'
 import { ITEM_METADATA_FIELDS, STATUS_LABELS, STATUS_PRIORITY, computeListStatus, type ListStatus, type ListTypeId } from '../../shared/lists'
+import { LIST_TYPE_EXAMPLES, LIST_TYPE_EMPTY_MESSAGES } from '../../shared/lists'
 import { labelForListType } from '../../shared/format'
 
 export function ListsWorkspace({
@@ -40,18 +41,80 @@ export function ListsWorkspace({
   onRemoveList: (id: string) => void
   onToggleListStar: (list: SharedList) => void
 }) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [sortMode, setSortMode] = useState('attention')
+
+  const selectedType = listTypes.find((t) => t.id === listDraft.listType)
+
+  const filteredLists = useMemo(() => {
+    let result = lists
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      result = result.filter((list) =>
+        list.name.toLowerCase().includes(q) ||
+        list.items.some((item) => item.text.toLowerCase().includes(q))
+      )
+    }
+    if (typeFilter !== 'all') {
+      result = result.filter((list) => list.listType === typeFilter)
+    }
+    if (sortMode === 'attention') {
+      result = [...result].sort((a, b) => {
+        const aStarred = Boolean(a.metadata?.starred)
+        const bStarred = Boolean(b.metadata?.starred)
+        if (aStarred !== bStarred) return aStarred ? -1 : 1
+        const aIncomplete = a.items.filter((i) => !i.done).length
+        const bIncomplete = b.items.filter((i) => !i.done).length
+        return bIncomplete - aIncomplete
+      })
+    } else if (sortMode === 'az') {
+      result = [...result].sort((a, b) => a.name.localeCompare(b.name))
+    } else {
+      result = [...result].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    }
+    return result
+  }, [lists, searchQuery, typeFilter, sortMode])
+
   return (
     <section className="workspace-grid">
+      <div className="lists-toolbar">
+        <input
+          className="lists-search"
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search lists and items..."
+        />
+        <select className="lists-type-filter" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+          <option value="all">All types</option>
+          {listTypes.map((type) => <option key={type.id} value={type.id}>{type.title}</option>)}
+        </select>
+        <select className="lists-sort" value={sortMode} onChange={(event) => setSortMode(event.target.value)}>
+          <option value="attention">Needs attention</option>
+          <option value="recent">Recently updated</option>
+          <option value="az">A-Z</option>
+        </select>
+      </div>
+
       <form className="panel form-panel" onSubmit={onCreateList}>
         <p className="kicker">Lists</p>
         <h2>New list</h2>
-        <input value={listDraft.name} onChange={(event) => setListDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder="Big shop, chores, goals..." />
+        <input value={listDraft.name} onChange={(event) => setListDraft((draft) => ({ ...draft, name: event.target.value }))} placeholder={selectedType ? LIST_TYPE_EXAMPLES[selectedType.id as ListTypeId] ?? 'List name...' : 'Big shop, chores, goals...'} />
         <select value={listDraft.listType} onChange={(event) => setListDraft((draft) => ({ ...draft, listType: event.target.value }))}>
           {listTypes.map((type) => <option key={type.id} value={type.id}>{type.title}</option>)}
         </select>
+        {selectedType && (
+          <div className="list-type-description">
+            <p>{selectedType.description}</p>
+            {LIST_TYPE_EXAMPLES[selectedType.id as ListTypeId] && (
+              <p className="list-type-examples">Example: {LIST_TYPE_EXAMPLES[selectedType.id as ListTypeId]}</p>
+            )}
+          </div>
+        )}
         <button type="submit">Add list</button>
       </form>
-      {lists.map((list) => (
+
+      {filteredLists.map((list) => (
         <ListPanel
           key={list.id}
           list={list}
@@ -141,6 +204,8 @@ function ListPanel({
   }, [itemsWithStatus])
 
   const hasFilters = filter !== 'all'
+  const emptyMessage = LIST_TYPE_EMPTY_MESSAGES[listTypeId] ?? 'Add items to this list.'
+  const isRecurring = listTypeId === 'daily_checklist' || listTypeId === 'weekly_chore'
 
   function startEditMeta(item: ListItem) {
     setEditingMeta(item.id)
@@ -184,6 +249,12 @@ function ListPanel({
         />
       )}
 
+      {isRecurring && (
+        <p className="list-recurring-hint">
+          {listTypeId === 'daily_checklist' ? 'Items reset each day. Missed items show a warning.' : 'Items reset each Monday. Missed items show a warning.'}
+        </p>
+      )}
+
       {itemsWithStatus.some((e) => e.status !== 'open' && e.status !== 'done') && (
         <div className="list-filter-row">
           <button type="button" className={!hasFilters ? 'ghost active' : 'ghost'} onClick={() => setFilter('all')}>All</button>
@@ -203,33 +274,49 @@ function ListPanel({
       )}
 
       <div className="items">
-        {sortedItems.map(({ item, status }) => (
-          <div key={item.id} className="item-row">
-            <label className={item.done ? 'item done' : 'item'}>
-              <input type="checkbox" checked={item.done} onChange={() => void onToggleItem(item)} />
-              <span>
-                {item.text}
-                {status !== 'open' && status !== 'done' && (
-                  <span className={`status-badge status-${status}`}>{STATUS_LABELS[status]}</span>
-                )}
-                {item.updatedByName ? ` / ${item.updatedByName}` : ''}
-              </span>
-              <button type="button" className="icon-button" aria-label={`Delete ${item.text}`} onClick={() => void onRemoveItem(item.id)}>x</button>
-            </label>
-            {metadataFields && metadataFields.length > 0 && !item.done && (
-              <ItemMetadataDisplay
-                item={item}
-                fields={metadataFields}
-                isEditing={editingMeta === item.id}
-                editValues={editValues}
-                setEditValues={setEditValues}
-                onStartEdit={() => startEditMeta(item)}
-                onCancelEdit={cancelEditMeta}
-                onSaveEdit={() => saveEditMeta(item)}
-              />
-            )}
-          </div>
-        ))}
+        {sortedItems.length === 0 && (
+          <div className="list-empty-state">{emptyMessage}</div>
+        )}
+        {sortedItems.map(({ item, status }) => {
+          const meta = item.metadata ?? {}
+          const dueDate = meta.dueDate ?? meta.targetDate
+          const quantity = meta.quantity
+          const category = meta.category
+          return (
+            <div key={item.id} className="item-row">
+              <label className={item.done ? 'item done' : 'item'}>
+                <input type="checkbox" checked={item.done} onChange={() => void onToggleItem(item)} />
+                <span>
+                  {quantity ? `${quantity} x ` : ''}
+                  {item.text}
+                  {status !== 'open' && status !== 'done' && (
+                    <span className={`status-badge status-${status}`}>{STATUS_LABELS[status]}</span>
+                  )}
+                  {typeof dueDate === 'string' && dueDate && (
+                    <span className="metadata-chip">{dueDate}</span>
+                  )}
+                  {typeof category === 'string' && category && (
+                    <span className="metadata-chip">{category}</span>
+                  )}
+                  {item.updatedByName ? ` / ${item.updatedByName}` : ''}
+                </span>
+                <button type="button" className="icon-button" aria-label={`Delete ${item.text}`} onClick={() => void onRemoveItem(item.id)}>x</button>
+              </label>
+              {metadataFields && metadataFields.length > 0 && !item.done && (
+                <ItemMetadataDisplay
+                  item={item}
+                  fields={metadataFields}
+                  isEditing={editingMeta === item.id}
+                  editValues={editValues}
+                  setEditValues={setEditValues}
+                  onStartEdit={() => startEditMeta(item)}
+                  onCancelEdit={cancelEditMeta}
+                  onSaveEdit={() => saveEditMeta(item)}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
     </article>
   )
