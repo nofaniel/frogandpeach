@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Frog &amp; Peach — Home Hub</title>
+  <meta name="description" content="A private, modular home hub for households. Weather, tides, shared lists, household notes — hosted free on Cloudflare Pages." />
+  <meta property="og:title" content="Frog &amp; Peach — Home Hub" />
+  <meta property="og:description" content="A private, modular home hub for households. Weather, tides, shared lists, household notes — hosted free on Cloudflare Pages." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-desktop.png" />
+  <meta property="og:url" content="https://nofaniel.github.io/frogandpeach/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    :root {
+      --bg:       #f3eee4;
+      --surface:  #fffaf0;
+      --surface2: #f8ecd8;
+      --ink:      #17211f;
+      --muted:    #6d675c;
+      --line:     #cfc5b7;
+      --accent:   #bc4f39;
+      --accent2:  #2f6f65;
+      --serif: Georgia, "Times New Roman", serif;
+      --sans:  -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      --max-w: 1100px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(243, 238, 228, 0.88);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav-inner {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      gap: 16px;
+    }
+    .wordmark {
+      font-family: var(--serif);
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    .wordmark .amp { color: var(--accent); }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-link {
+      font-size: 14px;
+      color: var(--muted);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 150ms;
+    }
+    .nav-link:hover { color: var(--ink); }
+    .nav-github {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 9px;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 180ms, transform 150ms;
+    }
+    .nav-github:hover { background: var(--accent2); transform: translateY(-1px); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: calc(100svh - 64px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 28px 64px;
+      text-align: center;
+      background:
+        linear-gradient(90deg, rgba(23,33,31,0.04) 1px, transparent 1px) 0 0 / 42px 42px,
+        radial-gradient(ellipse at 12% 8%,  rgba(188, 79, 57, 0.13), transparent 38%),
+        radial-gradient(ellipse at 88% 5%,  rgba( 47,111,101, 0.13), transparent 32%),
+        var(--bg);
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 7px 20px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: 12.5px;
+      color: var(--muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      margin-bottom: 40px;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent2);
+      flex-shrink: 0;
+    }
+    .hero h1 {
+      font-family: var(--serif);
+      font-size: clamp(50px, 8vw, 100px);
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1.03;
+      color: var(--ink);
+      max-width: 860px;
+      margin-bottom: 28px;
+    }
+    .hero h1 em { font-style: italic; color: var(--accent2); }
+    .hero-sub {
+      font-size: clamp(16px, 2.2vw, 20px);
+      color: var(--muted);
+      max-width: 500px;
+      line-height: 1.65;
+      margin-bottom: 44px;
+    }
+    .hero-btns {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 80px;
+    }
+    .btn-dark {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: background 180ms, transform 160ms;
+    }
+    .btn-dark:hover { background: var(--accent); transform: translateY(-2px); }
+    .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: transparent;
+      color: var(--ink);
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: border-color 180ms, background 180ms, transform 160ms;
+    }
+    .btn-outline:hover { border-color: var(--muted); background: var(--surface); transform: translateY(-2px); }
+
+    /* Hero screenshots */
+    .hero-gallery {
+      display: flex;
+      align-items: flex-start;
+      gap: 20px;
+      justify-content: center;
+      max-width: 960px;
+      width: 100%;
+    }
+    .shot-desktop {
+      flex: 1 1 580px;
+      min-width: 0;
+      max-width: 660px;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px var(--line),
+        0 28px 72px rgba(23,33,31,0.2),
+        0 1px 0 rgba(255,255,255,0.75) inset;
+    }
+    .shot-mobile {
+      flex: 0 0 158px;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow:
+        0 0 0 1px var(--line),
+        0 28px 72px rgba(23,33,31,0.2),
+        0 1px 0 rgba(255,255,255,0.75) inset;
+      margin-top: 52px;
+      transform: rotate(1.5deg);
+    }
+    .shot-desktop img,
+    .shot-mobile img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    /* ── SECTION BASE ── */
+    .sec { padding: 112px 28px; }
+    .sec-inner { max-width: var(--max-w); margin: 0 auto; }
+    .sec-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 14px;
+    }
+    .sec-title {
+      font-family: var(--serif);
+      font-size: clamp(30px, 4vw, 54px);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.08;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .sec-body {
+      font-size: 17px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── MODULES ── */
+    .modules-sec { background: var(--surface); }
+    .modules-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 40px;
+      margin-bottom: 56px;
+      flex-wrap: wrap;
+    }
+    .modules-top .sec-body { max-width: 400px; }
+    .modules-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      background: var(--line);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      gap: 1px;
+    }
+    .mod-card {
+      background: var(--surface);
+      padding: 36px 32px;
+      transition: background 180ms;
+    }
+    .mod-card:hover { background: #fffef8; }
+    .mod-icon { font-size: 30px; line-height: 1; margin-bottom: 14px; display: block; }
+    .mod-name {
+      font-family: var(--serif);
+      font-size: 19px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .mod-desc { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+    .mod-tags { margin-top: 14px; display: flex; gap: 5px; flex-wrap: wrap; }
+    .tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--surface2);
+      color: var(--muted);
+      letter-spacing: 0.03em;
+    }
+
+    /* ── SCREENSHOTS ── */
+    .screens-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      margin-top: 60px;
+    }
+    .screen-wrap {
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px var(--line), 0 20px 60px rgba(23,33,31,0.13);
+    }
+    .screen-wrap img { display: block; width: 100%; height: auto; }
+    .screen-caption {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 12px;
+      text-align: center;
+    }
+
+    /* ── PILLARS ── */
+    .pillars-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin-top: 60px;
+    }
+    .pillar {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 32px 28px;
+      transition: transform 200ms, box-shadow 200ms;
+    }
+    .pillar:hover { transform: translateY(-5px); box-shadow: 0 16px 48px rgba(23,33,31,0.09); }
+    .pillar-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 10px;
+      background: var(--surface2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 21px;
+      margin-bottom: 18px;
+    }
+    .pillar-name {
+      font-family: var(--serif);
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .pillar-desc { font-size: 13.5px; color: var(--muted); line-height: 1.65; }
+
+    /* ── SETUP ── */
+    .setup-sec { background: var(--ink); }
+    .setup-sec .sec-label  { color: #f5a48b; }
+    .setup-sec .sec-title  { color: #fff; }
+    .setup-sec .sec-body   { color: rgba(255,255,255,0.5); }
+    .setup-layout {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 80px;
+      align-items: start;
+    }
+    .setup-steps {
+      margin-top: 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .setup-step { display: flex; gap: 16px; }
+    .step-n {
+      width: 27px;
+      height: 27px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.38);
+      font-size: 11.5px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-t { font-size: 14.5px; color: rgba(255,255,255,0.62); line-height: 1.55; }
+    .step-t strong { color: #fff; font-weight: 600; }
+
+    /* Terminal */
+    .terminal {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 14px;
+      overflow: hidden;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 12.5px;
+      line-height: 1.85;
+    }
+    .term-bar {
+      background: rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .term-dots { display: flex; gap: 6px; }
+    .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .td-r { background: #ff5f56; }
+    .td-y { background: #ffbd2e; }
+    .td-g { background: #27c93f; }
+    .term-title { font-size: 11.5px; color: rgba(255,255,255,0.32); font-family: var(--sans); font-weight: 500; }
+    pre { padding: 24px; overflow-x: auto; color: rgba(255,255,255,0.82); margin: 0; }
+    code { font-family: inherit; }
+    .tc { color: rgba(255,255,255,0.28); }
+    .tk { color: #7dd3fc; }
+    .tv { color: #a7f3d0; }
+    .ts { color: #f9a8d4; }
+    .tu { color: #fde68a; }
+
+    /* ── FOOTER ── */
+    footer {
+      padding: 56px 28px;
+      border-top: 1px solid var(--line);
+      text-align: center;
+    }
+    .foot-inner { max-width: var(--max-w); margin: 0 auto; }
+    .foot-logo { font-family: var(--serif); font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 16px; }
+    .foot-logo .amp { color: var(--accent); }
+    .foot-links { display: flex; justify-content: center; gap: 28px; flex-wrap: wrap; margin-bottom: 16px; }
+    .foot-links a { font-size: 13.5px; color: var(--muted); text-decoration: none; transition: color 150ms; }
+    .foot-links a:hover { color: var(--ink); }
+    .foot-copy { font-size: 12.5px; color: var(--muted); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 900px) {
+      .modules-grid  { grid-template-columns: repeat(2, 1fr); }
+      .pillars-grid  { grid-template-columns: repeat(2, 1fr); }
+      .setup-layout  { grid-template-columns: 1fr; gap: 48px; }
+      .screens-layout{ grid-template-columns: 1fr; }
+      .hero-gallery  { flex-direction: column; align-items: center; }
+      .shot-mobile   { flex: 0 0 220px; margin-top: 0; transform: none; }
+      .modules-top   { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 620px) {
+      .modules-grid { grid-template-columns: 1fr; }
+      .pillars-grid { grid-template-columns: 1fr; }
+      .sec          { padding: 72px 20px; }
+      .nav-links .nav-link { display: none; }
+      .hero h1      { letter-spacing: -0.025em; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-inner">
+    <a href="#" class="wordmark">Frog <span class="amp">&amp;</span> Peach</a>
+    <div class="nav-links">
+      <a href="#modules" class="nav-link">Modules</a>
+      <a href="#setup"   class="nav-link">Get started</a>
+      <a
+        href="https://github.com/nofaniel/frogandpeach"
+        class="nav-github"
+        target="_blank"
+        rel="noopener"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+        </svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    Open source &nbsp;·&nbsp; Cloudflare Pages &nbsp;·&nbsp; React 19
+  </div>
+  <h1>Your household,<br /><em>beautifully</em> organised.</h1>
+  <p class="hero-sub">
+    A private, modular home hub. Weather, tides, shared lists, household notes —
+    everything your home needs, hosted free.
+  </p>
+  <div class="hero-btns">
+    <a
+      href="https://github.com/nofaniel/frogandpeach"
+      class="btn-dark"
+      target="_blank"
+      rel="noopener"
+    >
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+        <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+      </svg>
+      View on GitHub
+    </a>
+    <a href="#modules" class="btn-outline">See what's included ↓</a>
+  </div>
+  <div class="hero-gallery">
+    <div class="shot-desktop">
+      <img
+        src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-desktop.png"
+        alt="Frog &amp; Peach home dashboard on desktop"
+        loading="eager"
+      />
+    </div>
+    <div class="shot-mobile">
+      <img
+        src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-mobile.png"
+        alt="Frog &amp; Peach home dashboard on mobile"
+        loading="eager"
+      />
+    </div>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section class="sec modules-sec" id="modules">
+  <div class="sec-inner">
+    <div class="modules-top">
+      <div>
+        <p class="sec-label">Built-in modules</p>
+        <h2 class="sec-title">Everything your<br />home needs.</h2>
+      </div>
+      <p class="sec-body">Six built-in modules cover the essentials. Enable only what matters to your household — more on the way.</p>
+    </div>
+    <div class="modules-grid">
+
+      <div class="mod-card">
+        <span class="mod-icon">🌤</span>
+        <p class="mod-name">Weather</p>
+        <p class="mod-desc">Current conditions, hourly outlook, wind, UV index, humidity, and rainfall — powered by Open-Meteo with no API key required.</p>
+        <div class="mod-tags">
+          <span class="tag">Open-Meteo</span>
+          <span class="tag">5-day forecast</span>
+          <span class="tag">Cached</span>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <span class="mod-icon">🌊</span>
+        <p class="mod-name">Tides</p>
+        <p class="mod-desc">Predicted tide events from Open-Meteo marine data or a configurable external tide API. Next two tides plus a 5-day timeline.</p>
+        <div class="mod-tags">
+          <span class="tag">Marine data</span>
+          <span class="tag">Next 2 tides</span>
+          <span class="tag">5-day view</span>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <span class="mod-icon">✅</span>
+        <p class="mod-name">Lists</p>
+        <p class="mod-desc">Shared household lists — shopping, chores, daily checklists, goals. Persistent across every device on your network.</p>
+        <div class="mod-tags">
+          <span class="tag">Shopping</span>
+          <span class="tag">Checklists</span>
+          <span class="tag">Goals</span>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <span class="mod-icon">📝</span>
+        <p class="mod-name">Notes</p>
+        <p class="mod-desc">Pinned shared markdown notes with tags. Quick to create, easy to find, and clearly rendered for the whole household.</p>
+        <div class="mod-tags">
+          <span class="tag">Markdown</span>
+          <span class="tag">Pinned</span>
+          <span class="tag">Tagged</span>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <span class="mod-icon">📄</span>
+        <p class="mod-name">Pages</p>
+        <p class="mod-desc">Editable markdown pages and custom static launchers. Publish household guides, reference materials, and important links.</p>
+        <div class="mod-tags">
+          <span class="tag">Editable</span>
+          <span class="tag">Markdown</span>
+          <span class="tag">Static launchers</span>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <span class="mod-icon">📶</span>
+        <p class="mod-name">Network</p>
+        <p class="mod-desc">Wi-Fi credentials sharing, router and deployment links, connection info, and a snapshot of devices on your network.</p>
+        <div class="mod-tags">
+          <span class="tag">Wi-Fi sharing</span>
+          <span class="tag">Device list</span>
+          <span class="tag">Links</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SCREENSHOTS -->
+<section class="sec">
+  <div class="sec-inner">
+    <p class="sec-label">In the wild</p>
+    <h2 class="sec-title">Designed for the<br />household, not the desk.</h2>
+    <div class="screens-layout">
+      <div>
+        <div class="screen-wrap">
+          <img
+            src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-desktop.png"
+            alt="Home dashboard · desktop"
+            loading="lazy"
+          />
+        </div>
+        <p class="screen-caption">Home dashboard · Desktop</p>
+      </div>
+      <div>
+        <div class="screen-wrap">
+          <img
+            src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/admin-desktop.png"
+            alt="Admin settings · desktop"
+            loading="lazy"
+          />
+        </div>
+        <p class="screen-caption">Admin settings · Desktop</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PILLARS -->
+<section class="sec" style="background:var(--surface);">
+  <div class="sec-inner">
+    <p class="sec-label">Principles</p>
+    <h2 class="sec-title">Built the right way<br />for a household.</h2>
+    <div class="pillars-grid">
+
+      <div class="pillar">
+        <div class="pillar-icon">🔒</div>
+        <p class="pillar-name">Private by default</p>
+        <p class="pillar-desc">Single household login. Nothing is public unless you choose it. No third-party analytics or tracking.</p>
+      </div>
+
+      <div class="pillar">
+        <div class="pillar-icon">🎨</div>
+        <p class="pillar-name">Deeply customisable</p>
+        <p class="pillar-desc">Multiple themes, per-module settings, configurable display modes, and a full admin panel for the household manager.</p>
+      </div>
+
+      <div class="pillar">
+        <div class="pillar-icon">☁️</div>
+        <p class="pillar-name">Free to host</p>
+        <p class="pillar-desc">Runs entirely on the Cloudflare Pages free tier. No monthly bills, no servers to maintain, globally fast by default.</p>
+      </div>
+
+      <div class="pillar">
+        <div class="pillar-icon">🛠</div>
+        <p class="pillar-name">Developer friendly</p>
+        <p class="pillar-desc">TypeScript throughout. A built-in module registry makes it easy to add new household features with confidence.</p>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- SETUP -->
+<section class="sec setup-sec" id="setup">
+  <div class="sec-inner">
+    <div class="setup-layout">
+
+      <div>
+        <p class="sec-label">Get started</p>
+        <h2 class="sec-title">Up and running<br />in minutes.</h2>
+        <p class="sec-body" style="margin-top:18px">Deploy your own instance on Cloudflare Pages in a few commands. The free tier handles everything.</p>
+        <div class="setup-steps">
+          <div class="setup-step">
+            <div class="step-n">1</div>
+            <p class="step-t"><strong>Clone and install.</strong> Run npm install and generate your admin password hash.</p>
+          </div>
+          <div class="setup-step">
+            <div class="step-n">2</div>
+            <p class="step-t"><strong>Create the D1 database.</strong> One wrangler command applies the full schema locally.</p>
+          </div>
+          <div class="setup-step">
+            <div class="step-n">3</div>
+            <p class="step-t"><strong>Configure your location.</strong> Set your weather and tide location in the admin settings.</p>
+          </div>
+          <div class="setup-step">
+            <div class="step-n">4</div>
+            <p class="step-t"><strong>Deploy to Cloudflare.</strong> Push to GitHub — Cloudflare Pages CI does the rest.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="terminal">
+        <div class="term-bar">
+          <div class="term-dots">
+            <div class="term-dot td-r"></div>
+            <div class="term-dot td-y"></div>
+            <div class="term-dot td-g"></div>
+          </div>
+          <span class="term-title">PowerShell · Quick start</span>
+        </div>
+        <pre><code><span class="tc"># Clone and install</span>
+<span class="tk">git clone</span> <span class="ts">https://github.com/nofaniel/frogandpeach</span>
+<span class="tk">cd</span> frogandpeach
+<span class="tk">npm install</span>
+
+<span class="tc"># Generate your admin password hash</span>
+<span class="tk">npm run hash-password</span> <span class="tv">-- "your-password"</span>
+
+<span class="tc"># Create and migrate the D1 database</span>
+<span class="tk">npx wrangler d1 create</span> <span class="tv">frog-peach-db</span>
+<span class="tk">npm run</span> <span class="tv">cf:migrate:local</span>
+
+<span class="tc"># Build and run locally</span>
+<span class="tk">npm run build</span>
+<span class="tk">npm run dev:worker</span>
+
+<span class="tc"># Open</span> <span class="tu">http://localhost:8788</span></code></pre>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-inner">
+    <p class="foot-logo">Frog <span class="amp">&amp;</span> Peach</p>
+    <div class="foot-links">
+      <a href="https://github.com/nofaniel/frogandpeach"                                                  target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/nofaniel/frogandpeach/blob/main/README.md"                              target="_blank" rel="noopener">README</a>
+      <a href="https://github.com/nofaniel/frogandpeach/blob/main/docs/cloudflare-hosting.md"             target="_blank" rel="noopener">Hosting guide</a>
+      <a href="https://github.com/nofaniel/frogandpeach/blob/main/docs/router-hosting.md"                 target="_blank" rel="noopener">Router hosting</a>
+      <a href="https://github.com/nofaniel/frogandpeach/issues"                                           target="_blank" rel="noopener">Issues</a>
+    </div>
+    <p class="foot-copy">Open source &nbsp;·&nbsp; MIT &nbsp;·&nbsp; Built on Cloudflare Pages</p>
+  </div>
+</footer>
+
+</body>
+</html>
