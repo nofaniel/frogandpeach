@@ -76,10 +76,19 @@ export function useCanvasDrawing(
   const [optimisticStrokes, setOptimisticStrokes] = useState<LocalStroke[]>([])
   const [version, setVersion] = useState(0)
   const [viewportOffset, setViewportOffset] = useState<Point>({ x: 0, y: 0 })
+  const viewportOffsetRef = useRef<Point>({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(1)
   const zoomRef = useRef(1)
   const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 })
   const [isTouchDevice, setIsTouchDevice] = useState(false)
+
+  const updateViewportOffset = useCallback((next: Point | ((current: Point) => Point)) => {
+    const resolved = typeof next === 'function'
+      ? next(viewportOffsetRef.current)
+      : next
+    viewportOffsetRef.current = resolved
+    setViewportOffset(resolved)
+  }, [])
 
   const renderStrokes = useMemo(
     () => [
@@ -98,8 +107,8 @@ export function useCanvasDrawing(
     const dpr = window.devicePixelRatio || 1
     const vw = canvas.width / dpr
     const vh = canvas.height / dpr
-    const vx = viewportOffset.x
-    const vy = viewportOffset.y
+    const vx = viewportOffsetRef.current.x
+    const vy = viewportOffsetRef.current.y
     const z = zoomRef.current
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -109,8 +118,8 @@ export function useCanvasDrawing(
     paintWhiteboardSurface(ctx, vw, vh, 'plain')
 
     ctx.save()
-    ctx.translate(-vx, -vy)
     ctx.scale(z, z)
+    ctx.translate(-vx, -vy)
 
     for (const stroke of renderStrokes) {
       drawWhiteboardStroke(ctx, stroke)
@@ -128,7 +137,7 @@ export function useCanvasDrawing(
 
     ctx.restore()
     ctx.restore()
-  }, [options.color, options.opacity, options.tool, options.width, renderStrokes, viewportOffset])
+  }, [options.color, options.opacity, options.tool, options.width, renderStrokes])
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current
@@ -149,15 +158,15 @@ export function useCanvasDrawing(
 
       if (!centeredRef.current) {
         centeredRef.current = true
-        setViewportOffset({ x: -rect.width / 2, y: -rect.height / 2 })
+        updateViewportOffset({ x: -rect.width / 2, y: -rect.height / 2 })
       }
     }
     redrawCanvas()
-  }, [redrawCanvas])
+  }, [redrawCanvas, updateViewportOffset])
 
   useEffect(() => {
     redrawCanvas()
-  }, [redrawCanvas, version])
+  }, [redrawCanvas, version, viewportOffset, zoom])
 
   useEffect(() => {
     handleResize()
@@ -178,11 +187,12 @@ export function useCanvasDrawing(
     const screenX = clientX - rect.left
     const screenY = clientY - rect.top
     const z = zoomRef.current
+    const offset = viewportOffsetRef.current
     return {
-      x: screenX / z + viewportOffset.x,
-      y: screenY / z + viewportOffset.y,
+      x: screenX / z + offset.x,
+      y: screenY / z + offset.y,
     }
-  }, [viewportOffset])
+  }, [])
 
   const queueStrokePersistence = useCallback(async (entry: HistoryEntry, localStroke: LocalStroke) => {
     try {
@@ -230,16 +240,16 @@ export function useCanvasDrawing(
     const screenY = pivotClientY - rect.top
     const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newZoom))
 
-    setViewportOffset((prev) => {
-      const ratio = clamped / zoomRef.current
+    updateViewportOffset((prev) => {
+      const currentZoom = zoomRef.current
       return {
-        x: prev.x + screenX * (1 - ratio) / clamped,
-        y: prev.y + screenY * (1 - ratio) / clamped,
+        x: prev.x + screenX / currentZoom - screenX / clamped,
+        y: prev.y + screenY / currentZoom - screenY / clamped,
       }
     })
     zoomRef.current = clamped
     setZoom(clamped)
-  }, [])
+  }, [updateViewportOffset])
 
   const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault()
@@ -265,7 +275,8 @@ export function useCanvasDrawing(
       isDrawing.current = false
       currentPoints.current = []
       lastPoint.current = null
-      panStartRef.current = { x: event.clientX, y: event.clientY, vx: viewportOffset.x, vy: viewportOffset.y }
+      const offset = viewportOffsetRef.current
+      panStartRef.current = { x: event.clientX, y: event.clientY, vx: offset.x, vy: offset.y }
       return
     }
 
@@ -280,7 +291,8 @@ export function useCanvasDrawing(
       const dist = distance(positions[0], positions[1])
       initialPinchDistRef.current = dist
       initialPinchZoomRef.current = zoomRef.current
-      panStartRef.current = { x: midX, y: midY, vx: viewportOffset.x, vy: viewportOffset.y }
+      const offset = viewportOffsetRef.current
+      panStartRef.current = { x: midX, y: midY, vx: offset.x, vy: offset.y }
       return
     }
 
@@ -289,7 +301,7 @@ export function useCanvasDrawing(
     currentPoints.current = [point]
     lastPoint.current = point
     redrawCanvas()
-  }, [getWorldPoint, viewportOffset, redrawCanvas])
+  }, [getWorldPoint, redrawCanvas])
 
   const handlePointerMove = useCallback((event: PointerEvent) => {
     pointerPositionsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
@@ -298,7 +310,7 @@ export function useCanvasDrawing(
     if (isPanning.current && panStartRef.current) {
       event.preventDefault()
       const start = panStartRef.current
-      setViewportOffset({
+      updateViewportOffset({
         x: start.vx - (event.clientX - start.x) / zoomRef.current,
         y: start.vy - (event.clientY - start.y) / zoomRef.current,
       })
@@ -318,9 +330,21 @@ export function useCanvasDrawing(
       setZoom(clamped)
 
       const start = panStartRef.current
-      setViewportOffset({
-        x: start.vx - (midX - start.x),
-        y: start.vy - (midY - start.y),
+      const canvas = canvasRef.current
+      if (!canvas) return
+      const rect = canvas.getBoundingClientRect()
+      const startScreenX = start.x - rect.left
+      const startScreenY = start.y - rect.top
+      const midScreenX = midX - rect.left
+      const midScreenY = midY - rect.top
+      const worldAtStartMid = {
+        x: start.vx + startScreenX / initialPinchZoomRef.current,
+        y: start.vy + startScreenY / initialPinchZoomRef.current,
+      }
+
+      updateViewportOffset({
+        x: worldAtStartMid.x - midScreenX / clamped,
+        y: worldAtStartMid.y - midScreenY / clamped,
       })
       return
     }
@@ -335,7 +359,7 @@ export function useCanvasDrawing(
     currentPoints.current.push(point)
     lastPoint.current = point
     redrawCanvas()
-  }, [getWorldPoint, redrawCanvas])
+  }, [getWorldPoint, redrawCanvas, updateViewportOffset])
 
   const finishPointerInteraction = useCallback((event: PointerEvent) => {
     const canvas = canvasRef.current
@@ -474,14 +498,14 @@ export function useCanvasDrawing(
     setOptimisticStrokes([])
     undoStackRef.current = []
     redoStackRef.current = []
-    setViewportOffset({ x: 0, y: 0 })
+    updateViewportOffset({ x: 0, y: 0 })
     setVersion((current) => current + 1)
 
     return () => {
       hiddenServerStrokeIdsRef.current = previousHiddenIds
       setVersion((current) => current + 1)
     }
-  }, [serverStrokes])
+  }, [serverStrokes, updateViewportOffset])
 
   const exportPng = useCallback(() => {
     let minX = 0
