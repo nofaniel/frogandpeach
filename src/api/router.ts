@@ -40,7 +40,7 @@ import {
   updateSettings,
 } from './data'
 import { ApiError, json, methodNotAllowed, notFound, readJson } from './http'
-import { listModules, updateModules, type ModulePatch } from './modules'
+import { listModules, updateModules, redactModuleOptions, moduleDefinitions, type ModulePatch } from './modules'
 import type { ApiContext } from './types'
 import type { Session } from './auth'
 
@@ -131,7 +131,9 @@ async function routeModules(context: ApiContext, parts: string[]) {
     }
     const modules = await updateModules(context.env, patch)
     for (const entry of patch) {
-      await recordActivity(context, session, 'updated', 'module', entry.id, `Updated module ${entry.id}`, entry as Record<string, unknown>)
+      const definition = moduleDefinitions.find((d) => d.id === entry.id)
+      const metadata = entry.options ? redactModuleOptions(definition, entry.options) : {}
+      await recordActivity(context, session, 'updated', 'module', entry.id, `Updated module ${entry.id}`, metadata)
     }
     return json(modules)
   }

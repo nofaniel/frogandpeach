@@ -1,6 +1,6 @@
 # Modular Hub Upgrade Plan Progress
 
-Last updated: 2026-05-30
+Last updated: 2026-06-09
 
 ## Checkpoint Summary
 
@@ -59,6 +59,14 @@ The implementation intentionally keeps modules as built-in registry entries. Thi
 - Replaced manual position number input with a drag-and-drop module reorder control plus up/down arrow buttons for keyboard and mobile use.
 - Added batch module position updates via `batchPatchModules` with a single `PATCH /api/modules` call.
 - Added visual drag handle, dragging opacity, and drop-target highlight styles.
+- Added typed module settings schema (`ModuleSettingDefinition`) with select, boolean, text, secret, and number types.
+- Added `settings` field to `ModuleDefinition` for weather and tides modules with full setting definitions.
+- Replaced hard-coded per-module if-statements in `normaliseModuleOptions` with generic schema-driven normalisation.
+- Added `redactModuleOptions` helper to strip secret values before activity logging.
+- Updated `ModulesSection.tsx` with generic `SettingControl` renderer driven by module settings schema.
+- Updated `ModuleEditControls.tsx` with schema-driven edit controls for home edit mode.
+- Added size help text, mode description display, and secret field status indicators in admin UI.
+- Added 7 new unit tests for schema normalisation, number clamping, and secret redaction (21 module tests total).
 
 ## Partially Complete
 

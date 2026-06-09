@@ -31,6 +31,53 @@ export type ModuleNavigationBarState = {
   mode: string
 }
 
+export type ModuleSettingSelect = {
+  key: string
+  type: 'select'
+  label: string
+  description: string
+  defaultValue: string
+  options: Array<{ value: string; label: string; description?: string }>
+}
+
+export type ModuleSettingBoolean = {
+  key: string
+  type: 'boolean'
+  label: string
+  description: string
+  defaultValue: boolean
+}
+
+export type ModuleSettingText = {
+  key: string
+  type: 'text'
+  label: string
+  description: string
+  defaultValue: string
+  placeholder?: string
+}
+
+export type ModuleSettingSecret = {
+  key: string
+  type: 'secret'
+  label: string
+  description: string
+  defaultValue: string
+  placeholder?: string
+}
+
+export type ModuleSettingNumber = {
+  key: string
+  type: 'number'
+  label: string
+  description: string
+  defaultValue: number
+  min?: number
+  max?: number
+}
+
+export type ModuleSettingDefinition = ModuleSettingSelect | ModuleSettingBoolean | ModuleSettingText | ModuleSettingSecret | ModuleSettingNumber
+
 export type ModuleDefinition = {
   id: string
   title: string
@@ -42,6 +89,7 @@ export type ModuleDefinition = {
   defaultSize: ModuleSize
   navigationBar: ModuleNavigationBarDefinition
   homeWidget?: HomeWidgetDefinition
+  settings?: ModuleSettingDefinition[]
 }
 
 export type ModuleState = ModuleDefinition & {
@@ -78,10 +126,30 @@ export const moduleDefinitions: ModuleDefinition[] = [
       defaultEnabled: true,
       defaultMode: 'current',
       modes: [
-        { id: 'current', label: 'Current conditions', description: 'Compact current weather with today’s key metrics.' },
+        { id: 'current', label: 'Current conditions', description: "Compact current weather with today's key metrics." },
         { id: 'forecast', label: 'Forecast', description: 'Current weather plus the next 5 days.' },
       ],
     },
+    settings: [
+      {
+        key: 'iconStyle',
+        type: 'select',
+        label: 'Weather icons',
+        description: 'Choose how weather conditions are displayed on cards and widgets.',
+        defaultValue: 'emoji',
+        options: [
+          { value: 'emoji', label: 'Emoji', description: 'Native emoji characters for weather conditions.' },
+          { value: 'icons', label: 'Line icons', description: 'Minimal line-art icons for a cleaner look.' },
+        ],
+      },
+      {
+        key: 'showExtendedForecast',
+        type: 'boolean',
+        label: '5-day forecast',
+        description: 'Show a 5-day forecast row below the current weather card.',
+        defaultValue: false,
+      },
+    ],
   },
   {
     id: 'tides',
@@ -103,6 +171,64 @@ export const moduleDefinitions: ModuleDefinition[] = [
         { id: 'timeline', label: 'Timeline', description: 'Next tide events plus a short multi-day timeline.' },
       ],
     },
+    settings: [
+      {
+        key: 'source',
+        type: 'select',
+        label: 'Tide source',
+        description: 'Built-in estimate uses a marine model. API provides measured data from tidal stations.',
+        defaultValue: 'model',
+        options: [
+          { value: 'model', label: 'Built-in estimate', description: 'Open-Meteo marine model data, no key required.' },
+          { value: 'api', label: 'API', description: 'Measured station data from TidesAtlas. Requires an API key.' },
+        ],
+      },
+      {
+        key: 'apiKey',
+        type: 'secret',
+        label: 'API key',
+        description: 'Required when using the API tide source. Your key is stored securely and never shared.',
+        defaultValue: '',
+        placeholder: 'Paste API key',
+      },
+      {
+        key: 'showCurrentTide',
+        type: 'boolean',
+        label: 'Current tide',
+        description: 'Show the current sea level reading on the tide card.',
+        defaultValue: true,
+      },
+      {
+        key: 'showTimeUntilNext',
+        type: 'boolean',
+        label: 'Time until next',
+        description: 'Show the countdown to the next high or low tide.',
+        defaultValue: true,
+      },
+      {
+        key: 'showNextTides',
+        type: 'boolean',
+        label: 'Next tides list',
+        description: 'Show upcoming tide events in a list below the summary.',
+        defaultValue: true,
+      },
+      {
+        key: 'nextTideCount',
+        type: 'number',
+        label: 'Number of tides',
+        description: 'How many upcoming tide events to display in the list.',
+        defaultValue: 5,
+        min: 1,
+        max: 5,
+      },
+      {
+        key: 'showTideSourceNote',
+        type: 'boolean',
+        label: 'Source note',
+        description: 'Show a note about the tide data source below the card.',
+        defaultValue: true,
+      },
+    ],
   },
   {
     id: 'lists',
@@ -265,23 +391,46 @@ function normaliseModuleOptions(definition: ModuleDefinition | undefined, option
     delete normalised.homeWidget
   }
 
-  if (definition?.id === 'weather') {
-    normalised.iconStyle = options.iconStyle === 'icons' ? 'icons' : 'emoji'
-    normalised.showExtendedForecast = options.showExtendedForecast === true
-  }
-
-  if (definition?.id === 'tides') {
-    normalised.source = String(options.source ?? '').toLowerCase() === 'api' ? 'api' : 'model'
-    normalised.apiKey = typeof options.apiKey === 'string' ? options.apiKey : ''
-    normalised.showCurrentTide = options.showCurrentTide !== false
-    normalised.showTimeUntilNext = options.showTimeUntilNext !== false
-    normalised.showNextTides = options.showNextTides !== false
-    normalised.showTideSourceNote = options.showTideSourceNote !== false
-    const rawCount = typeof options.nextTideCount === 'number' && Number.isFinite(options.nextTideCount) ? Math.round(options.nextTideCount) : 5
-    normalised.nextTideCount = Math.max(1, Math.min(5, rawCount))
+  if (definition?.settings) {
+    for (const setting of definition.settings) {
+      normalised[setting.key] = normaliseSettingValue(setting, options[setting.key])
+    }
   }
 
   return normalised
+}
+
+function normaliseSettingValue(setting: ModuleSettingDefinition, raw: unknown): unknown {
+  switch (setting.type) {
+    case 'select': {
+      const values = setting.options.map((o) => o.value)
+      const str = String(raw ?? '').toLowerCase()
+      return values.includes(str) ? str : setting.defaultValue
+    }
+    case 'boolean':
+      return raw === true || raw === false ? raw : setting.defaultValue
+    case 'text':
+      return typeof raw === 'string' ? raw : setting.defaultValue
+    case 'secret':
+      return typeof raw === 'string' ? raw : setting.defaultValue
+    case 'number': {
+      const num = typeof raw === 'number' && Number.isFinite(raw) ? Math.round(raw) : setting.defaultValue
+      const min = setting.min ?? num
+      const max = setting.max ?? num
+      return Math.max(min, Math.min(max, num))
+    }
+  }
+}
+
+export function redactModuleOptions(definition: ModuleDefinition | undefined, options: Record<string, unknown>): Record<string, unknown> {
+  if (!definition?.settings) return options
+  const redacted = { ...options }
+  for (const setting of definition.settings) {
+    if (setting.type === 'secret' && typeof redacted[setting.key] === 'string' && (redacted[setting.key] as string).length > 0) {
+      redacted[setting.key] = '[redacted]'
+    }
+  }
+  return redacted
 }
 
 function normaliseHomeWidgetState(definition: HomeWidgetDefinition, value: unknown): HomeWidgetState {

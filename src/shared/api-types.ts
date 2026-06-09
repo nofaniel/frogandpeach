@@ -1,5 +1,17 @@
 export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network'
 
+export type ModuleSettingDefinition = {
+  key: string
+  type: 'select' | 'boolean' | 'text' | 'secret' | 'number'
+  label: string
+  description: string
+  defaultValue: unknown
+  options?: Array<{ value: string; label: string; description?: string }>
+  placeholder?: string
+  min?: number
+  max?: number
+}
+
 export type Module = {
   id: string
   title: string
@@ -20,16 +32,8 @@ export type Module = {
   enabled: boolean
   position: number
   size: 'small' | 'medium' | 'wide' | 'full'
+  settings?: ModuleSettingDefinition[]
   options: Record<string, unknown> & {
-    iconStyle?: 'emoji' | 'icons'
-    showExtendedForecast?: boolean
-    source?: 'model' | 'api'
-    apiKey?: string
-    showCurrentTide?: boolean
-    showTimeUntilNext?: boolean
-    showNextTides?: boolean
-    nextTideCount?: number
-    showTideSourceNote?: boolean
     navigationBar?: {
       enabled: boolean
       mode: string

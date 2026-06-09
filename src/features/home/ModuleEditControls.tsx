@@ -1,4 +1,4 @@
-import type { Module } from '../../shared/api-types'
+import type { Module, ModuleSettingDefinition } from '../../shared/api-types'
 
 export function ModuleEditControls({
   module,
@@ -36,6 +36,8 @@ export function ModuleEditControls({
       { id: toModule.id, position: fromModule.position },
     ])
   }
+
+  const visibleSettings = module.settings?.filter((s) => s.key !== 'apiKey' && s.key !== 'showTideSourceNote' && s.key !== 'nextTideCount') ?? []
 
   return (
     <div className="module-edit-controls">
@@ -96,30 +98,9 @@ export function ModuleEditControls({
         </button>
       </div>
       <div className="edit-display-options">
-        {module.id === 'weather' && module.installed && (
-          <>
-            <label className="compact-field">
-              Icons
-              <select
-                value={module.options.iconStyle === 'icons' ? 'icons' : 'emoji'}
-                onChange={(e) => onPatchModule(module, { options: { ...module.options, iconStyle: e.target.value as Module['options']['iconStyle'] } })}
-              >
-                <option value="emoji">Emoji</option>
-                <option value="icons">Line icons</option>
-              </select>
-            </label>
-            <label className="compact-field">
-              Forecast
-              <select
-                value={module.options.showExtendedForecast ? 'on' : 'off'}
-                onChange={(e) => onPatchModule(module, { options: { ...module.options, showExtendedForecast: e.target.value === 'on' } })}
-              >
-                <option value="off">Hidden</option>
-                <option value="on">Show</option>
-              </select>
-            </label>
-          </>
-        )}
+        {visibleSettings.map((setting) => (
+          <EditSettingControl key={setting.key} module={module} setting={setting} onPatchModule={onPatchModule} />
+        ))}
         {module.homeWidget && module.homeWidget.modes.length > 1 && (
           <label className="compact-field">
             Mode
@@ -146,4 +127,39 @@ export function ModuleEditControls({
       </div>
     </div>
   )
+}
+
+function EditSettingControl({ module, setting, onPatchModule }: { module: Module; setting: ModuleSettingDefinition; onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void }) {
+  if (setting.type === 'select' && setting.options) {
+    return (
+      <label className="compact-field">
+        {setting.label}
+        <select
+          value={String(module.options[setting.key] ?? setting.defaultValue)}
+          onChange={(e) => onPatchModule(module, { options: { ...module.options, [setting.key]: e.target.value } })}
+        >
+          {setting.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      </label>
+    )
+  }
+
+  if (setting.type === 'boolean') {
+    return (
+      <label className="compact-field">
+        {setting.label}
+        <select
+          value={module.options[setting.key] === true ? 'on' : 'off'}
+          onChange={(e) => onPatchModule(module, { options: { ...module.options, [setting.key]: e.target.value === 'on' } })}
+        >
+          <option value="on">Show</option>
+          <option value="off">Hidden</option>
+        </select>
+      </label>
+    )
+  }
+
+  return null
 }

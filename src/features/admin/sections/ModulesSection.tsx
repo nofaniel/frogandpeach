@@ -1,5 +1,94 @@
 import { useEffect, useState } from 'react'
-import type { Module } from '../../../shared/api-types'
+import type { Module, ModuleSettingDefinition } from '../../../shared/api-types'
+
+const sizeHelp: Record<string, string> = {
+  small: 'Compact card for quick status at a glance.',
+  medium: 'Default card footprint with balanced detail.',
+  wide: 'Spans more horizontal space on desktop layouts.',
+  full: 'Spans the full dashboard width, maximum detail.',
+}
+
+function SettingControl({
+  module,
+  setting,
+  value,
+  onChange,
+}: {
+  module: Module
+  setting: ModuleSettingDefinition
+  value: unknown
+  onChange: (key: string, next: unknown) => void
+}) {
+  const [draft, setDraft] = useState(String(value ?? ''))
+
+  useEffect(() => {
+    setDraft(String(value ?? ''))
+  }, [value])
+
+  if (setting.type === 'select' && setting.options) {
+    return (
+      <label className="compact-field">
+        {setting.label}
+        <select value={String(value ?? setting.defaultValue)} onChange={(e) => onChange(setting.key, e.target.value)}>
+          {setting.options.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+        {setting.options.find((o) => o.value === value)?.description && (
+          <small className="setting-option-help">{setting.options.find((o) => o.value === value)!.description}</small>
+        )}
+      </label>
+    )
+  }
+
+  if (setting.type === 'boolean') {
+    return (
+      <label className="compact-field">
+        {setting.label}
+        <select value={value === true ? 'on' : 'off'} onChange={(e) => onChange(setting.key, e.target.value === 'on')}>
+          <option value="on">Show</option>
+          <option value="off">Hidden</option>
+        </select>
+      </label>
+    )
+  }
+
+  if (setting.type === 'secret') {
+    const configured = typeof value === 'string' && value.length > 0
+    return (
+      <>
+        <label className="compact-field api-key-field">
+          {setting.label}
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              const trimmed = draft.trim()
+              if (trimmed !== value) onChange(setting.key, trimmed)
+            }}
+            placeholder={setting.placeholder ?? 'Enter value'}
+          />
+        </label>
+        {configured && <span className="setting-secret-status">Key configured</span>}
+      </>
+    )
+  }
+
+  if (setting.type === 'number') {
+    return (
+      <label className="compact-field">
+        {setting.label}
+        <select value={String(value ?? setting.defaultValue)} onChange={(e) => onChange(setting.key, Number(e.target.value))}>
+          {Array.from({ length: (setting.max ?? 5) - (setting.min ?? 1) + 1 }, (_, i) => (setting.min ?? 1) + i).map((n) => (
+            <option key={n} value={n}>{n}</option>
+          ))}
+        </select>
+      </label>
+    )
+  }
+
+  return null
+}
 
 export function ModulesSection({
   modules,
@@ -11,17 +100,8 @@ export function ModulesSection({
   onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
 }) {
   const [pendingUninstall, setPendingUninstall] = useState<Module | null>(null)
-  const [tideApiKeyDraft, setTideApiKeyDraft] = useState('')
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null)
   const [dropOverIndex, setDropOverIndex] = useState<number | null>(null)
-
-  const tidesModule = modules.find((module) => module.id === 'tides')
-  const tideSource = String(tidesModule?.options?.source ?? 'model')
-
-  useEffect(() => {
-    const key = String(tidesModule?.options?.apiKey ?? '')
-    setTideApiKeyDraft(key)
-  }, [tidesModule?.options])
 
   function moveModule(fromIndex: number, toIndex: number) {
     if (fromIndex === toIndex) return
@@ -30,6 +110,10 @@ export function ModulesSection({
     reordered.splice(toIndex, 0, moved)
     const patches = reordered.map((module, index) => ({ id: module.id, position: (index + 1) * 10 }))
     onBatchPatchModules(patches)
+  }
+
+  function handleSettingChange(module: Module, key: string, next: unknown) {
+    onPatchModule(module, { options: { ...module.options, [key]: next } })
   }
 
   return (
@@ -129,6 +213,7 @@ export function ModulesSection({
                       <option value="wide">Wide</option>
                       <option value="full">Full</option>
                     </select>
+                    <small className="setting-option-help">{sizeHelp[module.size] ?? ''}</small>
                   </label>
                 )}
                 {module.homeWidget && module.installed && (
@@ -140,91 +225,24 @@ export function ModulesSection({
                     >
                       {module.homeWidget!.modes.map((mode) => <option key={mode.id} value={mode.id}>{mode.label}</option>)}
                     </select>
-                    <small>{module.homeWidget!.description}</small>
+                    {(() => {
+                      const currentModeId = module.options.homeWidget?.mode && module.homeWidget!.modes.some((mode) => mode.id === module.options.homeWidget!.mode)
+                        ? module.options.homeWidget!.mode
+                        : module.homeWidget!.defaultMode
+                      const currentMode = module.homeWidget!.modes.find((m) => m.id === currentModeId)
+                      return currentMode ? <small className="setting-option-help">{currentMode.description}</small> : null
+                    })()}
                   </label>
                 )}
-                {module.id === 'weather' && module.installed && (
-                  <label className="compact-field">
-                    Weather icons
-                    <select value={module.options.iconStyle === 'icons' ? 'icons' : 'emoji'} onChange={(event) => onPatchModule(module, { options: { ...module.options, iconStyle: event.target.value as Module['options']['iconStyle'] } })}>
-                      <option value="emoji">Emoji</option>
-                      <option value="icons">Line icons</option>
-                    </select>
-                  </label>
-                )}
-                {module.id === 'weather' && module.installed && (
-                  <label className="compact-field">
-                    5-day forecast
-                    <select value={module.options.showExtendedForecast ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showExtendedForecast: event.target.value === 'on' } })}>
-                      <option value="off">Hidden</option>
-                      <option value="on">Show below weather</option>
-                    </select>
-                  </label>
-                )}
-                {module.id === 'tides' && module.installed && (
-                  <>
-                    <label className="compact-field">
-                      Tide source
-                      <select value={String(module.options?.source ?? 'model')} onChange={(event) => onPatchModule(module, { options: { ...module.options, source: event.target.value as 'model' | 'api' } })}>
-                        <option value="model">Built-in estimate</option>
-                        <option value="api">API</option>
-                      </select>
-                    </label>
-                    {tideSource === 'api' && (
-                      <>
-                        <label className="compact-field api-key-field">
-                          API key
-                          <input
-                            value={tideApiKeyDraft}
-                            onChange={(event) => setTideApiKeyDraft(event.target.value)}
-                            onBlur={() => onPatchModule(module, { options: { ...module.options, apiKey: tideApiKeyDraft.trim() } })}
-                            placeholder="Paste API key"
-                          />
-                        </label>
-                        <a className="plain-row compact-link api-key-link" href="https://tidesatlas.com/api/register" target="_blank" rel="noreferrer">
-                          <strong>Get API key</strong>
-                          <span>Open TidesAtlas signup page</span>
-                        </a>
-                      </>
-                    )}
-                    <label className="compact-field">
-                      Current tide
-                      <select value={module.options.showCurrentTide !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showCurrentTide: event.target.value === 'on' } })}>
-                        <option value="on">Show</option>
-                        <option value="off">Hidden</option>
-                      </select>
-                    </label>
-                    <label className="compact-field">
-                      Time until next
-                      <select value={module.options.showTimeUntilNext !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showTimeUntilNext: event.target.value === 'on' } })}>
-                        <option value="on">Show</option>
-                        <option value="off">Hidden</option>
-                      </select>
-                    </label>
-                    <label className="compact-field">
-                      Next tides list
-                      <select value={module.options.showNextTides !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showNextTides: event.target.value === 'on' } })}>
-                        <option value="on">Show</option>
-                        <option value="off">Hidden</option>
-                      </select>
-                    </label>
-                    {module.options.showNextTides !== false && (
-                      <label className="compact-field">
-                        Number of tides
-                        <select value={String(module.options.nextTideCount ?? 5)} onChange={(event) => onPatchModule(module, { options: { ...module.options, nextTideCount: Number(event.target.value) } })}>
-                          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                        </select>
-                      </label>
-                    )}
-                    <label className="compact-field">
-                      Source note
-                      <select value={module.options.showTideSourceNote !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showTideSourceNote: event.target.value === 'on' } })}>
-                        <option value="on">Show</option>
-                        <option value="off">Hidden</option>
-                      </select>
-                    </label>
-                  </>
-                )}
+                {module.installed && module.settings?.map((setting) => (
+                  <SettingControl
+                    key={setting.key}
+                    module={module}
+                    setting={setting}
+                    value={module.options[setting.key]}
+                    onChange={(key, next) => handleSettingChange(module, key, next)}
+                  />
+                ))}
               </div>
               <div className="compact-field position-field">
                 <span className="position-label">Order</span>
