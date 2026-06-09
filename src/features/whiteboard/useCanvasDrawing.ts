@@ -35,6 +35,23 @@ function createTempId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+function smoothPoints(points: Point[], iterations = 2): Point[] {
+  if (points.length < 3) return points
+  let smoothed = points
+  for (let i = 0; i < iterations; i++) {
+    const next: Point[] = [smoothed[0]]
+    for (let j = 1; j < smoothed.length - 1; j++) {
+      next.push({
+        x: (smoothed[j - 1].x + smoothed[j].x * 2 + smoothed[j + 1].x) / 4,
+        y: (smoothed[j - 1].y + smoothed[j].y * 2 + smoothed[j + 1].y) / 4,
+      })
+    }
+    next.push(smoothed[smoothed.length - 1])
+    smoothed = next
+  }
+  return smoothed
+}
+
 export function useCanvasDrawing(
   serverStrokes: WhiteboardStroke[],
   options: DrawingOptions,
@@ -352,7 +369,7 @@ export function useCanvasDrawing(
 
     if (currentPoints.current.length > 0) {
       commitStroke({
-        points: [...currentPoints.current],
+        points: smoothPoints([...currentPoints.current]),
         color: options.color,
         width: options.width,
         tool: options.tool,
