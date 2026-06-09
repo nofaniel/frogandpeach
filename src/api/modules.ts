@@ -22,6 +22,15 @@ export type HomeWidgetState = {
   mode: string
 }
 
+export type ModuleNavigationBarDefinition = {
+  defaultEnabled: boolean
+}
+
+export type ModuleNavigationBarState = {
+  enabled: boolean
+  mode: string
+}
+
 export type ModuleDefinition = {
   id: string
   title: string
@@ -31,6 +40,7 @@ export type ModuleDefinition = {
   defaultEnabled: boolean
   defaultInstalled: boolean
   defaultSize: ModuleSize
+  navigationBar: ModuleNavigationBarDefinition
   homeWidget?: HomeWidgetDefinition
 }
 
@@ -61,6 +71,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     defaultEnabled: true,
     defaultInstalled: true,
     defaultSize: 'wide',
+    navigationBar: { defaultEnabled: false },
     homeWidget: {
       label: 'Homepage weather widget',
       description: 'Controls whether weather appears on the home screen and which density is used.',
@@ -81,6 +92,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     defaultEnabled: true,
     defaultInstalled: true,
     defaultSize: 'wide',
+    navigationBar: { defaultEnabled: false },
     homeWidget: {
       label: 'Homepage tides widget',
       description: 'Controls whether tide events appear on the home screen and how much detail is shown.',
@@ -101,6 +113,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     defaultEnabled: true,
     defaultInstalled: true,
     defaultSize: 'medium',
+    navigationBar: { defaultEnabled: true },
     homeWidget: {
       label: 'Homepage lists widget',
       description: 'Controls whether list shortcuts appear on the home screen and how they are ranked.',
@@ -121,6 +134,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     defaultEnabled: true,
     defaultInstalled: true,
     defaultSize: 'medium',
+    navigationBar: { defaultEnabled: true },
     homeWidget: {
       label: 'Homepage notes widget',
       description: 'Controls whether notes appear on the home screen and how much text is shown.',
@@ -141,6 +155,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     defaultEnabled: true,
     defaultInstalled: true,
     defaultSize: 'wide',
+    navigationBar: { defaultEnabled: true },
     homeWidget: {
       label: 'Homepage pages widget',
       description: 'Controls whether page links appear on the home screen and whether they stay compact or expanded.',
@@ -161,6 +176,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     defaultEnabled: true,
     defaultInstalled: true,
     defaultSize: 'wide',
+    navigationBar: { defaultEnabled: true },
     homeWidget: {
       label: 'Homepage network widget',
       description: 'Controls whether deployment and network information appears on the home screen.',
@@ -172,7 +188,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
       ],
     },
   },
-  { id: 'settings', title: 'Admin tools', description: 'Users, modules, appearance, household settings, cache, and review tools.', category: 'admin', defaultPosition: 70, defaultEnabled: false, defaultInstalled: true, defaultSize: 'wide' },
+  { id: 'settings', title: 'Admin tools', description: 'Users, modules, appearance, household settings, cache, and review tools.', category: 'admin', defaultPosition: 70, defaultEnabled: false, defaultInstalled: true, defaultSize: 'wide', navigationBar: { defaultEnabled: false } },
 ]
 
 const validSizes: ModuleSize[] = ['small', 'medium', 'wide', 'full']
@@ -237,18 +253,19 @@ function parseOptions(value: string) {
 }
 
 function normaliseModuleOptions(definition: ModuleDefinition | undefined, options: Record<string, unknown>) {
-  if (!definition?.homeWidget) {
-    const { homeWidget: _homeWidget, ...rest } = options
-    return rest
-  }
-
-  const homeWidget = normaliseHomeWidgetState(definition.homeWidget, options.homeWidget)
+  const navigationBar = normaliseNavigationBarState(definition, options.navigationBar)
   const normalised: Record<string, unknown> = {
     ...options,
-    homeWidget,
+    navigationBar,
   }
 
-  if (definition.id === 'weather') {
+  if (definition?.homeWidget) {
+    normalised.homeWidget = normaliseHomeWidgetState(definition.homeWidget, options.homeWidget)
+  } else {
+    delete normalised.homeWidget
+  }
+
+  if (definition?.id === 'weather') {
     normalised.iconStyle = options.iconStyle === 'icons' ? 'icons' : 'emoji'
     normalised.showExtendedForecast = options.showExtendedForecast === true
   }
@@ -263,5 +280,13 @@ function normaliseHomeWidgetState(definition: HomeWidgetDefinition, value: unkno
   return {
     enabled: typeof current.enabled === 'boolean' ? current.enabled : definition.defaultEnabled,
     mode: typeof current.mode === 'string' && validModes.has(current.mode) ? current.mode : definition.defaultMode,
+  }
+}
+
+function normaliseNavigationBarState(definition: ModuleDefinition | undefined, value: unknown): ModuleNavigationBarState {
+  const current = value && typeof value === 'object' && !Array.isArray(value) ? (value as Partial<ModuleNavigationBarState>) : {}
+  return {
+    enabled: typeof current.enabled === 'boolean' ? current.enabled : Boolean(definition?.navigationBar?.defaultEnabled),
+    mode: typeof current.mode === 'string' && current.mode.trim() ? current.mode.trim() : 'default',
   }
 }

@@ -24,6 +24,13 @@ describe('module registry normalisation', () => {
     }
   })
 
+  it('defaults navigation bar visibility from the module registry', () => {
+    const modules = normaliseModules(new Map())
+
+    expect(modules.find((module) => module.id === 'lists')?.options.navigationBar).toMatchObject({ enabled: true, mode: 'default' })
+    expect(modules.find((module) => module.id === 'weather')?.options.navigationBar).toMatchObject({ enabled: false, mode: 'default' })
+  })
+
   it('disables modules when uninstalled regardless of enabled flag', () => {
     const modules = normaliseModules(
       new Map([
@@ -49,6 +56,25 @@ describe('module registry normalisation', () => {
         homeWidget: {
           enabled: false,
           mode: 'starred',
+        },
+      },
+    })
+  })
+
+  it('normalises invalid navigation bar state while preserving unrelated options', () => {
+    const modules = normaliseModules(
+      new Map([
+        ['lists', { id: 'lists', installed: 1, enabled: 1, position: 5, size: 'full', options_json: '{"view":"dense","navigationBar":{"enabled":"yes"}}' }],
+      ]),
+    )
+
+    const lists = modules.find((module) => module.id === 'lists')
+    expect(lists).toMatchObject({
+      options: {
+        view: 'dense',
+        navigationBar: {
+          enabled: true,
+          mode: 'default',
         },
       },
     })

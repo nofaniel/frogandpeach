@@ -23,6 +23,10 @@ export type Module = {
   options: Record<string, unknown> & {
     iconStyle?: 'emoji' | 'icons'
     showExtendedForecast?: boolean
+    navigationBar?: {
+      enabled: boolean
+      mode: string
+    }
     homeWidget?: {
       enabled: boolean
       mode: string

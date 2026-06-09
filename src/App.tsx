@@ -64,6 +64,36 @@ const tabModuleMap: Partial<Record<Tab, string>> = {
   network: 'network',
 }
 
+type NavigationTarget =
+  | { kind: 'tab'; tab: Tab }
+  | { kind: 'admin' }
+  | { kind: 'home'; moduleId: string }
+
+type NavigationEntry = {
+  id: string
+  label: string
+  icon: string
+  target: NavigationTarget
+}
+
+const coreNavigation: NavigationEntry[] = [
+  { id: 'home', label: 'Home', icon: '🏠', target: { kind: 'tab', tab: 'home' } },
+  { id: 'lists', label: 'Lists', icon: '🛒', target: { kind: 'tab', tab: 'lists' } },
+  { id: 'notes', label: 'Notes', icon: '📝', target: { kind: 'tab', tab: 'notes' } },
+  { id: 'pages', label: 'Pages', icon: '🌺', target: { kind: 'tab', tab: 'pages' } },
+  { id: 'network', label: 'Network', icon: '📡', target: { kind: 'tab', tab: 'network' } },
+]
+
+const moduleNavigationTargets: Record<string, NavigationTarget> = {
+  lists: { kind: 'tab', tab: 'lists' },
+  notes: { kind: 'tab', tab: 'notes' },
+  pages: { kind: 'tab', tab: 'pages' },
+  network: { kind: 'tab', tab: 'network' },
+  weather: { kind: 'home', moduleId: 'weather' },
+  tides: { kind: 'home', moduleId: 'tides' },
+  settings: { kind: 'admin' },
+}
+
 const emptySettings: Settings = {
   wifiName: '',
   wifiPassword: '',
@@ -111,6 +141,7 @@ function App() {
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastSeqRef = useRef(0)
   const warnedNearExpiryRef = useRef(false)
+  const pendingNavigationTargetRef = useRef<string | null>(null)
 
   const [loginDraft, setLoginDraft] = useState({ username: 'admin', password: '', displayName: '', setupToken: '' })
   const [unlockDraft, setUnlockDraft] = useState({ username: 'admin', password: '' })
@@ -527,17 +558,23 @@ function App() {
 
   const dashboardModules = useMemo(() => modules.filter((module) => module.installed && module.enabled), [modules])
   const locationConfigured = isLocationConfigured(settings)
-  const visibleTabs = useMemo(
-    () =>
-      tabs.filter((tab) => {
-        const moduleId = tabModuleMap[tab.id]
-        if (!moduleId) return true
-        const module = modules.find((entry) => entry.id === moduleId)
-        if (!module) return true
-        return module.installed && module.enabled
-      }),
-    [modules],
-  )
+  const navigationEntries = useMemo(() => {
+    const byId = new Map(modules.map((module) => [module.id, module]))
+    const coreEntries = coreNavigation.filter((entry) => {
+      if (entry.id === 'home') return true
+      const module = byId.get(entry.id)
+      return Boolean(module?.installed && module.enabled && module.options.navigationBar?.enabled)
+    })
+    const extraEntries = modules
+      .filter((module) => module.installed && module.enabled && module.options.navigationBar?.enabled && !coreNavigation.some((entry) => entry.id === module.id))
+      .map((module) => ({
+        id: `module-${module.id}`,
+        label: module.title,
+        icon: navigationIconForModule(module.id),
+        target: moduleNavigationTargets[module.id] ?? { kind: 'home', moduleId: module.id },
+      }))
+    return [...coreEntries, ...extraEntries]
+  }, [modules])
   const listTypes = home?.listTypes ?? []
   const adminUnlockExpiresAt = session?.adminUnlockedUntil ? Date.parse(session.adminUnlockedUntil) : NaN
   const adminUnlockRemainingMs = Number.isFinite(adminUnlockExpiresAt) ? Math.max(0, adminUnlockExpiresAt - now) : 0
@@ -545,9 +582,19 @@ function App() {
   const displayName = session?.displayName || session?.userName || 'there'
 
   useEffect(() => {
-    if (visibleTabs.some((tab) => tab.id === activeTab)) return
+    if (navigationEntries.some((entry) => entry.target.kind === 'tab' && entry.target.tab === activeTab)) return
     setActiveTab('home')
-  }, [activeTab, visibleTabs])
+  }, [activeTab, navigationEntries])
+
+  useEffect(() => {
+    if (activeTab !== 'home' || adminOpen || !home || !pendingNavigationTargetRef.current) return
+    const targetId = pendingNavigationTargetRef.current
+    pendingNavigationTargetRef.current = null
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [activeTab, adminOpen, home, navigationEntries])
 
   if (session === null) {
     return <main className="loading-screen">Opening Frog & Peach...</main>
@@ -652,10 +699,37 @@ function App() {
       </header>
 
       <nav className="tab-bar" aria-label="Sections">
-        {visibleTabs.map((tab) => (
-          <button key={tab.id} type="button" className={activeTab === tab.id ? 'active' : ''} onClick={() => setActiveTab(tab.id)}>
-            <span aria-hidden="true">{tab.icon}</span>
-            <span>{tab.label}</span>
+        {navigationEntries.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            className={isNavigationEntryActive(entry, activeTab, adminOpen) ? 'active' : ''}
+            onClick={() => {
+              if (entry.target.kind === 'tab') {
+                pendingNavigationTargetRef.current = null
+                setActiveTab(entry.target.tab)
+                return
+              }
+              if (entry.target.kind === 'admin') {
+                pendingNavigationTargetRef.current = null
+                void openAdmin()
+                return
+              }
+              const moduleId = entry.target.moduleId
+              pendingNavigationTargetRef.current = moduleId
+              setAdminOpen(false)
+              if (activeTab === 'home' && home && !adminOpen) {
+                window.requestAnimationFrame(() => {
+                  document.getElementById(moduleId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  pendingNavigationTargetRef.current = null
+                })
+                return
+              }
+              setActiveTab('home')
+            }}
+          >
+            <span aria-hidden="true">{entry.icon}</span>
+            <span>{entry.label}</span>
           </button>
         ))}
       </nav>
@@ -887,7 +961,7 @@ function renderModule(
   if (module.id === 'weather') {
     if (!locationConfigured) {
       return (
-        <article className={className + ' weather-panel'} key={module.id}>
+        <article id={module.id} className={className + ' weather-panel'} key={module.id}>
           <div className="weather-orb" aria-hidden="true" />
           <p className="kicker">Weather</p>
           <h2>Location not set</h2>
@@ -899,7 +973,7 @@ function renderModule(
 
     if (!home.weather) {
       return (
-        <article className={className + ' weather-panel'} key={module.id}>
+        <article id={module.id} className={className + ' weather-panel'} key={module.id}>
           <div className="weather-orb" aria-hidden="true" />
           <div className="weather-place">LOCAL WEATHER</div>
           <h2>Weather unavailable</h2>
@@ -913,7 +987,7 @@ function renderModule(
     const showForecast = widget.mode === 'forecast' || module.options.showExtendedForecast === true
     const weatherIconStyle = module.options.iconStyle === 'icons' ? 'icons' : 'emoji'
     return (
-      <article className={className + ' weather-panel'} key={module.id}>
+      <article id={module.id} className={className + ' weather-panel'} key={module.id}>
         <div className="weather-orb" aria-hidden="true" />
         <div className="weather-place">{weatherLocation.toUpperCase()}</div>
         <div className="weather-current">
@@ -985,7 +1059,7 @@ function renderModule(
   if (module.id === 'tides') {
     if (!locationConfigured) {
       return (
-        <article className={className + ' tide-panel'} key={module.id}>
+        <article id={module.id} className={className + ' tide-panel'} key={module.id}>
           <div className="panel-heading">
             <div>
               <p className="kicker">Tides - Predicted</p>
@@ -1004,7 +1078,7 @@ function renderModule(
     const featuredTides = tideEvents.filter(e => new Date(e.time).getTime() > now).slice(0, 2)
     const tideDays = groupTideDays(tideEvents, 5)
     return (
-      <article className={className + ' tide-panel'} key={module.id}>
+      <article id={module.id} className={className + ' tide-panel'} key={module.id}>
         <div className="panel-heading">
           <div>
             <p className="kicker">Tides - Predicted</p>
@@ -1076,7 +1150,7 @@ function renderModule(
     const orderedLists = getHomeListEntries(home.lists, widget.mode).slice(0, 4)
 
     return (
-      <article className={className} key={module.id}>
+      <article id={module.id} className={className} key={module.id}>
         <p className="kicker">Lists</p>
         <h2>{widget.mode === 'starred' ? 'Starred first' : 'Active lists'}</h2>
         <div className="stack-list">
@@ -1099,7 +1173,7 @@ function renderModule(
   if (module.id === 'notes') {
     const visibleNotes = home.notes.slice(0, widget.mode === 'large' ? 6 : 3)
     return (
-      <article className={className} key={module.id}>
+      <article id={module.id} className={className} key={module.id}>
         <p className="kicker">Notes</p>
         <h2>{widget.mode === 'large' ? 'Pinned, recent, and detailed' : 'Pinned & recent'}</h2>
         <div className={widget.mode === 'large' ? 'note-launchpad-grid' : 'stack-list'}>
@@ -1129,7 +1203,7 @@ function renderModule(
   if (module.id === 'pages') {
     const visiblePages = home.pages.slice(0, widget.mode === 'launchpad' ? 6 : 10)
     return (
-      <article className={className} key={module.id}>
+      <article id={module.id} className={className} key={module.id}>
         <p className="kicker">Pages</p>
         <h2>{widget.mode === 'launchpad' ? 'Launchpad cards' : 'Custom launchpad'}</h2>
         {widget.mode === 'launchpad' ? (
@@ -1165,7 +1239,7 @@ function renderModule(
   if (module.id === 'network') {
     const network = home.network
     return (
-      <article className={className + ' network-panel'} key={module.id}>
+      <article id={module.id} className={className + ' network-panel'} key={module.id}>
         <div className="panel-heading">
           <div>
             <p className="kicker">Deployment</p>
@@ -1269,6 +1343,19 @@ function resolveHomeWidgetState(module: Module) {
   const mode = typeof current?.mode === 'string' && validModes.has(current.mode) ? current.mode : definition.defaultMode
   const enabled = typeof current?.enabled === 'boolean' ? current.enabled : definition.defaultEnabled
   return { definition, mode, enabled }
+}
+
+function navigationIconForModule(moduleId: string) {
+  if (moduleId === 'weather') return '🌦️'
+  if (moduleId === 'tides') return '🌊'
+  if (moduleId === 'settings') return '⚙️'
+  return '▣'
+}
+
+function isNavigationEntryActive(entry: NavigationEntry, activeTab: Tab, adminOpen: boolean) {
+  if (entry.target.kind === 'tab') return entry.target.tab === activeTab
+  if (entry.target.kind === 'admin') return adminOpen
+  return false
 }
 
 type HomeListEntry = {
@@ -1598,12 +1685,30 @@ function AdminPanel({
                   <small>{module.category}</small>
                   <small>{module.installed ? 'Installed' : 'Not installed'}</small>
                   <small>{module.enabled ? 'Visible' : 'Hidden'}</small>
+                  <small>{module.options.navigationBar?.enabled ? 'Nav visible' : 'Nav hidden'}</small>
                 </div>
               </div>
               <div className="module-controls">
                 <div className="module-actions">
                   <button type="button" className="ghost" onClick={() => (module.installed ? setPendingUninstall(module) : onPatchModule(module, { installed: true, enabled: true }))}>{module.installed ? 'Uninstall' : 'Install'}</button>
                   {module.installed && <button type="button" className="ghost" onClick={() => onPatchModule(module, { enabled: !module.enabled })}>{module.enabled ? 'Disable' : 'Enable'}</button>}
+                  {module.installed && (
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => onPatchModule(module, {
+                        options: {
+                          ...module.options,
+                          navigationBar: {
+                            enabled: !(module.options.navigationBar?.enabled ?? false),
+                            mode: module.options.navigationBar?.mode ?? 'default',
+                          },
+                        },
+                      })}
+                    >
+                      {module.options.navigationBar?.enabled ? 'Nav off' : 'Nav on'}
+                    </button>
+                  )}
                   {module.homeWidget && module.installed && (
                     <button
                       type="button"
