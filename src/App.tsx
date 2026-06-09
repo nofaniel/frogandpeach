@@ -142,9 +142,10 @@ function App() {
           notes={notesGroup.notes}
           noteDraft={notesGroup.noteDraft}
           setNoteDraft={notesGroup.setNoteDraft}
-          onCreateNote={notesGroup.createNote}
-          onToggleNote={notesGroup.toggleNote}
-          onRemoveNote={notesGroup.removeNote}
+          onCreateNote={(data) => void notesGroup.createNote(data)}
+          onToggleNote={(note) => void notesGroup.toggleNote(note)}
+          onUpdateNote={(id, patch) => void notesGroup.updateNote(id, patch)}
+          onRemoveNote={(id) => void notesGroup.removeNote(id)}
         />
       )}
 

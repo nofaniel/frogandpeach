@@ -350,11 +350,10 @@ export function useAppController() {
     })
   }
 
-  async function createNote(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!noteDraft.title.trim() && !noteDraft.body.trim()) return
+  async function createNote(data: { title: string; body: string; tags: string }) {
+    if (!data.title.trim() && !data.body.trim()) return
     await run(async () => {
-      await api('/api/notes', { method: 'POST', body: noteDraft })
+      await api('/api/notes', { method: 'POST', body: data })
       setNoteDraft({ title: '', body: '', tags: '' })
       await refreshAll()
     })
@@ -363,6 +362,13 @@ export function useAppController() {
   async function toggleNote(note: Note) {
     await run(async () => {
       await api(`/api/notes/${note.id}`, { method: 'PATCH', body: { pinned: !note.pinned } })
+      await refreshAll()
+    })
+  }
+
+  async function updateNote(id: string, patch: { title?: string; body?: string; tags?: string; pinned?: boolean }) {
+    await run(async () => {
+      await api(`/api/notes/${id}`, { method: 'PATCH', body: patch })
       await refreshAll()
     })
   }
@@ -646,6 +652,7 @@ export function useAppController() {
       setNoteDraft,
       createNote,
       toggleNote,
+      updateNote,
       removeNote,
     },
     pages: {

@@ -33,12 +33,12 @@ async function setModuleMode(page: Page, title: string, mode: string) {
 async function createPinnedNote(page: Page, title: string, body: string) {
   await page.getByRole('button', { name: 'Notes' }).click()
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
-  await page.getByRole('textbox', { name: 'Markdown note' }).fill(body)
+  await page.getByRole('textbox', { name: 'Note body' }).fill(body)
   await page.getByRole('button', { name: 'Save note' }).click()
   const notePanel = page.locator('.note-panel').filter({ hasText: title }).first()
   await expect(notePanel).toBeVisible()
-  await notePanel.getByRole('button', { name: 'Pin' }).click()
-  await expect(notePanel.getByRole('button', { name: 'Unpin' })).toBeVisible()
+  await notePanel.getByRole('button', { name: new RegExp(`Pin note: ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click()
+  await expect(notePanel.getByRole('button', { name: new RegExp(`Unpin note: ${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) })).toBeVisible()
 }
 
 async function createList(page: Page, name: string) {

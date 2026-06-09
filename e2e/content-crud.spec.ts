@@ -52,17 +52,16 @@ test.describe('content workflows', () => {
     await page.getByRole('button', { name: 'Notes' }).click()
 
     await page.getByRole('textbox', { name: 'Title' }).fill(noteTitle)
-    await page.getByRole('textbox', { name: 'Markdown note' }).fill('This is an **automated** note.')
-    await page.getByRole('textbox', { name: 'Tags, comma separated' }).fill('e2e, codex')
+    await page.getByRole('textbox', { name: 'Note body' }).fill('This is an **automated** note.')
     await page.getByRole('button', { name: 'Save note' }).click()
 
     await expect(page.getByRole('heading', { name: noteTitle })).toBeVisible()
     await expect(page.getByText('automated')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Pin' }).click()
-    await expect(page.getByRole('button', { name: 'Unpin' })).toBeVisible()
+    await page.getByRole('button', { name: new RegExp(`Pin note: ${noteTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click()
+    await expect(page.getByRole('button', { name: new RegExp(`Unpin note: ${noteTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Delete' }).click()
+    await page.getByRole('button', { name: new RegExp(`Delete note: ${noteTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click()
     await expect(page.getByRole('heading', { name: noteTitle })).toHaveCount(0)
 
     await expectNoConsoleErrors(page, consoleErrors)
