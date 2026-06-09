@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WhiteboardStroke, WhiteboardStrokeInput } from '../../shared/api-types'
+import { WHITEBOARD_MAX_WIDTH } from '../../shared/whiteboard'
 import { drawWhiteboardStroke, paintWhiteboardSurface } from './rendering'
 
 const POINT_SAMPLING_DISTANCE = 5
 const ZOOM_MIN = 0.15
 const ZOOM_MAX = 5
 const ZOOM_STEP = 0.08
+const ERASER_WIDTH_MULTIPLIER = 2.5
 
 type DrawingTool = 'pen' | 'eraser'
 
@@ -52,6 +54,11 @@ function smoothPoints(points: Point[], iterations = 2): Point[] {
   return smoothed
 }
 
+function effectiveStrokeWidth(tool: DrawingTool, width: number): number {
+  if (tool !== 'eraser') return width
+  return Math.min(WHITEBOARD_MAX_WIDTH, Math.max(width, Math.round(width * ERASER_WIDTH_MULTIPLIER)))
+}
+
 export function useCanvasDrawing(
   serverStrokes: WhiteboardStroke[],
   options: DrawingOptions,
@@ -68,6 +75,7 @@ export function useCanvasDrawing(
   const panStartRef = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null)
   const currentPoints = useRef<Point[]>([])
   const lastPoint = useRef<Point | null>(null)
+  const pointerPreviewPointRef = useRef<Point | null>(null)
   const hiddenServerStrokeIdsRef = useRef<Set<string>>(new Set())
   const undoStackRef = useRef<HistoryEntry[]>([])
   const redoStackRef = useRef<WhiteboardStrokeInput[]>([])
@@ -110,6 +118,7 @@ export function useCanvasDrawing(
     const vx = viewportOffsetRef.current.x
     const vy = viewportOffsetRef.current.y
     const z = zoomRef.current
+    const activeWidth = effectiveStrokeWidth(options.tool, options.width)
 
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.save()
@@ -129,10 +138,25 @@ export function useCanvasDrawing(
       drawWhiteboardStroke(ctx, {
         points: currentPoints.current,
         color: options.color,
-        width: options.width,
+        width: activeWidth,
         tool: options.tool,
         opacity: options.opacity,
       })
+    }
+
+    const previewPoint = pointerPreviewPointRef.current
+    if (previewPoint) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.strokeStyle = options.tool === 'eraser'
+        ? 'rgba(21, 25, 34, 0.72)'
+        : options.color
+      ctx.lineWidth = 2 / z
+      ctx.setLineDash([5 / z, 5 / z])
+      ctx.beginPath()
+      ctx.arc(previewPoint.x, previewPoint.y, activeWidth / 2, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
     }
 
     ctx.restore()
@@ -275,6 +299,8 @@ export function useCanvasDrawing(
       isDrawing.current = false
       currentPoints.current = []
       lastPoint.current = null
+      pointerPreviewPointRef.current = null
+      redrawCanvas()
       const offset = viewportOffsetRef.current
       panStartRef.current = { x: event.clientX, y: event.clientY, vx: offset.x, vy: offset.y }
       return
@@ -284,6 +310,8 @@ export function useCanvasDrawing(
       isDrawing.current = false
       currentPoints.current = []
       lastPoint.current = null
+      pointerPreviewPointRef.current = null
+      redrawCanvas()
 
       const positions = Array.from(pointerPositionsRef.current.values())
       const midX = (positions[0].x + positions[1].x) / 2
@@ -300,6 +328,7 @@ export function useCanvasDrawing(
     const point = getWorldPoint(event.clientX, event.clientY)
     currentPoints.current = [point]
     lastPoint.current = point
+    pointerPreviewPointRef.current = point
     redrawCanvas()
   }, [getWorldPoint, redrawCanvas])
 
@@ -358,6 +387,7 @@ export function useCanvasDrawing(
 
     currentPoints.current.push(point)
     lastPoint.current = point
+    pointerPreviewPointRef.current = point
     redrawCanvas()
   }, [getWorldPoint, redrawCanvas, updateViewportOffset])
 
@@ -395,7 +425,7 @@ export function useCanvasDrawing(
       commitStroke({
         points: smoothPoints([...currentPoints.current]),
         color: options.color,
-        width: options.width,
+        width: effectiveStrokeWidth(options.tool, options.width),
         tool: options.tool,
         opacity: options.opacity,
       })
@@ -403,6 +433,7 @@ export function useCanvasDrawing(
 
     currentPoints.current = []
     lastPoint.current = null
+    pointerPreviewPointRef.current = null
     redrawCanvas()
     if (canvas?.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId)
@@ -495,6 +526,7 @@ export function useCanvasDrawing(
     clearEpochRef.current += 1
     currentPoints.current = []
     lastPoint.current = null
+    pointerPreviewPointRef.current = null
     setOptimisticStrokes([])
     undoStackRef.current = []
     redoStackRef.current = []
