@@ -1,4 +1,4 @@
-type Tool = 'pen' | 'eraser'
+type Tool = 'pen' | 'eraser' | 'pan'
 
 const COLOR_PRESETS = [
   '#000000', '#ef4444', '#f97316', '#eab308',
@@ -45,7 +45,7 @@ export function WhiteboardToolbar({
           onClick={() => setTool('pen')}
           title="Pen"
         >
-          ✏️
+          &#9998;
         </button>
         <button
           type="button"
@@ -53,7 +53,15 @@ export function WhiteboardToolbar({
           onClick={() => setTool('eraser')}
           title="Eraser"
         >
-          🧹
+          &#129529;
+        </button>
+        <button
+          type="button"
+          className={'wb-tool-btn' + (tool === 'pan' ? ' active' : '')}
+          onClick={() => setTool('pan')}
+          title="Pan"
+        >
+          &#9995;
         </button>
       </div>
 
@@ -111,7 +119,7 @@ export function WhiteboardToolbar({
           disabled={!canUndo}
           title="Undo (Ctrl+Z)"
         >
-          ↩
+          &#8617;
         </button>
         <button
           type="button"
@@ -120,17 +128,15 @@ export function WhiteboardToolbar({
           disabled={!canRedo}
           title="Redo (Ctrl+Shift+Z)"
         >
-          ↪
+          &#8618;
         </button>
         <button
           type="button"
           className="wb-action-btn wb-clear-btn"
-          onClick={() => {
-            if (window.confirm('Clear the entire whiteboard?')) onClearAll()
-          }}
+          onClick={onClearAll}
           title="Clear all"
         >
-          🗑
+          &#128465;
         </button>
       </div>
     </div>

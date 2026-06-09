@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { WhiteboardStroke } from '../../shared/api-types'
 import { useCanvasDrawing } from './useCanvasDrawing'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
 import { WhiteboardToolbar } from './WhiteboardToolbar'
 
-type Tool = 'pen' | 'eraser'
+type Tool = 'pen' | 'eraser' | 'pan'
 
 export function WhiteboardWorkspace({
   strokes,
@@ -20,16 +20,20 @@ export function WhiteboardWorkspace({
   const [tool, setTool] = useState<Tool>('pen')
   const [color, setColor] = useState('#000000')
   const [width, setWidth] = useState(4)
+  const drawingOptions = useMemo(() => ({ tool, color, width }), [tool, color, width])
 
   const {
+    containerRef,
     canvasRef,
+    boardSize,
+    isPanning,
     undo,
     redo,
     clearAll: clearCanvasHistory,
     handleResize,
     canUndo,
     canRedo,
-  } = useCanvasDrawing(strokes, { tool, color, width }, onAddStroke, onRemoveStroke)
+  } = useCanvasDrawing(strokes, drawingOptions, onAddStroke, onRemoveStroke)
 
   function handleClearAll() {
     if (window.confirm('Clear the entire whiteboard?')) {
@@ -54,8 +58,11 @@ export function WhiteboardWorkspace({
         canRedo={canRedo}
       />
       <WhiteboardCanvas
+        containerRef={containerRef}
         canvasRef={canvasRef}
         tool={tool}
+        boardSize={boardSize}
+        isPanning={isPanning}
         handleResize={handleResize}
       />
     </section>
