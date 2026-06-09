@@ -1208,6 +1208,11 @@ button.danger:not(.ghost) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .tide-current-labels {
+    flex-direction: column;
+    gap: 4px;
+  }
+
   .module-row {
     grid-template-columns: 1fr;
   }
@@ -2214,6 +2219,104 @@ body {
 
 .tide-source-note a {
   color: #285f43;
+}
+
+.tide-current-section {
+  display: grid;
+  gap: 10px;
+}
+
+.tide-current-scale {
+  display: grid;
+  gap: 8px;
+}
+
+.tide-current-track {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-line) 60%, transparent);
+  overflow: visible;
+}
+
+.tide-current-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-accent-2) 55%, var(--color-surface)) 0%,
+    color-mix(in srgb, var(--color-accent) 55%, var(--color-surface)) 100%
+  );
+  transition: width 0.4s ease;
+}
+
+.tide-current-needle {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--app-ink);
+  border: 2px solid var(--color-surface);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%);
+  transition: left 0.4s ease;
+}
+
+.tide-current-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tide-current-endpoint {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.tide-current-endpoint strong {
+  color: var(--app-ink);
+  font-size: 0.78rem;
+  letter-spacing: -0.02em;
+}
+
+.tide-current-endpoint small {
+  color: #7b7772;
+  font-size: 0.72rem;
+}
+
+.tide-current-height {
+  color: #77746f;
+  font-size: 0.82rem;
+}
+
+.tide-countdown-section {
+  display: grid;
+}
+
+.tide-countdown-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.tide-countdown-label {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.tide-countdown-value {
+  color: var(--app-ink);
+  font-size: 1.15rem;
+  font-weight: 900;
+  letter-spacing: -0.03em;
 }
 
 .workspace-grid {

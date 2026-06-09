@@ -96,6 +96,18 @@ export function formatDuration(milliseconds: number) {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
+export function formatTideCountdown(milliseconds: number) {
+  if (milliseconds < 60 * 1000) return 'Due now'
+  const totalMinutes = Math.floor(milliseconds / 60000)
+  if (totalMinutes < 60) return `${totalMinutes}m`
+  const hours = Math.floor(totalMinutes / 60)
+  const remainingMinutes = totalMinutes % 60
+  if (hours < 24) return `${hours}h ${remainingMinutes}m`
+  const days = Math.floor(hours / 24)
+  const remainingHours = hours % 24
+  return `${days}d ${remainingHours}h`
+}
+
 export function weatherIcon(label: string | undefined) {
   const value = label?.toLowerCase() ?? ''
   if (value.includes('rain') || value.includes('drizzle')) return '\u{1F327}\uFE0F'   // 🌧️

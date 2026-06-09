@@ -107,4 +107,74 @@ describe('module registry normalisation', () => {
   it('guards invalid sizes', () => {
     expect(normaliseModuleSize('giant')).toBe('medium')
   })
+
+  it('defaults tide display options to enabled with count of 5', () => {
+    const modules = normaliseModules(new Map())
+    const tides = modules.find((module) => module.id === 'tides')
+    expect(tides?.options).toMatchObject({
+      source: 'model',
+      apiKey: '',
+      showCurrentTide: true,
+      showTimeUntilNext: true,
+      showNextTides: true,
+      showTideSourceNote: true,
+      nextTideCount: 5,
+    })
+  })
+
+  it('normalises invalid tide source to model', () => {
+    const modules = normaliseModules(
+      new Map([
+        ['tides', { id: 'tides', installed: 1, enabled: 1, position: 20, size: 'wide', options_json: '{"source":"bogus"}' }],
+      ]),
+    )
+    const tides = modules.find((module) => module.id === 'tides')
+    expect(tides?.options['source']).toBe('model')
+  })
+
+  it('preserves tide api key as a string', () => {
+    const modules = normaliseModules(
+      new Map([
+        ['tides', { id: 'tides', installed: 1, enabled: 1, position: 20, size: 'wide', options_json: '{"apiKey":"sk-test-123"}' }],
+      ]),
+    )
+    const tides = modules.find((module) => module.id === 'tides')
+    expect(tides?.options['apiKey']).toBe('sk-test-123')
+  })
+
+  it('clamps nextTideCount to 1..5 range', () => {
+    const tooHigh = normaliseModules(
+      new Map([
+        ['tides', { id: 'tides', installed: 1, enabled: 1, position: 20, size: 'wide', options_json: '{"nextTideCount":10}' }],
+      ]),
+    )
+    expect(tooHigh.find((m) => m.id === 'tides')?.options['nextTideCount']).toBe(5)
+
+    const tooLow = normaliseModules(
+      new Map([
+        ['tides', { id: 'tides', installed: 1, enabled: 1, position: 20, size: 'wide', options_json: '{"nextTideCount":0}' }],
+      ]),
+    )
+    expect(tooLow.find((m) => m.id === 'tides')?.options['nextTideCount']).toBe(1)
+
+    const valid = normaliseModules(
+      new Map([
+        ['tides', { id: 'tides', installed: 1, enabled: 1, position: 20, size: 'wide', options_json: '{"nextTideCount":3}' }],
+      ]),
+    )
+    expect(valid.find((m) => m.id === 'tides')?.options['nextTideCount']).toBe(3)
+  })
+
+  it('defaults tide display booleans to true when explicitly false in stored options', () => {
+    const modules = normaliseModules(
+      new Map([
+        ['tides', { id: 'tides', installed: 1, enabled: 1, position: 20, size: 'wide', options_json: '{"showCurrentTide":false,"showTimeUntilNext":false,"showNextTides":false,"showTideSourceNote":false}' }],
+      ]),
+    )
+    const tides = modules.find((module) => module.id === 'tides')
+    expect(tides?.options['showCurrentTide']).toBe(false)
+    expect(tides?.options['showTimeUntilNext']).toBe(false)
+    expect(tides?.options['showNextTides']).toBe(false)
+    expect(tides?.options['showTideSourceNote']).toBe(false)
+  })
 })

@@ -270,6 +270,17 @@ function normaliseModuleOptions(definition: ModuleDefinition | undefined, option
     normalised.showExtendedForecast = options.showExtendedForecast === true
   }
 
+  if (definition?.id === 'tides') {
+    normalised.source = String(options.source ?? '').toLowerCase() === 'api' ? 'api' : 'model'
+    normalised.apiKey = typeof options.apiKey === 'string' ? options.apiKey : ''
+    normalised.showCurrentTide = options.showCurrentTide !== false
+    normalised.showTimeUntilNext = options.showTimeUntilNext !== false
+    normalised.showNextTides = options.showNextTides !== false
+    normalised.showTideSourceNote = options.showTideSourceNote !== false
+    const rawCount = typeof options.nextTideCount === 'number' && Number.isFinite(options.nextTideCount) ? Math.round(options.nextTideCount) : 5
+    normalised.nextTideCount = Math.max(1, Math.min(5, rawCount))
+  }
+
   return normalised
 }
 

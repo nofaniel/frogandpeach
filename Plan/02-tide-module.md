@@ -26,56 +26,67 @@ Do not replace the existing module framework or introduce a client-side router. 
 
 ## Current State
 
-The app is a Cloudflare Pages + D1 app with a React/Vite frontend and hand-rolled Worker API.
+The app is a Cloudflare Pages + D1 app with a React/Vite frontend and hand-rolled Worker API. The frontend is decomposed into feature components under `src/features/`.
 
 Relevant current implementation:
 
-- `src/App.tsx` renders all homepage widgets in `renderModule(...)`.
-- The Tides widget branch is in `src/App.tsx` under `if (module.id === 'tides')`.
-- The Tides widget currently:
-  - Shows a location-not-set state if `isLocationConfigured(settings)` is false.
-  - Reads tide events from `home.tides?.events ?? []`.
+- `src/features/home/widgets/TidesWidget.tsx` renders the tides homepage widget (108 lines).
+  - Receives `module`, `tides: TideSummary | null`, `locationConfigured`, `onOpenAdmin` props.
+  - Calls `resolveHomeWidgetState(module)` to get `{ definition, mode, enabled }`.
+  - Shows a location-not-set state if `locationConfigured` is false.
+  - Reads tide events from `tides?.events ?? []`.
   - Calculates `featuredTides` with future events only, then `.slice(0, 2)`.
   - Calculates `tideDays` with `groupTideDays(tideEvents, 5)`.
-  - Always shows the "Next 2 tides" cards.
-  - Shows a "Next 5 days" grouped timeline only when `homeWidget.mode === 'timeline'`.
+  - Always shows "Next 2 tides" feature cards.
+  - Shows "Next 5 days" grouped timeline only when `widget.mode === 'timeline'`.
   - Does not show current tide progress or time until next tide.
-- `src/shared/tide.ts` contains tide data extraction and event derivation:
-  - `extractTideSeries(raw)` maps Open-Meteo marine points into `{ time, height }`.
-  - `deriveTideEvents(series, referenceTime)` derives high/low events and skips events older than one hour before the reference time.
-  - The derived events currently only expose event extrema, not a continuous current-state calculation.
-- `src/api/data.ts` returns marine data from `getMarine(env)`:
+- `src/features/admin/sections/ModulesSection.tsx` renders admin controls for all modules (207 lines).
+  - Tides-specific controls at lines 164-191: `Tide source` select and API key input.
+  - Options are patched via `onPatchModule(module, { options: { ...module.options, ... } })`.
+  - No tide-specific display toggles exist yet.
+- `src/features/app-shell/homeWidgets.ts` has `resolveHomeWidgetState(module)` which validates mode against definition modes and falls back to `definition.defaultMode`.
+- `src/shared/tide.ts` contains tide data extraction and event derivation (140 lines):
+  - `TideEvent` type: `{ id, type: 'high'|'low', time, height, source: 'forecast' }`.
+  - `TidePoint` type: `{ time, height }`.
+  - `extractTideSeries(raw)` maps Open-Meteo marine points into `TidePoint[]`.
+  - `deriveTideEvents(series, referenceTime)` derives high/low events, skips events older than 1 hour before reference time.
+  - `numericOrNull(value)` is exported.
+  - No helpers for tide window filtering or current tide state calculation.
+- `src/api/data.ts` returns marine data from `getMarine(env)` (1072 lines):
   - Reads tide module options from `module_settings.options_json`.
   - Supports `source: 'model'` using Open-Meteo marine data.
-  - Supports `source: 'api'` using TidesAtlas and falls back to model data when needed.
-  - For model data, the response includes `current`, `forecastUntil`, `events`, and `note`.
-  - For API data, the response includes `current` with null sea level, `forecastUntil`, `events`, and `note`.
+  - Supports `source: 'api'` using TidesAtlas, falls back to model data when needed.
+  - Returns `{ current: { seaLevel, waveHeight, time }, forecastUntil, events, note }`.
+  - `getTidesModuleOptions(env)` reads from D1 and returns `{ source, apiKey }`.
+  - `normaliseTideSource(value)` returns `'api'` only if lowercased value is `'api'`, otherwise `'model'`.
 - `src/shared/api-types.ts` currently types `TideSummary` as only:
   - `events: Array<{ id; type; time; height }>`
   - `note: string`
-  - This type is narrower than the actual `getMarine` runtime response, which already includes `current` and `forecastUntil`.
-- `src/shared/format.ts` contains tide formatting helpers:
-  - `formatTideTime`
-  - `formatTideEventLabel`
-  - `formatTideHeight`
-  - `formatTideDayBadge`
-  - `groupTideDays`
-  - `formatDuration` exists but is currently countdown-style (`m:ss` under an hour), so a more tide-friendly duration helper may be needed.
-- `src/api/modules.ts` defines the hardcoded `tides` module:
+  - This type is narrower than the actual `getMarine(...)` runtime response, which already includes `current` and `forecastUntil`.
+- `Module['options']` is typed as `Record<string, unknown>` with optional `iconStyle`, `showExtendedForecast`, `navigationBar`, and `homeWidget` fields. No tide-specific typed fields exist.
+- `src/shared/format.ts` contains tide formatting helpers (159 lines):
+  - `formatTideTime` -- "12:00 PM" style
+  - `formatTideEventLabel` -- "High tide" / "Low tide"
+  - `formatTideHeight` -- "X.X m" or "Height unavailable"
+  - `formatTideDayBadge` -- "Today" / "Tomorrow" / "Day N"
+  - `groupTideDays` -- groups events by calendar day
+  - `formatDuration(milliseconds)` -- returns `"Xh Ym"` for >= 60 minutes, `"M:SS"` for < 60 minutes. The `Xh Ym` format is adequate for tide countdown; no new helper needed.
+- `src/api/modules.ts` defines the hardcoded `tides` module (292 lines):
   - `defaultSize: 'wide'`
   - `homeWidget.defaultMode: 'next'`
-  - modes: `next` and `timeline`
-  - `normaliseModuleOptions(...)` currently normalizes weather-specific options, but not tide-specific display toggles.
-- `src/App.tsx` Admin settings already exposes Tides module options:
-  - Homepage mode
-  - Tide source (`model` or `api`)
-  - API key field when Tide source is `api`
-- `src/styles.css` already has tide widget styles around `.tide-panel`, `.tide-feature-card`, `.tide-day-card`, and `.tide-source-note`.
-- Tests already exist for tide and module behavior:
-  - `src/shared/tide.test.ts`
-  - `src/api/data.test.ts`
-  - `src/api/modules.test.ts`
-  - `e2e/home.spec.ts`
+  - modes: `next` ("Compact next-two tide overview") and `timeline` ("Next tide events plus a short multi-day timeline")
+  - `normaliseModuleOptions(...)` currently normalizes weather-specific options (`iconStyle`, `showExtendedForecast`) but NOT tide-specific display toggles.
+- `src/styles.css` has tide widget styles (lines 1956-2217):
+  - `.tide-panel`, `.tide-panel .panel-heading`, `.tide-mark`
+  - `.tide-section`, `.tide-section-head`, `.tide-section-title`, `.tide-section-subtitle`
+  - `.tide-feature-grid`, `.tide-feature-card`, `.tide-feature-badge`, `.tide-feature-time`
+  - `.tide-day-list`, `.tide-day-card`, `.tide-day-events`, `.tide-day-event`
+  - `.tide-empty-state`, `.tide-source-note`
+  - Responsive: `@media (max-width: 820px)` for `.tide-feature-grid` and `.tide-day-events`
+- Tests already exist:
+  - `src/shared/tide.test.ts` -- 3 tests for tide event detection
+  - `src/shared/format.test.ts` -- 3 tests for `formatTideTime` only
+  - `src/api/modules.test.ts` -- 8 tests for general module normalisation (1 checks tides homeWidget default)
 
 ## Proposed Behavior
 
@@ -201,7 +212,7 @@ Responsive behavior:
 
 ### Admin UX
 
-In the existing Tides module row in Admin settings:
+In the existing Tides module row in `ModulesSection.tsx`:
 
 - Keep the current `Tide source` select.
 - Keep the API key input behavior for API mode.
@@ -221,19 +232,18 @@ No migration should be needed.
 Expected backend/type updates:
 
 - Update `src/shared/api-types.ts` so `TideSummary` matches the runtime `getMarine(...)` response:
-  - Add optional or required `current`.
-  - Add `forecastUntil`.
+  - Add optional `current` with `{ seaLevel: number | null; waveHeight: number | null; time: string | null }`.
+  - Add optional `forecastUntil: string | null`.
   - Keep `events` and `note`.
 - Update `src/api/modules.ts` `normaliseModuleOptions(...)` for `definition.id === 'tides'`:
   - Normalize `source` to `model` or `api`.
   - Preserve `apiKey` as a string.
   - Normalize display booleans with the defaults listed above.
   - Normalize `nextTideCount` to an integer from `1..5`, defaulting to `5`.
-- Consider adding shared helper functions in `src/shared/tide.ts` for pure tide display calculations:
-  - `getTideWindow(events, now, count)`
-  - `getCurrentTideState(events, now, currentSeaLevel?)`
+- Add shared helper functions in `src/shared/tide.ts` for pure tide display calculations:
+  - `getTideWindow(events, now, count)` -- returns the next `count` upcoming events.
+  - `getCurrentTideState(events, now, currentSeaLevel?)` -- returns previous/next events, progress, direction, and height estimate.
   - Keep these pure and unit-tested.
-- If the display logic remains frontend-only, still prefer pure helper functions in `src/shared/tide.ts` or `src/shared/format.ts` instead of embedding all calculations inside `renderModule(...)`.
 
 Do not add a new API endpoint. The existing `/api/home` response and `/api/tides` or `/api/marine` GET behavior are enough.
 
@@ -241,35 +251,30 @@ Do not add a new API endpoint. The existing `/api/home` response and `/api/tides
 
 Core implementation:
 
-- `src/App.tsx`
-  - Tides widget rendering.
-  - Admin module options UI for tide display toggles.
-  - Possibly small local helper calls around tide options.
+- `src/features/home/widgets/TidesWidget.tsx`
+  - Rewrite to use new tide window helper, current tide scale, countdown, and display toggles.
+- `src/features/admin/sections/ModulesSection.tsx`
+  - Add compact select controls for tide display options in the `module.id === 'tides'` branch (lines 164-191).
 - `src/shared/api-types.ts`
-  - Expand `TideSummary`.
-  - Extend `Module['options']` with tide option fields.
+  - Expand `TideSummary` to include `current` and `forecastUntil`.
 - `src/shared/tide.ts`
-  - Add pure helpers for upcoming tide selection/current tide state.
+  - Add pure helpers: `getTideWindow`, `getCurrentTideState`.
 - `src/shared/format.ts`
-  - Add a tide-friendly duration formatter, or adjust usage of existing `formatDuration` if acceptable.
+  - Adapt `formatDuration` usage for tide countdown, or add `formatTideCountdown` if `formatDuration`'s `M:SS` sub-hour format is undesirable for tides.
 - `src/api/modules.ts`
-  - Normalize tide module options and defaults.
+  - Add tide-specific normalisation in `normaliseModuleOptions(...)`.
 - `src/styles.css`
-  - Add styles for current tide scale/needle and next tide countdown.
+  - Add styles for current tide scale/needle, tide countdown, and next tide event list.
   - Adjust existing tide card/list styles if switching from day groups to event list.
 
 Tests:
 
 - `src/shared/tide.test.ts`
-  - Add helper tests for next 5 event filtering, previous/current/next state, progress clamping, and height interpolation.
+  - Add helper tests for `getTideWindow`, `getCurrentTideState`, progress clamping, and height interpolation.
 - `src/shared/format.test.ts`
-  - Add tests for tide duration formatting if implemented in `format.ts`.
+  - Add tests for tide duration formatting if a new helper is added.
 - `src/api/modules.test.ts`
   - Add tests for tide option defaults and invalid option normalization.
-- `src/api/data.test.ts`
-  - Add or update tests only if `TideSummary` shape or marine payload behavior changes.
-- `e2e/home.spec.ts`
-  - Add visual/behavior coverage for Tides widget controls if practical.
 
 Possibly unchanged:
 
@@ -281,39 +286,44 @@ Possibly unchanged:
 ## Implementation Plan
 
 1. Add shared tide display helpers.
-   - In `src/shared/tide.ts`, implement pure helpers to sort/filter finite event times, identify previous and next events, return the next visible events, and compute current tide progress.
+   - In `src/shared/tide.ts`, implement `getTideWindow(events, now, count)` to filter and return the next `count` upcoming events.
+   - Implement `getCurrentTideState(events, now, currentSeaLevel?)` to find previous/next events, compute progress (0..1), determine direction (rising/falling), and interpolate height.
    - Keep existing `deriveTideEvents(...)` behavior intact.
    - Unit-test edge cases before wiring into UI.
 
-2. Add duration formatting.
-   - Add a helper such as `formatTideCountdown(milliseconds)` in `src/shared/format.ts`.
-   - Use minute-level precision.
+2. Add duration formatting if needed.
+   - Check if existing `formatDuration(milliseconds)` in `src/shared/format.ts` is acceptable (returns `"Xh Ym"` for >= 60 min).
+   - If the `M:SS` sub-hour format is undesirable for tides, add a `formatTideCountdown` variant that returns `"35m"` style for sub-hour.
    - Unit-test boundary cases: due now, minutes only, hours/minutes, days/hours.
 
-3. Expand shared API/module types.
-   - Update `TideSummary` in `src/shared/api-types.ts` to include the marine `current` and `forecastUntil` fields currently returned by `getMarine(...)`.
-   - Add typed tide option fields to `Module['options']`.
+3. Expand shared API types.
+   - Update `TideSummary` in `src/shared/api-types.ts` to include optional `current` and `forecastUntil` fields matching the runtime `getMarine(...)` response.
 
 4. Normalize tide options in the backend module registry.
-   - Update `normaliseModuleOptions(...)` in `src/api/modules.ts`.
-   - Preserve existing `homeWidget`, `source`, and `apiKey` behavior.
-   - Add defaults for all new display options.
+   - Update `normaliseModuleOptions(...)` in `src/api/modules.ts` for `definition.id === 'tides'`.
+   - Normalize `source` to `model` or `api`.
+   - Preserve `apiKey` as a string.
+   - Add defaults for all new display booleans (`showCurrentTide`, `showTimeUntilNext`, `showNextTides`, `showTideSourceNote`) defaulting to `true`.
+   - Normalize `nextTideCount` to an integer clamped to `1..5`, defaulting to `5`.
    - Add module normalization tests.
 
 5. Update the Tides home widget.
-   - Replace `featuredTides = ...slice(0, 2)` and `groupTideDays(tideEvents, 5)` usage with the new tide window helper.
-   - Render current tide scale when enabled and data is available.
-   - Render next tide countdown when enabled.
-   - Render the next `nextTideCount` upcoming tide events when enabled.
-   - Keep the location-not-set state and source note behavior.
+   - Replace `featuredTides = ...slice(0, 2)` and `groupTideDays(tideEvents, 5)` usage with `getTideWindow(...)` and `getCurrentTideState(...)`.
+   - Render current tide scale when `showCurrentTide !== false` and data is available.
+   - Render next tide countdown when `showTimeUntilNext !== false`.
+   - Render the next `nextTideCount` upcoming tide events when `showNextTides !== false`.
+   - Render source note when `showTideSourceNote !== false`.
+   - Keep the location-not-set state.
 
 6. Update Admin module controls.
-   - Add compact select controls in the existing `module.id === 'tides'` branch.
+   - Add compact select controls in the `module.id === 'tides'` branch of `ModulesSection.tsx`.
    - Patch nested options with `{ ...module.options, optionName: value }`, following the existing weather/tide source pattern.
    - Ensure changing one display setting does not drop `source`, `apiKey`, or `homeWidget`.
 
 7. Add styles.
-   - Add `.tide-current-*` and `.tide-countdown-*` styles near the existing tide styles in `src/styles.css`.
+   - Add `.tide-current-*` styles for the current tide scale/needle in `src/styles.css`.
+   - Add `.tide-countdown-*` styles for the time-until-next display.
+   - Adjust existing `.tide-feature-grid` / `.tide-feature-card` if switching from 2-card to N-card layout.
    - Reuse theme variables such as `--app-card`, `--color-accent`, `--color-accent-2`, `--color-line`, and `--color-muted`.
    - Add responsive behavior in the existing media-query area if needed.
 
@@ -357,14 +367,14 @@ Possibly unchanged:
 Unit tests to add or update:
 
 - `src/shared/tide.test.ts`
-  - Next event helper excludes invalid times and past events.
-  - Next event helper returns exactly the next 5 when more are available.
-  - Current tide helper finds previous and next events correctly.
-  - Current tide helper returns rising from low to high and falling from high to low.
+  - `getTideWindow` excludes invalid times and past events.
+  - `getTideWindow` returns exactly the next N when more are available.
+  - `getCurrentTideState` finds previous and next events correctly.
+  - `getCurrentTideState` returns rising from low to high and falling from high to low.
   - Progress clamps to `0` and `1`.
   - Height uses current sea level when provided and interpolation when current sea level is absent.
 - `src/shared/format.test.ts`
-  - Tide countdown formatting for due now, minutes, hours, and days.
+  - Tide countdown formatting for due now, minutes, hours, and days (if new helper added).
 - `src/api/modules.test.ts`
   - Tides module defaults include all display options.
   - Invalid tide `source` falls back to `model`.

@@ -3,7 +3,7 @@ export type TideEvent = {
   type: 'high' | 'low'
   time: string
   height: number | null
-  source: 'forecast'
+  source?: 'forecast'
 }
 
 export type TidePoint = {
@@ -137,4 +137,69 @@ export function numericOrNull(value: unknown): number | null {
 function isMoreExtreme(candidate: TideEvent, current: TideEvent) {
   if (candidate.height === null || current.height === null) return false
   return candidate.type === 'high' ? candidate.height > current.height : candidate.height < current.height
+}
+
+export type TideWindowState = {
+  nextEvents: TideEvent[]
+}
+
+export function getTideWindow(events: TideEvent[], now: number, count: number): TideWindowState {
+  const validEvents = events.filter((event) => {
+    const time = new Date(event.time).getTime()
+    return Number.isFinite(time)
+  })
+
+  const upcoming = validEvents
+    .filter((event) => new Date(event.time).getTime() > now - 60 * 60 * 1000)
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+
+  return {
+    nextEvents: upcoming.slice(0, Math.max(1, Math.min(5, count))),
+  }
+}
+
+export type TideCurrentState = {
+  previousTide: TideEvent | null
+  nextTide: TideEvent | null
+  progress: number
+  direction: 'rising' | 'falling' | null
+  estimatedHeight: number | null
+}
+
+export function getCurrentTideState(
+  events: TideEvent[],
+  now: number,
+  currentSeaLevel: number | null = null,
+): TideCurrentState {
+  const sorted = events
+    .filter((event) => Number.isFinite(new Date(event.time).getTime()))
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+
+  const previousTide = [...sorted].reverse().find((event) => new Date(event.time).getTime() <= now) ?? null
+  const nextTide = sorted.find((event) => new Date(event.time).getTime() > now) ?? null
+
+  if (!previousTide || !nextTide) {
+    return {
+      previousTide,
+      nextTide,
+      progress: 0,
+      direction: null,
+      estimatedHeight: currentSeaLevel,
+    }
+  }
+
+  const prevTime = new Date(previousTide.time).getTime()
+  const nextTime = new Date(nextTide.time).getTime()
+  const span = nextTime - prevTime
+  const elapsed = now - prevTime
+  const progress = span > 0 ? Math.min(1, Math.max(0, elapsed / span)) : 0
+
+  const direction = previousTide.type === 'low' ? 'rising' : 'falling'
+
+  let estimatedHeight: number | null = currentSeaLevel
+  if (estimatedHeight === null && previousTide.height !== null && nextTide.height !== null) {
+    estimatedHeight = previousTide.height + (nextTide.height - previousTide.height) * progress
+  }
+
+  return { previousTide, nextTide, progress, direction, estimatedHeight }
 }

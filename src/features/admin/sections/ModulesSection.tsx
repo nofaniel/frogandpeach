@@ -165,7 +165,7 @@ export function ModulesSection({
                   <>
                     <label className="compact-field">
                       Tide source
-                      <select value={String(module.options?.source ?? 'model')} onChange={(event) => onPatchModule(module, { options: { ...module.options, source: event.target.value } })}>
+                      <select value={String(module.options?.source ?? 'model')} onChange={(event) => onPatchModule(module, { options: { ...module.options, source: event.target.value as 'model' | 'api' } })}>
                         <option value="model">Built-in estimate</option>
                         <option value="api">API</option>
                       </select>
@@ -187,6 +187,42 @@ export function ModulesSection({
                         </a>
                       </>
                     )}
+                    <label className="compact-field">
+                      Current tide
+                      <select value={module.options.showCurrentTide !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showCurrentTide: event.target.value === 'on' } })}>
+                        <option value="on">Show</option>
+                        <option value="off">Hidden</option>
+                      </select>
+                    </label>
+                    <label className="compact-field">
+                      Time until next
+                      <select value={module.options.showTimeUntilNext !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showTimeUntilNext: event.target.value === 'on' } })}>
+                        <option value="on">Show</option>
+                        <option value="off">Hidden</option>
+                      </select>
+                    </label>
+                    <label className="compact-field">
+                      Next tides list
+                      <select value={module.options.showNextTides !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showNextTides: event.target.value === 'on' } })}>
+                        <option value="on">Show</option>
+                        <option value="off">Hidden</option>
+                      </select>
+                    </label>
+                    {module.options.showNextTides !== false && (
+                      <label className="compact-field">
+                        Number of tides
+                        <select value={String(module.options.nextTideCount ?? 5)} onChange={(event) => onPatchModule(module, { options: { ...module.options, nextTideCount: Number(event.target.value) } })}>
+                          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </label>
+                    )}
+                    <label className="compact-field">
+                      Source note
+                      <select value={module.options.showTideSourceNote !== false ? 'on' : 'off'} onChange={(event) => onPatchModule(module, { options: { ...module.options, showTideSourceNote: event.target.value === 'on' } })}>
+                        <option value="on">Show</option>
+                        <option value="off">Hidden</option>
+                      </select>
+                    </label>
                   </>
                 )}
               </div>

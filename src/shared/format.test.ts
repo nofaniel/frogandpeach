@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatTideTime, weatherIcon } from './format'
+import { formatTideCountdown, formatTideTime, weatherIcon } from './format'
 
 describe('weatherIcon', () => {
   it('returns rain emoji for Rain label', () => {
@@ -59,5 +59,28 @@ describe('formatTideTime', () => {
   it('includes minutes in the output', () => {
     const result = formatTideTime('2024-06-15T14:45:00Z')
     expect(result).toMatch(/:\d{2}/)
+  })
+})
+
+describe('formatTideCountdown', () => {
+  it('returns Due now for less than 1 minute', () => {
+    expect(formatTideCountdown(0)).toBe('Due now')
+    expect(formatTideCountdown(30000)).toBe('Due now')
+  })
+
+  it('returns minutes only for sub-hour durations', () => {
+    expect(formatTideCountdown(60000)).toBe('1m')
+    expect(formatTideCountdown(35 * 60000)).toBe('35m')
+    expect(formatTideCountdown(59 * 60000)).toBe('59m')
+  })
+
+  it('returns hours and minutes for multi-hour durations', () => {
+    expect(formatTideCountdown(60 * 60000)).toBe('1h 0m')
+    expect(formatTideCountdown(2 * 60 * 60000 + 10 * 60000)).toBe('2h 10m')
+  })
+
+  it('returns days and hours for day-scale durations', () => {
+    expect(formatTideCountdown(24 * 60 * 60000)).toBe('1d 0h')
+    expect(formatTideCountdown(27 * 60 * 60000)).toBe('1d 3h')
   })
 })

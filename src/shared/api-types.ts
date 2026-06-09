@@ -23,6 +23,13 @@ export type Module = {
   options: Record<string, unknown> & {
     iconStyle?: 'emoji' | 'icons'
     showExtendedForecast?: boolean
+    source?: 'model' | 'api'
+    apiKey?: string
+    showCurrentTide?: boolean
+    showTimeUntilNext?: boolean
+    showNextTides?: boolean
+    nextTideCount?: number
+    showTideSourceNote?: boolean
     navigationBar?: {
       enabled: boolean
       mode: string
@@ -167,6 +174,12 @@ export type WeatherSummary = {
 }
 
 export type TideSummary = {
+  current: {
+    seaLevel: number | null
+    waveHeight: number | null
+    time: string | null
+  } | null
+  forecastUntil: string | null
   events: Array<{
     id: string
     type: 'high' | 'low'
