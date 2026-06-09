@@ -3317,8 +3317,8 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 14px 8px;
+  gap: 14px;
+  padding: 16px 10px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(24px) saturate(1.8);
@@ -3351,13 +3351,26 @@ body {
 .wb-brush-slider input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
-  width: 120px;
+  width: 140px;
+  height: 28px;
+  margin: 60px 0;
+  background: transparent;
+  outline: none;
+  transform: rotate(-90deg);
+  transform-origin: center center;
+  cursor: pointer;
+}
+
+.wb-brush-slider input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   background: rgba(28, 40, 37, 0.12);
   border-radius: 2px;
-  outline: none;
-  transform: rotate(-90deg);
-  cursor: pointer;
+}
+
+.wb-brush-slider input[type="range"]::-moz-range-track {
+  height: 4px;
+  background: rgba(28, 40, 37, 0.12);
+  border-radius: 2px;
 }
 
 .wb-brush-slider input[type="range"]::-webkit-slider-thumb {
@@ -3440,7 +3453,8 @@ body {
 
 .wb-color-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, auto);
+  place-items: center;
   gap: 8px;
 }
 
@@ -3451,6 +3465,7 @@ body {
   border: 2px solid transparent;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
   -webkit-tap-highlight-color: transparent;
   transition: transform 0.1s ease, border-color 0.15s ease;
 }

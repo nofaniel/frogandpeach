@@ -2,7 +2,10 @@ import { PRESET_COLORS, ColorPickerPopover } from './ColorPicker'
 
 type DrawingTool = 'pen' | 'eraser'
 
+import { type RefObject } from 'react'
+
 export function WhiteboardToolbar({
+  toolbarRef,
   tool,
   setTool,
   color,
@@ -15,6 +18,7 @@ export function WhiteboardToolbar({
   canRedo,
   visible,
 }: {
+  toolbarRef: RefObject<HTMLDivElement | null>
   tool: DrawingTool
   setTool: (tool: DrawingTool) => void
   color: string
@@ -28,7 +32,7 @@ export function WhiteboardToolbar({
   visible: boolean
 }) {
   return (
-    <div className={`wb-floating-toolbar ${visible ? 'visible' : 'auto-hidden'}`}>
+    <div ref={toolbarRef} className={`wb-floating-toolbar ${visible ? 'visible' : 'auto-hidden'}`}>
       <button
         type="button"
         className={`wb-ftool-btn${tool === 'pen' ? ' active' : ''}`}

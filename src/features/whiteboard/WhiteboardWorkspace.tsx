@@ -75,10 +75,22 @@ export function WhiteboardWorkspace({
     }
   }, [isTouchDevice, resetHideTimer])
 
+  const toolbarRef = useRef<HTMLDivElement | null>(null)
+
   const handleCanvasInteraction = useCallback(() => {
     resetHideTimer()
-    if (colorPickerOpen) setColorPickerOpen(false)
-  }, [resetHideTimer, colorPickerOpen])
+  }, [resetHideTimer])
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node
+      if (toolbarRef.current && !toolbarRef.current.contains(target)) {
+        setColorPickerOpen(false)
+      }
+    }
+    window.addEventListener('pointerdown', handlePointerDown)
+    return () => window.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -124,6 +136,7 @@ export function WhiteboardWorkspace({
       />
 
       <WhiteboardToolbar
+        toolbarRef={toolbarRef}
         tool={tool}
         setTool={setTool}
         color={color}
