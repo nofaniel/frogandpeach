@@ -97,7 +97,6 @@ export function useAppController() {
   const [pageManifestWarnings, setPageManifestWarnings] = useState<Array<{ path: string; message: string }>>([])
   const { setTheme } = useTheme()
   const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastSeqRef = useRef(0)
@@ -186,7 +185,6 @@ export function useAppController() {
   }
 
   async function refreshAll() {
-    setBusy(true)
     setError('')
     try {
       const [homeData, listData, noteData, pageData, linkData, appearanceData, whiteboardData] = await Promise.all([
@@ -221,8 +219,6 @@ export function useAppController() {
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong')
-    } finally {
-      setBusy(false)
     }
   }
 
@@ -593,9 +589,6 @@ export function useAppController() {
           ? 'login'
           : 'app'
 
-  const adminUnlockExpiresAt = session?.adminUnlockedUntil ? Date.parse(session.adminUnlockedUntil) : NaN
-  const adminUnlockRemainingMs = Number.isFinite(adminUnlockExpiresAt) ? Math.max(0, adminUnlockExpiresAt - now) : 0
-  const adminUnlockLabel = session?.adminUnlockedUntil ? `Admin ${formatDuration(adminUnlockRemainingMs)} left` : null
   const displayName = session?.displayName || session?.userName || 'there'
   const locationConfigured = isLocationConfigured(publicSettings)
   const listTypes: ListType[] = home?.listTypes ?? []
@@ -652,12 +645,8 @@ export function useAppController() {
       displayModules,
       dashboardModules,
       error,
-      busy,
-      adminUnlockLabel,
-      adminUnlockRemainingMs,
       displayName,
       now,
-      refreshAll,
     },
     navigation: {
       navigationEntries,

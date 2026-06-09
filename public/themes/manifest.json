@@ -20,6 +20,18 @@
       "version": "1.0.0"
     },
     {
+      "id": "dusk",
+      "name": "Dusk",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "forest",
+      "name": "Forest",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
       "id": "frog-peach",
       "name": "Frog & Peach",
       "author": "Frog & Peach",
@@ -28,6 +40,18 @@
     {
       "id": "mono-dark",
       "name": "Mono Dark",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "nordic",
+      "name": "Nordic",
+      "author": "Frog & Peach",
+      "version": "1.0.0"
+    },
+    {
+      "id": "slate",
+      "name": "Slate",
       "author": "Frog & Peach",
       "version": "1.0.0"
     }

@@ -9,10 +9,6 @@ import { TopNavigation } from './TopNavigation'
 export function AppShellLayout({
   displayName,
   now,
-  adminUnlockLabel,
-  adminUnlockRemainingMs,
-  busy,
-  onRefresh,
   onOpenSettings,
   onCloseSettings,
   onOpenAdmin,
@@ -36,10 +32,6 @@ export function AppShellLayout({
 }: {
   displayName: string
   now: number
-  adminUnlockLabel: string | null
-  adminUnlockRemainingMs: number
-  busy: boolean
-  onRefresh: () => void
   onOpenSettings: () => void
   onCloseSettings: () => void
   onOpenAdmin: () => void
@@ -66,14 +58,10 @@ export function AppShellLayout({
       <TopNavigation
         displayName={displayName}
         now={now}
-        adminUnlockLabel={adminUnlockLabel}
-        adminUnlockRemainingMs={adminUnlockRemainingMs}
-        busy={busy}
         activeTab={activeTab}
         adminOpen={adminOpen}
         editMode={editMode}
         setEditMode={setEditMode}
-        onRefresh={onRefresh}
         onOpenSettings={onOpenSettings}
         onOpenAdmin={onOpenAdmin}
         onLogout={onLogout}

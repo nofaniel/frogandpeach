@@ -1,0 +1,23 @@
+{
+  "id": "dusk",
+  "name": "Dusk",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "frog-peach",
+  "tokens": {
+    "color": {
+      "bg": "#1f1b1a",
+      "surface": "#2a2423",
+      "surface2": "#362f2e",
+      "ink": "#f0ebe6",
+      "muted": "#a09590",
+      "line": "#4a3f3d",
+      "accent": "#e8a84c",
+      "accent2": "#c96b4a",
+      "danger": "#d4605a"
+    },
+    "layout": {
+      "bodyBackground": "#1f1b1a"
+    }
+  }
+}

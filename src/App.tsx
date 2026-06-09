@@ -45,17 +45,13 @@ function App() {
     )
   }
 
-  const { activeTab, adminOpen, settingsOpen, setSettingsOpen, editMode, setEditMode, viewedPage, dashboardModules, publicSettings, error, busy, adminUnlockLabel, adminUnlockRemainingMs, displayName, now } = shell
+  const { activeTab, adminOpen, settingsOpen, setSettingsOpen, editMode, setEditMode, viewedPage, dashboardModules, publicSettings, error, displayName, now } = shell
   const { home } = homeGroup
 
   return (
     <AppShellLayout
       displayName={displayName}
       now={now}
-      adminUnlockLabel={adminUnlockLabel}
-      adminUnlockRemainingMs={adminUnlockRemainingMs}
-      busy={busy}
-      onRefresh={() => void shell.refreshAll()}
       onOpenSettings={() => setSettingsOpen((prev) => !prev)}
       onCloseSettings={() => setSettingsOpen(false)}
       onOpenAdmin={() => void navigation.openAdmin()}
@@ -111,7 +107,6 @@ function App() {
           allModules={admin.adminModules}
           locationConfigured={homeGroup.locationConfigured}
           publicSettings={publicSettings}
-          busy={busy}
           error={error}
           editMode={editMode}
           session={auth.session}

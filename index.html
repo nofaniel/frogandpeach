@@ -11,18 +11,23 @@
   <body>
     <div id="root"></div>
     <script>
-      // No-FOUC: repaint the last-applied theme snapshot before React mounts.
+      // No-FOUC: repaint the last-applied theme snapshot and color mode before React mounts.
       (function () {
         try {
           var snapshot = JSON.parse(localStorage.getItem('fp-theme-snapshot') || 'null')
-          if (!snapshot) return
-          var root = document.documentElement
-          Object.keys(snapshot.cssVars || {}).forEach(function (name) {
-            root.style.setProperty(name, snapshot.cssVars[name])
-          })
-          Object.keys(snapshot.dataAttrs || {}).forEach(function (name) {
-            root.setAttribute(name, snapshot.dataAttrs[name])
-          })
+          if (snapshot) {
+            var root = document.documentElement
+            Object.keys(snapshot.cssVars || {}).forEach(function (name) {
+              root.style.setProperty(name, snapshot.cssVars[name])
+            })
+            Object.keys(snapshot.dataAttrs || {}).forEach(function (name) {
+              root.setAttribute(name, snapshot.dataAttrs[name])
+            })
+          }
+          var colorMode = localStorage.getItem('fp-color-mode')
+          if (colorMode) {
+            document.documentElement.setAttribute('data-color-mode', colorMode)
+          }
         } catch (e) {}
       })()
     </script>

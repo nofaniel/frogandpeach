@@ -1,0 +1,23 @@
+{
+  "id": "nordic",
+  "name": "Nordic",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "frog-peach",
+  "tokens": {
+    "color": {
+      "bg": "#e8ecf0",
+      "surface": "#f4f7fa",
+      "surface2": "#dce3ea",
+      "ink": "#1a2433",
+      "muted": "#627685",
+      "line": "#c4ced9",
+      "accent": "#3d6fc8",
+      "accent2": "#4a8a7a",
+      "danger": "#c44d4d"
+    },
+    "layout": {
+      "bodyBackground": "#e8ecf0"
+    }
+  }
+}

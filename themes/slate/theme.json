@@ -1,0 +1,23 @@
+{
+  "id": "slate",
+  "name": "Slate",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "frog-peach",
+  "tokens": {
+    "color": {
+      "bg": "#1e2228",
+      "surface": "#272b33",
+      "surface2": "#323843",
+      "ink": "#e2e5ea",
+      "muted": "#8b919c",
+      "line": "#3a404c",
+      "accent": "#6b8af5",
+      "accent2": "#5fb5a8",
+      "danger": "#d45a5a"
+    },
+    "layout": {
+      "bodyBackground": "#1e2228"
+    }
+  }
+}

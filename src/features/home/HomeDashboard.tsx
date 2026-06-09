@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react'
 import type { HomeData, Module, Session, Settings, Tab } from '../../shared/api-types'
 import { ModuleEditControls } from './ModuleEditControls'
 import { ListsWidget } from './widgets/ListsWidget'
@@ -15,7 +16,6 @@ export function HomeDashboard({
   allModules,
   locationConfigured,
   publicSettings,
-  busy,
   error,
   editMode,
   session,
@@ -29,11 +29,10 @@ export function HomeDashboard({
   allModules: Module[]
   locationConfigured: boolean
   publicSettings: Settings
-  busy: boolean
   error: string
   editMode: boolean
   session: Session | null
-  onSetActiveTab: (tab: Tab) => void
+  onSetActiveTab: Dispatch<SetStateAction<Tab>>
   onOpenAdmin: () => void
   onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
   onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
@@ -42,8 +41,8 @@ export function HomeDashboard({
     return (
       <section className="panel empty-state">
         <p className="kicker">Home</p>
-        <h2>{busy ? 'Loading dashboard...' : 'Dashboard unavailable'}</h2>
-        <p>{error || 'Use Refresh to load the dashboard again.'}</p>
+        <h2>Dashboard unavailable</h2>
+        <p>{error || 'Something went wrong loading the dashboard.'}</p>
       </section>
     )
   }

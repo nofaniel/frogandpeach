@@ -1,0 +1,23 @@
+{
+  "id": "forest",
+  "name": "Forest",
+  "author": "Frog & Peach",
+  "version": "1.0.0",
+  "extends": "frog-peach",
+  "tokens": {
+    "color": {
+      "bg": "#0e1612",
+      "surface": "#182019",
+      "surface2": "#222d24",
+      "ink": "#e0ebe4",
+      "muted": "#7a9180",
+      "line": "#2d3a30",
+      "accent": "#5cb87a",
+      "accent2": "#d4974a",
+      "danger": "#c45050"
+    },
+    "layout": {
+      "bodyBackground": "#0e1612"
+    }
+  }
+}

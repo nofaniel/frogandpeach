@@ -4,33 +4,25 @@ import { formatFullDateTime, greetingForNow } from '../../shared/format'
 export function TopNavigation({
   displayName,
   now,
-  adminUnlockLabel,
-  adminUnlockRemainingMs,
-  busy,
   activeTab,
   adminOpen,
   editMode,
   setEditMode,
-  onRefresh,
   onOpenSettings,
   onOpenAdmin,
   onLogout,
 }: {
   displayName: string
   now: number
-  adminUnlockLabel: string | null
-  adminUnlockRemainingMs: number
-  busy: boolean
   activeTab: string
   adminOpen: boolean
   editMode: boolean
   setEditMode: Dispatch<SetStateAction<boolean>>
-  onRefresh: () => void
   onOpenSettings: () => void
   onOpenAdmin: () => void
   onLogout: () => void
 }) {
-  const showEditHome = adminUnlockLabel && activeTab === 'home' && !adminOpen
+  const showEditHome = activeTab === 'home' && !adminOpen
   return (
     <header className="top-strip">
       <div>
@@ -38,11 +30,6 @@ export function TopNavigation({
         <p>{formatFullDateTime(now)}</p>
       </div>
       <div className="top-actions">
-        {adminUnlockLabel && (
-          <span className={adminUnlockRemainingMs <= 120000 ? 'unlock-status warning' : 'unlock-status'}>
-            {adminUnlockLabel}
-          </span>
-        )}
         {showEditHome && (
           <button
             type="button"
@@ -52,7 +39,6 @@ export function TopNavigation({
             {editMode ? 'Done' : 'Edit home'}
           </button>
         )}
-        <button type="button" onClick={onRefresh} disabled={busy}>Refresh</button>
         <button type="button" className="icon-settings" aria-label="Settings" title="Settings" onClick={onOpenSettings}>⚙️</button>
         <button type="button" className="icon-cog" aria-label="Admin settings" title="Admin settings" onClick={onOpenAdmin}>Admin</button>
         <button type="button" className="ghost" onClick={onLogout}>Logout</button>
