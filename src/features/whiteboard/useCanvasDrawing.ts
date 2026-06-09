@@ -43,6 +43,7 @@ export function useCanvasDrawing(
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const isDrawing = useRef(false)
+  const isPanning = useRef(false)
   const activePointerIdsRef = useRef<Set<number>>(new Set())
   const pointerPositionsRef = useRef<Map<number, Point>>(new Map())
   const initialPinchDistRef = useRef<number | null>(null)
@@ -241,6 +242,16 @@ export function useCanvasDrawing(
 
     const pointerCount = activePointerIdsRef.current.size
 
+    if (event.button === 1) {
+      event.preventDefault()
+      isPanning.current = true
+      isDrawing.current = false
+      currentPoints.current = []
+      lastPoint.current = null
+      panStartRef.current = { x: event.clientX, y: event.clientY, vx: viewportOffset.x, vy: viewportOffset.y }
+      return
+    }
+
     if (pointerCount >= 2) {
       isDrawing.current = false
       currentPoints.current = []
@@ -266,6 +277,16 @@ export function useCanvasDrawing(
   const handlePointerMove = useCallback((event: PointerEvent) => {
     pointerPositionsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
     const pointerCount = activePointerIdsRef.current.size
+
+    if (isPanning.current && panStartRef.current) {
+      event.preventDefault()
+      const start = panStartRef.current
+      setViewportOffset({
+        x: start.vx - (event.clientX - start.x) / zoomRef.current,
+        y: start.vy - (event.clientY - start.y) / zoomRef.current,
+      })
+      return
+    }
 
     if (pointerCount >= 2 && panStartRef.current && initialPinchDistRef.current) {
       event.preventDefault()
@@ -310,6 +331,14 @@ export function useCanvasDrawing(
 
     if (activePointerIdsRef.current.size === 0) {
       panStartRef.current = null
+    }
+
+    if (isPanning.current) {
+      isPanning.current = false
+      if (canvas?.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId)
+      }
+      return
     }
 
     if (!isDrawing.current) {

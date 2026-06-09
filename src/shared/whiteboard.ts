@@ -5,6 +5,7 @@ export const WHITEBOARD_DEFAULT_WIDTH = 4
 export const WHITEBOARD_DEFAULT_OPACITY = 1
 export const WHITEBOARD_MAX_POINTS = 4000
 export const WHITEBOARD_MAX_COORDINATE = 50000
+export const WHITEBOARD_MIN_COORDINATE = -50000
 export const WHITEBOARD_MIN_WIDTH = 1
 export const WHITEBOARD_MAX_WIDTH = 36
 export const WHITEBOARD_MIN_OPACITY = 0.08
@@ -51,8 +52,8 @@ function normaliseWhiteboardPoint(value: unknown, index: number): WhiteboardPoin
 function normaliseCoordinate(value: unknown, message: string): number {
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) throw new Error(message)
-  if (numeric < 0 || numeric > WHITEBOARD_MAX_COORDINATE) {
-    throw new Error(`Whiteboard coordinates must stay between 0 and ${WHITEBOARD_MAX_COORDINATE}.`)
+  if (numeric < WHITEBOARD_MIN_COORDINATE || numeric > WHITEBOARD_MAX_COORDINATE) {
+    throw new Error(`Whiteboard coordinates must stay between ${WHITEBOARD_MIN_COORDINATE} and ${WHITEBOARD_MAX_COORDINATE}.`)
   }
   return roundCoordinate(numeric)
 }

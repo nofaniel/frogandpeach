@@ -33,7 +33,7 @@ export function WhiteboardToolbar({
         onClick={() => setTool('eraser')}
         title="Erase"
       >
-        ◻
+        ⌫
       </button>
 
       <div className="wb-ftool-divider" />
