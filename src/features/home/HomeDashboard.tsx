@@ -1,4 +1,5 @@
-import type { HomeData, Module, Settings, Tab } from '../../shared/api-types'
+import type { HomeData, Module, Session, Settings, Tab } from '../../shared/api-types'
+import { ModuleEditControls } from './ModuleEditControls'
 import { ListsWidget } from './widgets/ListsWidget'
 import { NetworkWidget } from './widgets/NetworkWidget'
 import { NotesWidget } from './widgets/NotesWidget'
@@ -9,21 +10,31 @@ import { WeatherWidget } from './widgets/WeatherWidget'
 export function HomeDashboard({
   home,
   dashboardModules,
+  allModules,
   locationConfigured,
   publicSettings,
   busy,
   error,
+  editMode,
+  session,
   onSetActiveTab,
   onOpenAdmin,
+  onPatchModule,
+  onBatchPatchModules,
 }: {
   home: HomeData | null
   dashboardModules: Module[]
+  allModules: Module[]
   locationConfigured: boolean
   publicSettings: Settings
   busy: boolean
   error: string
+  editMode: boolean
+  session: Session | null
   onSetActiveTab: (tab: Tab) => void
   onOpenAdmin: () => void
+  onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
+  onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
 }) {
   if (!home) {
     return (
@@ -35,11 +46,63 @@ export function HomeDashboard({
     )
   }
 
+  const visibleWidgets = dashboardModules.filter(
+    (module) => module.homeWidget && module.options.homeWidget?.enabled !== false,
+  )
+
+  const hiddenWidgets = allModules.filter(
+    (module) => module.installed && module.enabled && module.homeWidget && module.options.homeWidget?.enabled === false,
+  )
+
   return (
     <section className="dashboard-grid home-dashboard">
-      {dashboardModules
-        .filter((module) => module.homeWidget && module.options.homeWidget?.enabled !== false)
-        .map((module) => renderWidget(module, home, locationConfigured, publicSettings, onSetActiveTab, onOpenAdmin))}
+      {editMode && (
+        <div className="edit-mode-toolbar">
+          <span className="edit-mode-label">Home edit mode</span>
+          <button type="button" className="ghost" onClick={onOpenAdmin}>Admin settings</button>
+        </div>
+      )}
+      {visibleWidgets.map((module, index) => (
+        <div key={module.id} className={editMode ? 'edit-widget-wrapper' : undefined}>
+          {renderWidget(module, home, locationConfigured, publicSettings, onSetActiveTab, onOpenAdmin)}
+          {editMode && session?.adminUnlocked && (
+            <ModuleEditControls
+              module={module}
+              visibleModules={visibleWidgets}
+              visibleIndex={index}
+              onPatchModule={onPatchModule}
+              onBatchPatchModules={onBatchPatchModules}
+            />
+          )}
+        </div>
+      ))}
+      {editMode && hiddenWidgets.length > 0 && (
+        <div className="hidden-widgets-strip">
+          <p className="kicker">Hidden home widgets</p>
+          <div className="hidden-widgets-list">
+            {hiddenWidgets.map((module) => (
+              <button
+                key={module.id}
+                type="button"
+                className="ghost"
+                onClick={() => onPatchModule(module, {
+                  options: {
+                    ...module.options,
+                    homeWidget: {
+                      enabled: true,
+                      mode: module.options.homeWidget?.mode && module.homeWidget!.modes.some((m) => m.id === module.options.homeWidget?.mode)
+                        ? module.options.homeWidget!.mode
+                        : module.homeWidget!.defaultMode,
+                    },
+                  },
+                })}
+              >
+                Show {module.homeWidget!.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </section>
   )
 }

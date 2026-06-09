@@ -20,16 +20,27 @@ The first implementation should cover homepage module visibility, widget visibil
 
 ## Current State
 
-- The app is a React 19 + TypeScript + Vite frontend with Cloudflare Pages Functions and D1. There is no client-side router; navigation is managed in `src/App.tsx` with `useState<Tab>`.
-- `src/App.tsx` owns almost all frontend state. Relevant state includes:
-  - `adminOpen` and `unlockOpen` at `src/App.tsx:91`.
-  - `session` and `modules` at `src/App.tsx:89` and `src/App.tsx:102`.
-  - admin unlock expiry handling at `src/App.tsx:129`, `src/App.tsx:136`, and `src/App.tsx:145`.
-- The top bar already exposes an `Admin settings` button at `src/App.tsx:649`. If the user is not admin-unlocked, `openAdmin()` opens the unlock modal at `src/App.tsx:264`; after successful `/api/admin/unlock`, `unlockAdmin()` updates `session.adminUnlocked` and `session.adminUnlockedUntil` at `src/App.tsx:274`.
-- The existing Admin settings panel is rendered from `AdminPanel` at `src/App.tsx:1310` when `adminOpen` is true. It already has module install, enable, homepage-widget, size, display option, drag, keyboard reorder, and up/down controls in the module registry area starting at `src/App.tsx:1548`.
-- `patchModule()` at `src/App.tsx:485` sends `PATCH /api/modules` and then refreshes both admin and regular app data. `batchPatchModules()` at `src/App.tsx:493` sends reorder patches.
-- Homepage modules are derived from `modules.filter((module) => module.installed && module.enabled)` at `src/App.tsx:528`. The home dashboard renders installed/enabled modules with home widgets at `src/App.tsx:715`, filtering by `module.homeWidget` and `module.options.homeWidget?.enabled !== false`.
-- `renderModule()` starts at `src/App.tsx:875`, resolves `panel module-${module.size}`, and branches by built-in module id. The module cards already respond to module size classes.
+- The app is a React 19 + TypeScript + Vite frontend with Cloudflare Pages Functions and D1. There is no client-side router; navigation is managed in `src/features/app-shell/useAppController.ts` via `activeTab` state.
+- **Frontend follows a "smart hook + dumb components" pattern.** All state and logic live in `useAppController.ts` (679 lines). `src/App.tsx` (171 lines) is a thin render dispatcher.
+- `useAppController.ts` owns all relevant state:
+  - `session` (line 71), `activeTab` (72), `adminOpen` (73), `unlockOpen` (74).
+  - `displayModules` (line 84) — installed/enabled modules for homepage.
+  - `adminModules` (line 85) — full module list for Admin panel.
+  - admin unlock expiry effect (lines 121-129) — resets `session.adminUnlocked`, closes admin, clears state, toasts on expiry.
+  - near-expiry warning effect (lines 131-145) — toasts when within 120s of expiry.
+- Key functions in `useAppController.ts`:
+  - `openAdmin()` (line 267) — opens unlock modal or admin panel.
+  - `unlockAdmin()` (line 277) — POSTs `/api/admin/unlock`, updates session.
+  - `patchModule()` (line 481) — sends `PATCH /api/modules`, refreshes data.
+  - `batchPatchModules()` (line 489) — sends reorder patches.
+  - `logout()` (line 252) — clears session and all state.
+  - `navigate()` (line 524) — handles tab/admin/module navigation.
+- The top bar is `src/features/app-shell/TopNavigation.tsx` (47 lines). It renders an `Admin settings` button (line 42). The outer shell is `src/features/app-shell/AppShellLayout.tsx` (94 lines).
+- The Admin unlock modal is `src/features/app-shell/AdminUnlockModal.tsx` (28 lines).
+- `src/App.tsx` (line 76-98) renders `<AdminPanel>` when `adminOpen && !viewedPage`.
+- `src/features/admin/AdminPanel.tsx` (138 lines) composes 7 section components. `src/features/admin/sections/ModulesSection.tsx` handles module install, enable, homepage-widget, size, display option, drag, keyboard reorder, and up/down controls.
+- `src/features/home/HomeDashboard.tsx` (71 lines) renders the homepage grid. It receives `dashboardModules` and dispatches to widget components via `renderWidget()` (lines 47-70). Widgets live in `src/features/home/widgets/`.
+- Homepage modules are derived in `useAppController.ts` from `displayModules` (installed/enabled modules with `homeWidget` enabled).
 - The backend module registry is hardcoded in `src/api/modules.ts`. Adding a brand-new module still requires a code change there, but this admin-mode feature does not need new module definitions.
 - `module_settings` already stores `installed`, `enabled`, `position`, `size`, and `options_json`. The base table is in `migrations/0001_initial.sql`; the extended module fields are added in `migrations/0002_modular_hub.sql`.
 - `PATCH /api/modules` is implemented in `src/api/router.ts:123`. It requires `requireAdminUnlock()`, persists through `updateModules()`, optionally deletes data on uninstall, and writes activity entries.
@@ -57,8 +68,8 @@ The first implementation should cover homepage module visibility, widget visibil
 
 ## UX Details
 
-- Add an `editMode` state in `src/App.tsx`, scoped to the current browser session. Do not persist edit mode in D1 or localStorage.
-- Add a compact top-bar control that only appears when `session.adminUnlocked` is true. Suggested copy:
+- Add an `editMode` state in `useAppController.ts`, scoped to the current browser session. Do not persist edit mode in D1 or localStorage.
+- Add a compact top-bar control in `TopNavigation.tsx` that only appears when `session.adminUnlocked` is true. Suggested copy:
   - Off state: `Edit home`
   - On state: `Done`
 - Keep the existing `Admin settings` button. It should still open the full Admin settings panel for users, private settings, cache, activity, deployment, pages, and advanced module management.
@@ -106,12 +117,21 @@ The first implementation should cover homepage module visibility, widget visibil
 
 ## Files Likely to Change
 
+- `src/features/app-shell/useAppController.ts`
+  - Add `editMode` state and `setEditMode` toggle.
+  - Turn edit mode off when admin unlock expires (in expiry effect at line 121) or the user logs out (`logout()` at line 252).
+  - Return `editMode` and `setEditMode` from the hook's return shape.
+- `src/features/app-shell/TopNavigation.tsx`
+  - Add an `Edit home` / `Done` toggle button that only appears when `session.adminUnlocked` is true and `activeTab === 'home'`.
 - `src/App.tsx`
-  - Add edit-mode state and top-bar toggle.
-  - Turn edit mode off when admin unlock expires or the user logs out.
-  - Pass edit-mode props and module patch/reorder handlers into homepage rendering.
-  - Extract reusable module edit controls from the existing AdminPanel module registry where practical.
-  - Add the hidden-home-widgets strip.
+  - Pass `editMode` and edit-related props through to `<HomeDashboard>`.
+- `src/features/home/HomeDashboard.tsx`
+  - Accept edit-mode props and render inline controls on each module widget when edit mode is active.
+  - Add the hidden-home-widgets recovery strip below the dashboard grid.
+- `src/features/home/` (new component)
+  - Extract a reusable `ModuleEditControls` component for the inline controls (up/down, size, widget toggle, display options). Place it alongside the widget components in `src/features/home/`.
+- `src/features/admin/sections/ModulesSection.tsx`
+  - Extract shared reorder/option logic into a helper that both `ModulesSection` and the new `ModuleEditControls` can import, avoiding duplication.
 - `src/styles.css`
   - Style the edit-mode toolbar, inline module controls, module edit state, hidden widget strip, and responsive stacking.
   - Reuse existing module/admin control classes where possible.
@@ -126,32 +146,30 @@ The first implementation should cover homepage module visibility, widget visibil
 
 ## Implementation Plan
 
-1. Add frontend edit-mode state in `src/App.tsx`.
-   - Add `const [homeEditMode, setHomeEditMode] = useState(false)`.
-   - In the existing admin expiry effect at `src/App.tsx:136`, also set `homeEditMode` to false when unlock expires.
-   - In `logout()`, also set `homeEditMode` to false.
+1. Add frontend edit-mode state in `useAppController.ts`.
+   - Add `const [editMode, setEditMode] = useState(false)` alongside the existing state (around line 73).
+   - In the existing admin expiry effect at line 121-129, also set `editMode` to false when unlock expires.
+   - In `logout()` at line 252-260, also set `editMode` to false.
    - If `session.adminUnlocked` becomes false for any reason, ensure edit mode is off.
+   - Return `editMode` and a `setEditMode` toggle from the hook's return shape.
 
-2. Add edit-mode entry points.
-   - In the top actions area around `src/App.tsx:637`, show an `Edit home` button only when `session.adminUnlocked` is true and `activeTab === 'home'` and `!adminOpen` and `!viewedPage`.
+2. Add edit-mode entry point in `TopNavigation.tsx`.
+   - Show an `Edit home` button only when `session.adminUnlocked` is true and `activeTab === 'home'` and `!adminOpen` and `!viewedPage`.
    - When active, the same control should read `Done`.
    - Keep the existing `Admin settings` button and `openAdmin()` behavior unchanged.
+   - Pass `editMode` and `setEditMode` through `App.tsx` → `<AppShellLayout>` → `<TopNavigation>`.
 
-3. Create a reusable module edit controls component or helper inside `src/App.tsx`.
-   - Prefer extracting a local component near `AdminPanel` rather than creating a new file, because `App.tsx` currently owns these patterns.
-   - Inputs should include `module`, visible editable modules, index, `onPatchModule`, `onBatchPatchModules`, and any option-specific patch helpers.
-   - Reuse logic from `AdminPanel` for:
-     - Toggle `options.homeWidget.enabled`.
-     - Change `size`.
-     - Change `homeWidget.mode`.
-     - Weather icon style and extended forecast.
-     - Up/down reorder with `(index + 1) * 10` position values.
+3. Create a reusable `ModuleEditControls` component in `src/features/home/`.
+   - This component renders the inline edit toolbar for a single module widget.
+   - Inputs: `module`, visible editable modules list, index, `onPatchModule`, `onBatchPatchModules`, and option-specific callbacks.
+   - Extract shared reorder/option logic from `src/features/admin/sections/ModulesSection.tsx` into a shared helper to avoid duplicating the up/down, size select, widget toggle, and mode select logic.
+   - Controls: up arrow, down arrow, size select (Small/Medium/Wide/Full), widget visibility toggle, and existing display options (weather icon style, extended forecast, homepage modes for lists/notes/pages/network).
    - Keep uninstall and delete-data out of inline homepage edit mode for the first version; those stay in full Admin settings.
 
-4. Pass edit controls into homepage module rendering.
-   - Update the home dashboard mapping around `src/App.tsx:717`.
-   - Either wrap each `renderModule(...)` result in an edit shell or extend `renderModule()` to accept an optional `editControls` node.
-   - Prefer a wrapper if it avoids touching every module branch. The wrapper should preserve the module card's `module-${size}` grid class, so size changes still work.
+4. Wire edit controls into `HomeDashboard.tsx`.
+   - Accept `editMode` and edit-related callbacks as props.
+   - When `editMode` is true, wrap each module widget in an edit shell that renders `<ModuleEditControls>` alongside the widget.
+   - Preserve the module card's `module-${size}` grid class so size changes still work.
    - Ensure keys stay stable by `module.id`.
 
 5. Implement reorder for homepage-visible modules.
@@ -160,9 +178,9 @@ The first implementation should cover homepage module visibility, widget visibil
    - Disable up/down buttons at the first and last visible positions.
    - After a reorder, rely on `PATCH /api/modules`, `refreshAdmin()`, and `refreshAll()` or replace local `modules` with returned API data if refactoring the handler.
 
-6. Add "Hidden home widgets" recovery UI.
+6. Add "Hidden home widgets" recovery UI in `HomeDashboard.tsx`.
    - Derive hidden widgets from `modules.filter((module) => module.installed && module.enabled && module.homeWidget && module.options.homeWidget?.enabled === false)`.
-   - Render only while `homeEditMode` is active.
+   - Render only while `editMode` is active.
    - Each row should call `onPatchModule(module, { options: { ...module.options, homeWidget: { enabled: true, mode: validOrDefaultMode } } })`.
 
 7. Keep backend unchanged unless tests expose a gap.

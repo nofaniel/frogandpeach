@@ -18,6 +18,8 @@ export function AppShellLayout({
   navigationEntries,
   activeTab,
   adminOpen,
+  editMode,
+  setEditMode,
   onNavigate,
   error,
   unlockOpen,
@@ -41,6 +43,8 @@ export function AppShellLayout({
   navigationEntries: NavigationEntry[]
   activeTab: Tab
   adminOpen: boolean
+  editMode: boolean
+  setEditMode: Dispatch<SetStateAction<boolean>>
   onNavigate: (entry: NavigationEntry) => void
   error: string
   unlockOpen: boolean
@@ -61,6 +65,10 @@ export function AppShellLayout({
         adminUnlockLabel={adminUnlockLabel}
         adminUnlockRemainingMs={adminUnlockRemainingMs}
         busy={busy}
+        activeTab={activeTab}
+        adminOpen={adminOpen}
+        editMode={editMode}
+        setEditMode={setEditMode}
         onRefresh={onRefresh}
         onOpenAdmin={onOpenAdmin}
         onLogout={onLogout}

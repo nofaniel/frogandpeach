@@ -43,7 +43,7 @@ function App() {
     )
   }
 
-  const { activeTab, adminOpen, viewedPage, dashboardModules, publicSettings, error, busy, adminUnlockLabel, adminUnlockRemainingMs, displayName, now } = shell
+  const { activeTab, adminOpen, editMode, setEditMode, viewedPage, dashboardModules, publicSettings, error, busy, adminUnlockLabel, adminUnlockRemainingMs, displayName, now } = shell
   const { home } = homeGroup
 
   return (
@@ -60,6 +60,8 @@ function App() {
       navigationEntries={navigation.navigationEntries}
       activeTab={activeTab}
       adminOpen={adminOpen}
+      editMode={editMode}
+      setEditMode={setEditMode}
       onNavigate={navigation.navigate}
       error={error}
       unlockOpen={adminUnlock.unlockOpen}
@@ -102,12 +104,17 @@ function App() {
         <HomeDashboard
           home={home}
           dashboardModules={dashboardModules}
+          allModules={admin.adminModules}
           locationConfigured={homeGroup.locationConfigured}
           publicSettings={publicSettings}
           busy={busy}
           error={error}
+          editMode={editMode}
+          session={auth.session}
           onSetActiveTab={shell.setActiveTab}
           onOpenAdmin={() => void navigation.openAdmin()}
+          onPatchModule={admin.patchModule}
+          onBatchPatchModules={admin.batchPatchModules}
         />
       )}
 

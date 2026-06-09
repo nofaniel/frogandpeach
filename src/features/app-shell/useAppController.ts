@@ -72,6 +72,7 @@ export function useAppController() {
   const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network'>('home')
   const [adminOpen, setAdminOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)
+  const [editMode, setEditMode] = useState(false)
   const [home, setHome] = useState<HomeData | null>(null)
   const [network, setNetwork] = useState<NetworkOverview | null>(null)
   const [lists, setLists] = useState<SharedList[]>([])
@@ -124,6 +125,7 @@ export function useAppController() {
     if (!Number.isFinite(expiresAt) || expiresAt > now) return
     setSession((current) => (current ? { ...current, adminUnlocked: false, adminUnlockedUntil: null } : current))
     setAdminOpen(false)
+    setEditMode(false)
     clearAdminState(setAdminSettingsDraft, setAdminModules, setUsers, setCacheEntries, setActivityEntries, setCustomPages, setPageManifestWarnings, setNetwork)
     addToast('Admin session expired', 'warn')
   }, [now, session?.adminUnlocked, session?.adminUnlockedUntil])
@@ -254,6 +256,7 @@ export function useAppController() {
     setSession(loggedOutSession)
     setHome(null)
     setAdminOpen(false)
+    setEditMode(false)
     clearAdminState(setAdminSettingsDraft, setAdminModules, setUsers, setCacheEntries, setActivityEntries, setCustomPages, setPageManifestWarnings, setNetwork)
     setLoginDraft((draft) => ({ ...draft, password: '' }))
     setPasswordSetupDraft({ password: '', confirmPassword: '' })
@@ -583,6 +586,8 @@ export function useAppController() {
       setActiveTab,
       adminOpen,
       setAdminOpen,
+      editMode,
+      setEditMode,
       viewedPage,
       publicSettings,
       displayModules,

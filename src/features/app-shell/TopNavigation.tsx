@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from 'react'
 import { formatFullDateTime, greetingForNow } from '../../shared/format'
 
 export function TopNavigation({
@@ -7,6 +8,10 @@ export function TopNavigation({
   adminUnlockLabel,
   adminUnlockRemainingMs,
   busy,
+  activeTab,
+  adminOpen,
+  editMode,
+  setEditMode,
   onRefresh,
   onOpenAdmin,
   onLogout,
@@ -17,10 +22,15 @@ export function TopNavigation({
   adminUnlockLabel: string | null
   adminUnlockRemainingMs: number
   busy: boolean
+  activeTab: string
+  adminOpen: boolean
+  editMode: boolean
+  setEditMode: Dispatch<SetStateAction<boolean>>
   onRefresh: () => void
   onOpenAdmin: () => void
   onLogout: () => void
 }) {
+  const showEditHome = adminUnlockLabel && activeTab === 'home' && !adminOpen
   return (
     <header className="top-strip">
       <div>
@@ -37,6 +47,15 @@ export function TopNavigation({
           <span className={adminUnlockRemainingMs <= 120000 ? 'unlock-status warning' : 'unlock-status'}>
             {adminUnlockLabel}
           </span>
+        )}
+        {showEditHome && (
+          <button
+            type="button"
+            className={editMode ? 'ghost edit-mode-active' : 'ghost'}
+            onClick={() => setEditMode((prev) => !prev)}
+          >
+            {editMode ? 'Done' : 'Edit home'}
+          </button>
         )}
         <button type="button" onClick={onRefresh} disabled={busy}>Refresh</button>
         <button type="button" className="icon-cog" aria-label="Admin settings" title="Admin settings" onClick={onOpenAdmin}>Admin</button>

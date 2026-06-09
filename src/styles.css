@@ -1252,6 +1252,26 @@ button.danger:not(.ghost) {
     min-height: 40px;
   }
 
+  .module-edit-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-options,
+  .edit-display-options {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-options .compact-field,
+  .edit-display-options .compact-field {
+    width: 100%;
+  }
+
+  .hidden-widgets-list {
+    flex-direction: column;
+  }
+
   .manifest-detail-grid,
   .manifest-fields div,
   .activity-row {
@@ -1675,6 +1695,101 @@ body {
 
 .home-dashboard + * {
   margin-top: 0;
+}
+
+/* Edit mode toolbar */
+.edit-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px dashed var(--color-accent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+.edit-mode-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: 0.02em;
+}
+
+.edit-mode-active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Widget wrapper in edit mode */
+.edit-widget-wrapper {
+  position: relative;
+}
+
+.edit-widget-wrapper .panel {
+  border: 2px solid transparent;
+  transition: border-color 180ms ease;
+}
+
+.edit-widget-wrapper:hover .panel {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* Inline edit controls */
+.module-edit-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-surface) 85%, var(--color-bg));
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+.edit-reorder {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.edit-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.edit-options .compact-field {
+  min-width: 0;
+}
+
+.edit-display-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Hidden widgets strip */
+.hidden-widgets-strip {
+  padding: 12px 14px;
+  border: 1px dashed var(--color-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-2) 50%, transparent);
+}
+
+.hidden-widgets-strip .kicker {
+  margin-bottom: 8px;
+}
+
+.hidden-widgets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hidden-widgets-list button {
+  white-space: nowrap;
 }
 
 .tide-panel {
