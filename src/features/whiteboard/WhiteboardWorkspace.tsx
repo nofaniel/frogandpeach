@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { WhiteboardStroke, WhiteboardStrokeInput } from '../../shared/api-types'
 import { WhiteboardCanvas } from './WhiteboardCanvas'
 import { WhiteboardToolbar } from './WhiteboardToolbar'
+import { BrushSizeSlider } from './BrushSizeSlider'
 import { useCanvasDrawing } from './useCanvasDrawing'
 
 type DrawingTool = 'pen' | 'eraser'
@@ -31,7 +32,7 @@ export function WhiteboardWorkspace({
   const savedPrefs = useMemo(readWhiteboardPrefs, [])
   const [tool, setTool] = useState<DrawingTool>(savedPrefs.tool ?? 'pen')
   const [color] = useState(savedPrefs.color ?? '#111111')
-  const [width] = useState(savedPrefs.width ?? 4)
+  const [width, setWidth] = useState(savedPrefs.width ?? 4)
   const [opacity] = useState(savedPrefs.opacity ?? 1)
   const [toolbarVisible, setToolbarVisible] = useState(true)
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -127,6 +128,12 @@ export function WhiteboardWorkspace({
         onRedo={() => void redo()}
         canUndo={canUndo}
         canRedo={canRedo}
+        visible={toolbarVisible}
+      />
+
+      <BrushSizeSlider
+        width={width}
+        onChange={setWidth}
         visible={toolbarVisible}
       />
     </section>
