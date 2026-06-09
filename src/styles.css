@@ -3168,6 +3168,7 @@ body {
 }
 
 .wb-ftool-btn {
+  position: relative;
   display: grid;
   place-items: center;
   width: 36px;
@@ -3389,6 +3390,80 @@ body {
   text-align: center;
 }
 
+/* Pen colour dot */
+
+.wb-pen-icon {
+  position: relative;
+}
+
+.wb-pen-color-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  box-shadow: 0 0 0 1px rgba(28, 40, 37, 0.15);
+}
+
+/* Colour picker popover */
+
+.wb-color-popover {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 110;
+  padding: 10px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(28, 40, 37, 0.08);
+  box-shadow:
+    0 8px 32px rgba(33, 52, 39, 0.12),
+    0 2px 8px rgba(33, 52, 39, 0.06);
+  animation: wb-pop-in 0.15s ease;
+}
+
+@keyframes wb-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+.wb-color-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.wb-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+
+.wb-color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.wb-color-swatch.active {
+  border-color: var(--app-ink, #1a2e28);
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3.5px var(--app-ink, #1a2e28);
+}
+
 /* Mobile brush slider */
 
 @media (pointer: coarse), (max-width: 768px) {
@@ -3429,5 +3504,15 @@ body {
   .wb-brush-slider input[type="range"]::-moz-range-thumb {
     width: 22px;
     height: 22px;
+  }
+
+  .wb-color-popover {
+    bottom: calc(100% + 12px);
+    padding: 12px;
+  }
+
+  .wb-color-swatch {
+    width: 34px;
+    height: 34px;
   }
 }

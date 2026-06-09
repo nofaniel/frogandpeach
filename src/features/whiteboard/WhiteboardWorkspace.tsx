@@ -31,7 +31,8 @@ export function WhiteboardWorkspace({
 }) {
   const savedPrefs = useMemo(readWhiteboardPrefs, [])
   const [tool, setTool] = useState<DrawingTool>(savedPrefs.tool ?? 'pen')
-  const [color] = useState(savedPrefs.color ?? '#111111')
+  const [color, setColor] = useState(savedPrefs.color ?? '#111111')
+  const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [width, setWidth] = useState(savedPrefs.width ?? 4)
   const [opacity] = useState(savedPrefs.opacity ?? 1)
   const [toolbarVisible, setToolbarVisible] = useState(true)
@@ -76,7 +77,8 @@ export function WhiteboardWorkspace({
 
   const handleCanvasInteraction = useCallback(() => {
     resetHideTimer()
-  }, [resetHideTimer])
+    if (colorPickerOpen) setColorPickerOpen(false)
+  }, [resetHideTimer, colorPickerOpen])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -124,6 +126,10 @@ export function WhiteboardWorkspace({
       <WhiteboardToolbar
         tool={tool}
         setTool={setTool}
+        color={color}
+        onColorChange={setColor}
+        colorPickerOpen={colorPickerOpen}
+        onToggleColorPicker={() => setColorPickerOpen((v) => !v)}
         onUndo={() => void undo()}
         onRedo={() => void redo()}
         canUndo={canUndo}

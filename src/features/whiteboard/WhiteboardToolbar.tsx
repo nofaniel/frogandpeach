@@ -1,8 +1,14 @@
+import { PRESET_COLORS, ColorPickerPopover } from './ColorPicker'
+
 type DrawingTool = 'pen' | 'eraser'
 
 export function WhiteboardToolbar({
   tool,
   setTool,
+  color,
+  onColorChange,
+  colorPickerOpen,
+  onToggleColorPicker,
   onUndo,
   onRedo,
   canUndo,
@@ -11,6 +17,10 @@ export function WhiteboardToolbar({
 }: {
   tool: DrawingTool
   setTool: (tool: DrawingTool) => void
+  color: string
+  onColorChange: (hex: string) => void
+  colorPickerOpen: boolean
+  onToggleColorPicker: () => void
   onUndo: () => void
   onRedo: () => void
   canUndo: boolean
@@ -22,15 +32,39 @@ export function WhiteboardToolbar({
       <button
         type="button"
         className={`wb-ftool-btn${tool === 'pen' ? ' active' : ''}`}
-        onClick={() => setTool('pen')}
+        onClick={() => {
+          if (tool === 'pen') {
+            onToggleColorPicker()
+          } else {
+            setTool('pen')
+            // close picker when switching from eraser to pen
+            if (colorPickerOpen) onToggleColorPicker()
+          }
+        }}
         title="Draw"
       >
-        ✎
+        <span className="wb-pen-icon">✎</span>
+        <span
+          className="wb-pen-color-dot"
+          style={{ backgroundColor: color }}
+          aria-hidden="true"
+        />
       </button>
+
+      <ColorPickerPopover
+        color={color}
+        onChange={onColorChange}
+        visible={colorPickerOpen}
+        onClose={onToggleColorPicker}
+      />
+
       <button
         type="button"
         className={`wb-ftool-btn${tool === 'eraser' ? ' active' : ''}`}
-        onClick={() => setTool('eraser')}
+        onClick={() => {
+          setTool('eraser')
+          if (colorPickerOpen) onToggleColorPicker()
+        }}
         title="Erase"
       >
         ✖
