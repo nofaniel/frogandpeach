@@ -1,19 +1,17 @@
 import { useEffect, type RefObject } from 'react'
 import type { WhiteboardSurface } from './rendering'
 
-type Tool = 'pen' | 'eraser' | 'pan'
+type DrawingTool = 'pen' | 'eraser'
 
 export function WhiteboardCanvas({
   canvasRef,
   tool,
-  isPanning,
   surface,
   handleResize,
   empty,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
-  tool: Tool
-  isPanning: boolean
+  tool: DrawingTool
   surface: WhiteboardSurface
   handleResize: () => void
   empty: boolean
@@ -37,9 +35,7 @@ export function WhiteboardCanvas({
     }
   }, [canvasRef, handleResize])
 
-  const cursor = tool === 'pan'
-    ? (isPanning ? 'grabbing' : 'grab')
-    : (tool === 'eraser' ? 'cell' : 'crosshair')
+  const cursor = tool === 'eraser' ? 'cell' : 'crosshair'
 
   return (
     <div className="wb-canvas-viewport">

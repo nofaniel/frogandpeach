@@ -3142,25 +3142,25 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 12px;
+  padding: 6px 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  border: 1px solid rgba(28, 40, 37, 0.1);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border: 1px solid rgba(28, 40, 37, 0.08);
   box-shadow:
-    0 8px 32px rgba(33, 52, 39, 0.14),
-    0 2px 8px rgba(33, 52, 39, 0.06);
+    0 4px 24px rgba(33, 52, 39, 0.1),
+    0 1px 4px rgba(33, 52, 39, 0.04);
   transition: opacity 0.3s ease, transform 0.3s ease;
-  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
-  padding-left: max(12px, env(safe-area-inset-left, 0px));
-  padding-right: max(12px, env(safe-area-inset-right, 0px));
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(8px, env(safe-area-inset-left, 0px));
+  padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
 
 .wb-floating-toolbar.auto-hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-50%) translateY(12px);
+  transform: translateX(-50%) translateY(8px);
 }
 
 .wb-floating-toolbar.visible {
@@ -3171,13 +3171,13 @@ body {
 .wb-ftool-btn {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border: none;
   border-radius: 999px;
   background: transparent;
   color: var(--app-ink, #1a2e28);
-  font-size: 1.1rem;
+  font-size: 1rem;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
@@ -3194,169 +3194,16 @@ body {
 }
 
 .wb-ftool-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
 }
 
 .wb-ftool-divider {
   width: 1px;
-  height: 24px;
-  background: rgba(28, 40, 37, 0.12);
-  flex-shrink: 0;
-  margin: 0 4px;
-}
-
-.wb-ftool-color {
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
-  border: 2px solid transparent;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.wb-ftool-color:hover {
-  transform: scale(1.15);
-}
-
-.wb-ftool-color.active {
-  border-color: rgba(17, 24, 39, 0.65);
-  transform: scale(1.15);
-}
-
-.wb-ftool-zoom-label {
-  display: grid;
-  place-items: center;
-  min-width: 52px;
-  height: 32px;
-  padding: 0 6px;
-  border: none;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--app-ink, #1a2e28);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  flex-shrink: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.wb-ftool-zoom-label:hover {
-  background: rgba(28, 40, 37, 0.08);
-}
-
-/* Popover for secondary controls */
-
-.wb-ftool-more-anchor {
-  position: relative;
-}
-
-.wb-ftool-popover {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: 50%;
-  transform: translateX(-50%);
-  width: 260px;
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(20px) saturate(1.6);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  border: 1px solid rgba(28, 40, 37, 0.1);
-  box-shadow: 0 16px 48px rgba(33, 52, 39, 0.18);
-  display: grid;
-  gap: 14px;
-  z-index: 110;
-}
-
-.wb-ftool-popover-section {
-  display: grid;
-  gap: 8px;
-}
-
-.wb-ftool-popover-label {
-  display: grid;
-  gap: 6px;
-  font-size: 0.78rem;
-  color: var(--text-muted, #627177);
-}
-
-.wb-ftool-popover-label input[type="range"] {
-  width: 100%;
-}
-
-.wb-ftool-popover-label strong {
-  font-size: 0.78rem;
-  color: var(--app-ink);
-}
-
-.wb-ftool-popover-heading {
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--text-muted, #627177);
-}
-
-.wb-ftool-popover-chips {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.wb-ftool-popover-chip {
-  padding: 6px 12px;
-  border: 1px solid rgba(33, 52, 39, 0.14);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--app-ink);
-  font-size: 0.82rem;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.wb-ftool-popover-chip:hover {
-  background: rgba(28, 40, 37, 0.06);
-}
-
-.wb-ftool-popover-chip.active {
-  border-color: rgba(25, 92, 66, 0.35);
-  background: rgba(220, 248, 233, 0.94);
-}
-
-.wb-ftool-popover-divider {
-  height: 1px;
+  height: 20px;
   background: rgba(28, 40, 37, 0.1);
-}
-
-.wb-ftool-popover-action {
-  display: block;
-  width: 100%;
-  padding: 10px 14px;
-  border: 1px solid rgba(33, 52, 39, 0.14);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--app-ink);
-  font-size: 0.86rem;
-  text-align: center;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.wb-ftool-popover-action:hover {
-  background: rgba(28, 40, 37, 0.06);
-}
-
-.wb-ftool-popover-action.danger {
-  border-color: rgba(185, 28, 28, 0.2);
-  background: rgba(254, 242, 242, 0.9);
-  color: #991b1b;
-}
-
-.wb-ftool-popover-action.danger:hover {
-  background: rgba(254, 242, 242, 1);
+  flex-shrink: 0;
+  margin: 0 2px;
 }
 
 /* Home dashboard widget styles (unchanged) */
@@ -3441,44 +3288,20 @@ body {
   .wb-ftool-btn {
     width: 44px;
     height: 44px;
-    font-size: 1.2rem;
-  }
-
-  .wb-ftool-color {
-    width: 26px;
-    height: 26px;
-  }
-
-  .wb-ftool-zoom-label {
-    height: 36px;
-    min-width: 56px;
-    font-size: 0.82rem;
+    font-size: 1.15rem;
   }
 
   .wb-floating-toolbar {
-    bottom: max(20px, env(safe-area-inset-bottom, 20px));
-    gap: 5px;
-    padding: 10px 14px;
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    gap: 4px;
+    padding: 8px 10px;
   }
 }
 
 @media (max-width: 640px) {
   .wb-floating-toolbar {
-    width: calc(100vw - 32px);
+    width: auto;
+    max-width: calc(100vw - 32px);
     justify-content: center;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-
-  .wb-floating-toolbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .wb-ftool-popover {
-    width: calc(100vw - 64px);
-    left: 50%;
-    transform: translateX(-50%);
   }
 }
