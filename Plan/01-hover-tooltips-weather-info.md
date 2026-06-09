@@ -1,5 +1,7 @@
 # Weather Tooltips and Hourly Timeline
 
+> **Status: Implemented** (2026-06-09)
+
 ## Original Note
 
 When looking at weather, I want to be able to hover over an icon and have a tooltip saying what it means.
@@ -21,22 +23,26 @@ The result should work on desktop hover, keyboard focus, and mobile/touch where 
 
 ## Current State
 
-The Weather module is already implemented as a home dashboard widget in `src/App.tsx`.
+The Weather module is a self-contained React component at `src/features/home/widgets/WeatherWidget.tsx` (172 lines), rendered by `src/features/home/HomeDashboard.tsx`. It was refactored out of the monolithic `src/App.tsx` in commit `2801bf3`.
 
 Important existing files:
 
-- `src/App.tsx`: renders the Weather widget inside `renderModule`.
-- `src/styles.css`: contains all Weather widget styles under `.weather-panel`.
+- `src/features/home/widgets/WeatherWidget.tsx`: the Weather widget component. Contains local helpers `WeatherMetricSymbol`, `WeatherMetricIcon`, and the `WeatherMetricName` type.
+- `src/features/home/HomeDashboard.tsx`: imports and renders `WeatherWidget` inside `renderWidget()`.
+- `src/styles.css`: contains all Weather widget styles under `.weather-panel` (lines 1437-1694).
 - `src/shared/api-types.ts`: defines `WeatherSummary`, but currently does not include the `hourly` field.
-- `src/api/data.ts`: `getWeather()` already requests Open-Meteo hourly data and returns an `hourly` array from the cache payload.
-- `src/api/modules.ts`: defines weather home widget modes and weather module options.
-- `src/api/data.test.ts`: has weather API mapping tests.
-- `src/shared/format.test.ts`: tests the weather condition icon mapping.
-- `e2e/home.spec.ts`: covers home widget behavior.
+- `src/api/data.ts`: `getWeather()` already requests Open-Meteo hourly data and returns an `hourly` array from the cache payload (lines 511-567).
+- `src/api/modules.ts`: defines weather home widget modes (`current`, `forecast`) and weather module options (`iconStyle`, `showExtendedForecast`).
+- `src/shared/format.ts`: exports `formatTemperature`, `formatNumber`, `weatherIcon`, `formatDate`.
+- `src/shared/weather.ts`: exports `formatCurrentPrecipitationMm`.
+- `src/api/data.test.ts`: has weather API mapping tests, but hourly assertions are missing.
+- `src/shared/format.test.ts`: tests the `weatherIcon` function.
+- `e2e/home.spec.ts`: covers home widget behavior but has no weather-specific tests.
 
-Current Weather UI:
+Current Weather UI (in `WeatherWidget.tsx`):
 
-- Shows location, large current condition icon, temperature, condition label, metric row, and optional 5-day forecast.
+- Three render states: location not configured, weather unavailable, weather data present.
+- The main weather render shows: `.weather-orb`, location name, `.weather-current` (icon + temperature + condition label), `.metric-row` (5 metrics), and optional 5-day forecast.
 - Metric row includes:
   - today's high/low temperature
   - wind speed
@@ -44,15 +50,17 @@ Current Weather UI:
   - current precipitation amount
   - feels-like temperature
 - Icons can be emoji or custom inline SVG based on the module option `iconStyle`.
-- The 5-day forecast rain bar uses `--precip` height, but the UI does not explain that the bar represents rain chance.
+- The 5-day forecast rain bar uses `--precip` height, but the UI does not explain that the bar represents rain chance. The `.weather-precip-track` element has `aria-hidden="true"`.
+- The `showForecast` flag depends on `widget.mode === 'forecast' || module.options.showExtendedForecast === true`.
+- **No tooltip code exists anywhere in the codebase.**
+- **No hourly forecast rendering exists.**
 
 Current backend/data situation:
 
-- `src/api/data.ts` already fetches hourly:
-  - `precipitation_probability`
-  - `temperature_2m`
-  - `weather_code`
-- `getWeather()` returns up to 8 hourly entries after filtering near the current time.
+- `src/api/data.ts` already fetches hourly: `precipitation_probability`, `temperature_2m`, `weather_code`.
+- `getWeather()` returns up to 8 hourly entries after filtering entries before `now - 1 hour`.
+- Each hourly entry has: `time`, `temperature`, `precipitationChance`, `label`.
+- The backend also returns `current.code`, `daily[].code`, `daily[].sunrise`, `daily[].sunset`, but these are not on the shared type.
 - The TypeScript type in `src/shared/api-types.ts` is stale and needs to include `hourly`.
 - No D1 migration should be needed for this work.
 
@@ -135,7 +143,7 @@ The tooltip should disappear when:
 
 Recommended implementation:
 
-- Create a small reusable component in `src/App.tsx`, near other app-local helper components:
+- Create a small reusable component in `src/features/home/widgets/WeatherWidget.tsx`, near the existing local helpers (`WeatherMetricSymbol`, `WeatherMetricIcon`):
   - `InfoTooltip`
   - Props: `label`, `children`, optional `className`
 - Render the trigger as a `span` or `button` depending on whether click/tap toggling is implemented.
@@ -235,11 +243,11 @@ Edit `src/shared/api-types.ts`:
 
 ### 2. Add Tooltip Helpers
 
-Edit `src/App.tsx`:
+Edit `src/features/home/widgets/WeatherWidget.tsx`:
 
-- Add a reusable tooltip helper component near `WeatherMetricSymbol` or other local helpers.
+- Add a reusable tooltip helper component near the existing local helpers (`WeatherMetricSymbol` at line 17, `WeatherMetricIcon` at line 24).
 - Add a small ID helper using React `useId()` if needed.
-- Make sure any new React imports are added at the top.
+- The file already imports `CSSProperties` from `react` (line 1); add `ReactNode` and `useId` to that import if needed.
 
 Suggested component shape:
 
@@ -249,14 +257,14 @@ function InfoTooltip({ label, children, className }: { label: string; children: 
 }
 ```
 
-Keep it simple. This app is monolithic and does not currently have a component library.
+Keep it simple. The widget file is self-contained at 172 lines and does not use a component library.
 
 ### 3. Add Weather Metric Metadata
 
-Edit `src/App.tsx`:
+Edit `src/features/home/widgets/WeatherWidget.tsx`:
 
-- Extend `WeatherMetricName` only if new metric types are needed.
-- Add a metadata map for metric labels/tooltips:
+- The `WeatherMetricName` type (line 8) has 4 values: `temperature`, `wind`, `precipitationChance`, `precipitation`. No new metric types are needed.
+- Add a metadata map for metric labels/tooltips alongside the existing `weatherMetricEmoji` map (line 10):
 
 ```ts
 const weatherMetricTooltip: Record<WeatherMetricName, string> = {
@@ -268,20 +276,20 @@ const weatherMetricTooltip: Record<WeatherMetricName, string> = {
 ```
 
 - Wrap metric icons or whole metric spans with `InfoTooltip`.
-- Add a tooltip for feels-like, even though it has text, because the metric may be unclear.
+- Add a tooltip for feels-like (line 134), even though it has text, because the metric may be unclear.
 
 ### 4. Render Hourly Timeline
 
-Edit the Weather branch inside `renderModule()` in `src/App.tsx`:
+Edit the Weather data-present branch inside the `WeatherWidget` component return (lines 99-171 of `src/features/home/widgets/WeatherWidget.tsx`):
 
 - Derive `const hourlyForecast = home.weather.hourly ?? []`.
-- Add a section after `.metric-row` and before `{showForecast && (...)}`.
+- Add a section after `.metric-row` (line 135) and before `{showForecast && (...)}` (line 136).
 - Hide the section when there are no hourly entries.
-- Use existing format helpers where possible:
-  - `formatTemperature`
-  - `formatNumber`
-  - `weatherIcon`
-- Add a local helper if needed:
+- Use existing format helpers already imported by the file:
+  - `formatTemperature` (from `../../../shared/format`)
+  - `formatNumber` (from `../../../shared/format`)
+  - `weatherIcon` (from `../../../shared/format`)
+- Add local helpers if needed:
   - `formatWeatherHour(time: string, index: number): string`
   - `formatHourlyTooltip(hour): string`
 
@@ -311,9 +319,10 @@ If wrapping `article` in `InfoTooltip` makes invalid or awkward markup, put the 
 
 ### 5. Clarify 5-Day Rain Bar
 
-Edit the forecast day card rendering in `src/App.tsx`:
+Edit the forecast day card rendering in `src/features/home/widgets/WeatherWidget.tsx` (lines 143-166):
 
-- Add a tooltip to `.weather-precip-track` or the visible precip percentage.
+- Add a tooltip to `.weather-precip-track` (line 155) or the visible precip percentage (line 159).
+- The `.weather-precip-track` currently has `aria-hidden="true"` (line 155). If the tooltip trigger is placed here, remove `aria-hidden` and add an accessible label. If the tooltip trigger is on the text percentage instead, the `aria-hidden` on the bar can stay.
 - Include an accessible label such as `aria-label={`Chance of rain: ${formatNumber(precip)}%`}`.
 - Keep the visual bar decorative if the text percentage remains visible.
 
@@ -321,8 +330,8 @@ Edit the forecast day card rendering in `src/App.tsx`:
 
 Edit `src/styles.css`:
 
-- Add tooltip styles near the weather styles or global utility area.
-- Add hourly timeline styles near the existing `.weather-forecast-grid` rules.
+- Add tooltip styles near the weather styles (around line 1694) or in a global utility area.
+- Add hourly timeline styles near the existing `.weather-forecast-grid` rules (line 1539).
 - Add responsive rules in the existing `@media (max-width: 520px)` block.
 
 Style hooks to add:
@@ -349,6 +358,7 @@ Unit/type-level coverage:
 
 - `src/api/data.test.ts`
   - Assert `getWeather()` maps hourly forecast entries into `weather.hourly`.
+  - The existing test mock (line 192) sends `hourly: { time: [], ... }` — add a second test case with populated hourly data.
   - Assert entries before the cutoff are filtered out if practical with existing fake time setup.
 - `src/api/modules.test.ts`
   - No required change unless new weather module options are added.
@@ -446,9 +456,10 @@ Manual browser checks:
 - The backend cache key is currently `weather-v6`. If only the TypeScript type and frontend rendering change, the cache key can stay as-is because `hourly` is already in the cached payload. If backend payload shape changes, bump it.
 - Open-Meteo times are returned in the configured timezone. Format hours from the provided time string; do not convert to UTC manually.
 - `new Date('YYYY-MM-DDTHH:mm')` behavior can vary by environment. If formatting becomes inconsistent, parse the hour directly from the time string instead of relying on timezone conversion.
-- The app has no configured formatter or linter. Follow the existing style in `src/App.tsx`.
+- The app has no configured formatter or linter. Follow the existing style in `src/features/home/widgets/WeatherWidget.tsx`.
 - Keep all changes local to weather UI/type/tests unless tests reveal a real shared issue.
 - Avoid replacing the current weather widget layout wholesale. This is an enhancement, not a redesign.
+- The `WeatherWidget` component imports from `../../../shared/format`, `../../../shared/location`, `../../../shared/weather`, and `../../app-shell/homeWidgets`. New shared helpers should follow the same import paths.
 
 ## Open Questions
 
@@ -458,3 +469,25 @@ These do not need to block implementation:
 - Should the hourly timeline be configurable in Admin settings? Do not add a setting for the first implementation; keep it always visible when hourly data exists.
 - Should sunrise/sunset be shown in the hourly timeline later? Not part of this implementation.
 - Should humidity be added as a real metric later? Not part of this implementation; the current goal is to clarify that the existing rain bar is not humidity.
+
+---
+
+## Implementation Summary
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `src/shared/api-types.ts` | Added `hourly` field to `WeatherSummary` type |
+| `src/features/home/widgets/WeatherWidget.tsx` | Added `InfoTooltip` component, metric tooltip metadata map, hourly timeline section, tooltip on 5-day rain bar, tooltip on main weather icon |
+| `src/styles.css` | Added `.info-tooltip`, `.weather-hourly`, `.weather-hour-card`, and responsive styles |
+| `src/api/data.test.ts` | Added `weather hourly forecast mapping` describe block with 2 test cases (populated hourly + empty hourly) |
+
+### What was built
+
+- **InfoTooltip** — reusable hover/focus/click tooltip component using `useId`, `aria-describedby`, and `role="tooltip"`. Supports keyboard focus, mouse hover, and touch tap.
+- **Metric tooltips** — each metric icon in `.metric-row` is wrapped with an `InfoTooltip` that explains what it measures (e.g. "Chance of rain today" for the umbrella icon).
+- **Main weather icon tooltip** — shows "Current conditions: Light rain".
+- **5-day rain bar tooltip** — the `.weather-precip-track` bar now has a tooltip showing "Chance of rain: 42%".
+- **Hourly timeline** — horizontal scrollable section below `.metric-row`, showing up to 8 compact cards with hour label, condition icon, temperature, and rain percentage. Degrades cleanly when `hourly` is empty/missing.
+- **Unit tests** — hourly data mapping tests covering populated and empty hourly arrays, with fake timer for cutoff filtering.

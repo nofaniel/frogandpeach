@@ -158,6 +158,12 @@ export type WeatherSummary = {
     min: number | null
     precipitationChance: number | null
   }>
+  hourly: Array<{
+    time: string
+    temperature: number | null
+    precipitationChance: number | null
+    label: string
+  }>
 }
 
 export type TideSummary = {

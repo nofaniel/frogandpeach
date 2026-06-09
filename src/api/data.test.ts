@@ -232,6 +232,114 @@ describe('weather precipitation mapping', () => {
   })
 })
 
+describe('weather hourly forecast mapping', () => {
+  it('maps hourly forecast entries and filters entries before the cutoff', async () => {
+    const now = new Date('2026-06-09T14:00:00Z')
+    vi.useFakeTimers({ now })
+
+    const env = createFakeEnv({
+      locationName: 'Newquay',
+      locationRegion: 'Cornwall',
+      latitude: '50.4155',
+      longitude: '-5.0737',
+      timezone: 'Europe/London',
+    })
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        current: {
+          temperature_2m: 14,
+          apparent_temperature: 13,
+          wind_speed_10m: 10,
+          wind_gusts_10m: 15,
+          precipitation: 0,
+          weather_code: 3,
+          time: '2026-06-09T14:00:00Z',
+        },
+        daily: {
+          time: ['2026-06-09'],
+          weather_code: [3],
+          temperature_2m_max: [16],
+          temperature_2m_min: [10],
+          precipitation_probability_max: [30],
+          sunrise: ['2026-06-09T05:00:00Z'],
+          sunset: ['2026-06-09T20:00:00Z'],
+        },
+        hourly: {
+          time: [
+            '2026-06-09T12:00:00Z',
+            '2026-06-09T13:00:00Z',
+            '2026-06-09T14:00:00Z',
+            '2026-06-09T15:00:00Z',
+            '2026-06-09T16:00:00Z',
+          ],
+          temperature_2m: [12.5, 13.1, 14, 14.2, 13.8],
+          precipitation_probability: [10, 20, 30, 45, 60],
+          weather_code: [2, 3, 3, 61, 61],
+        },
+      }),
+    } as Response)
+
+    const weather = await getWeather(env)
+
+    expect(weather?.hourly).toBeDefined()
+    expect(weather?.hourly.length).toBeGreaterThan(0)
+    expect(weather?.hourly.length).toBeLessThanOrEqual(8)
+
+    const firstEntry = weather?.hourly[0]
+    expect(firstEntry?.time).toBe('2026-06-09T13:00:00Z')
+    expect(firstEntry?.temperature).toBe(13.1)
+    expect(firstEntry?.precipitationChance).toBe(20)
+    expect(firstEntry?.label).toBe('Cloudy spells')
+
+    const lastEntry = weather?.hourly[weather!.hourly.length - 1]
+    expect(lastEntry?.time).toBe('2026-06-09T16:00:00Z')
+    expect(lastEntry?.precipitationChance).toBe(60)
+
+    vi.useRealTimers()
+  })
+
+  it('returns an empty hourly array when Open-Meteo sends no hourly data', async () => {
+    const env = createFakeEnv({
+      locationName: 'Newquay',
+      locationRegion: 'Cornwall',
+      latitude: '50.4155',
+      longitude: '-5.0737',
+      timezone: 'Europe/London',
+    })
+
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        current: {
+          temperature_2m: 14,
+          apparent_temperature: 13,
+          wind_speed_10m: 10,
+          wind_gusts_10m: 15,
+          precipitation: 0,
+          weather_code: 3,
+          time: '2026-06-09T14:00:00Z',
+        },
+        daily: {
+          time: ['2026-06-09'],
+          weather_code: [3],
+          temperature_2m_max: [16],
+          temperature_2m_min: [10],
+          precipitation_probability_max: [30],
+          sunrise: ['2026-06-09T05:00:00Z'],
+          sunset: ['2026-06-09T20:00:00Z'],
+        },
+        hourly: { time: [], precipitation_probability: [], temperature_2m: [], weather_code: [] },
+      }),
+    } as Response)
+
+    const weather = await getWeather(env)
+
+    expect(weather?.hourly).toEqual([])
+  })
+})
+
 describe('marine cache keying', () => {
   it('keeps tide API keys out of cache keys and separates different API options', async () => {
     const modelKey = await buildMarineCacheKey('model', 'ignored-secret')

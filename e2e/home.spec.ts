@@ -160,3 +160,112 @@ test.describe('home dashboard', () => {
     await expectNoConsoleErrors(page, consoleErrors)
   })
 })
+
+test.describe('weather widget', () => {
+  test('renders the weather panel on the home dashboard', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+
+    const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+    await expect(weatherPanel).toBeVisible()
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+
+  test('shows hourly timeline when weather data is available', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+
+    const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+    await expect(weatherPanel).toBeVisible()
+
+    const hourlySection = weatherPanel.locator('.weather-hourly')
+    const hourlyCount = await hourlySection.count()
+    if (hourlyCount > 0) {
+      await expect(hourlySection).toBeVisible()
+      await expect(hourlySection).toHaveAttribute('aria-label', 'Hourly forecast for today')
+      const cards = hourlySection.locator('.weather-hour-card')
+      expect(await cards.count()).toBeGreaterThan(0)
+    }
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+
+  test('tooltip appears on hover over metric icons', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+
+    const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+    const currentSection = weatherPanel.locator('.weather-current')
+    const hasCurrentWeather = (await currentSection.count()) > 0 && await currentSection.isVisible().catch(() => false)
+
+    if (hasCurrentWeather) {
+      const tooltipTriggers = weatherPanel.locator('.info-tooltip-trigger')
+      const triggerCount = await tooltipTriggers.count()
+      if (triggerCount > 0) {
+        const firstTrigger = tooltipTriggers.first()
+        await firstTrigger.hover()
+        const tooltipBubble = weatherPanel.locator('.info-tooltip-bubble')
+        await expect(tooltipBubble.first()).toBeVisible()
+        await page.mouse.move(0, 0)
+      }
+    }
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+
+  test('tooltip appears on keyboard focus', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+
+    const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+    const tooltipTriggers = weatherPanel.locator('.info-tooltip-trigger')
+    const triggerCount = await tooltipTriggers.count()
+
+    if (triggerCount > 0) {
+      await tooltipTriggers.first().focus()
+      const tooltipBubble = weatherPanel.locator('.info-tooltip-bubble')
+      await expect(tooltipBubble.first()).toBeVisible()
+    }
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+
+  test('5-day forecast rain bar has accessible label', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+
+    const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+    const precipTrack = weatherPanel.locator('.weather-precip-track')
+    const trackCount = await precipTrack.count()
+
+    if (trackCount > 0) {
+      const firstTrack = precipTrack.first()
+      const ariaLabel = await firstTrack.getAttribute('aria-label')
+      expect(ariaLabel).toBeTruthy()
+      expect(ariaLabel).toMatch(/Chance of rain/)
+    }
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+})

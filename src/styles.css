@@ -1661,6 +1661,153 @@ body {
   font-weight: 800;
 }
 
+/* Info Tooltip */
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.info-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  cursor: help;
+}
+
+.info-tooltip-trigger:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.info-tooltip-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  max-width: 220px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(10, 36, 22, 0.94);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.28);
+}
+
+.info-tooltip-bubble::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: rgba(10, 36, 22, 0.94);
+}
+
+.info-tooltip--open .info-tooltip-bubble {
+  display: block;
+}
+
+/* Hourly timeline */
+.weather-hourly {
+  position: relative;
+  z-index: 1;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  padding-top: 15px;
+  margin-top: 16px;
+}
+
+.weather-hourly-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.weather-hourly-heading .kicker {
+  color: rgba(255, 255, 255, 0.78);
+  margin: 0;
+}
+
+.weather-hourly-heading span {
+  color: rgba(216, 235, 205, 0.7);
+  font-size: 0.76rem;
+  font-weight: 900;
+}
+
+.weather-hourly-track {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-bottom: 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+
+.weather-hourly-track::-webkit-scrollbar {
+  height: 4px;
+}
+
+.weather-hourly-track::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.weather-hourly-tooltip {
+  flex: 0 0 auto;
+}
+
+.weather-hour-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 72px;
+  padding: 8px 10px;
+  border: 1px solid rgba(218, 242, 222, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  scroll-snap-align: start;
+  text-align: center;
+}
+
+.weather-hour-time {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+}
+
+.weather-hour-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.weather-hour-temp {
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.weather-hour-rain {
+  color: rgba(126, 216, 255, 0.9);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+/* Precip track tooltip override */
+.weather-precip-tooltip .info-tooltip-trigger {
+  display: block;
+  width: 100%;
+}
+
 @media (max-width: 820px) {
   .weather-forecast-grid {
     grid-template-columns: repeat(3, minmax(92px, 1fr));
@@ -1690,6 +1837,20 @@ body {
 
   .weather-forecast-grid .weather-forecast-card:first-child {
     border-left: 0;
+  }
+
+  .weather-hourly-track {
+    gap: 6px;
+  }
+
+  .weather-hour-card {
+    min-width: 64px;
+    padding: 6px 8px;
+  }
+
+  .info-tooltip-bubble {
+    max-width: 180px;
+    font-size: 0.68rem;
   }
 }
 
