@@ -39,7 +39,9 @@ The symbols are not a browser/font rendering failure. They come from hardcoded R
 - Tide mark: `src/App.tsx:956` and `src/App.tsx:974`
 - Starred home-list prefix also uses `? ` at `src/App.tsx:1045`, while the full list page uses `★`.
 
-Plan note: replace these with text labels, stable Unicode symbols already used elsewhere, or CSS/lucide-style icon components. The weather row should read as real metrics, for example `High 14°`, `Low 11°`, `Wind 20 km/h`, `Rain 100%`, `Precip 0 mm`.
+~~Plan note: replace these with text labels, stable Unicode symbols already used elsewhere, or CSS/lucide-style icon components. The weather row should read as real metrics, for example `High 14°`, `Low 11°`, `Wind 20 km/h`, `Rain 100%`, `Precip 0 mm`.~~
+
+> **Resolved (2026-06-09):** The starred list prefix `? ` has been replaced with an accessible `★` star marker in `ListsWidget.tsx`. Weather/tide `?`/`??` symbols are a separate issue (hardcoded in the weather/tide feature modules, not in this cleanup scope).
 
 ### Live visual direction is inconsistent
 
@@ -80,7 +82,9 @@ Heavy weights and uppercase treatments make small utility text feel loud:
 - Tide section labels: `font-weight: 900`, uppercase in `src/styles.css:1610-1618`.
 - Large serif headings such as `Starred first`, `Pinned & recent`, and deployment host dominate small cards.
 
-Plan note: reduce utility labels to semibold, reduce uppercase usage, and scale card headings down. Keep hero-scale typography out of compact dashboard cards.
+~~Plan note: reduce utility labels to semibold, reduce uppercase usage, and scale card headings down. Keep hero-scale typography out of compact dashboard cards.~~
+
+> **Partially resolved (2026-06-09):** `Starred first` heading changed to `Starred` in ListsWidget. Network widget heading changed from deployment host to `Connection`. Remaining typography weight/size issues are out of scope for this cleanup.
 
 ### Missing or placeholder info appears in Network
 
@@ -109,7 +113,9 @@ Code context:
 - Deployment docs link: `src/App.tsx:1144`
 - Theming docs link: `src/App.tsx:1634`
 
-Plan note: if these docs are intended to be available from the deployed app, copy them into `public/docs/` during build or replace them with in-app help pages.
+~~Plan note: if these docs are intended to be available from the deployed app, copy them into `public/docs/` during build or replace them with in-app help pages.~~
+
+> **Partially resolved (2026-06-09):** The Network home widget now only shows the Cloudflare hosting guide link. The deployment origin is still linked within the Network widget for explicit access. Full docs link audit remains open.
 
 ## Improvement Plan Notes
 

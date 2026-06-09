@@ -2462,6 +2462,11 @@ body {
   }
 }
 
+.star-marker {
+  color: var(--color-accent);
+  font-style: normal;
+}
+
 @media (max-width: 920px) {
   .workspace-grid.admin-grid {
     grid-template-columns: 1fr;

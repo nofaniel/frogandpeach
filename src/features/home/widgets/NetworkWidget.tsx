@@ -20,8 +20,8 @@ export function NetworkWidget({
     <article id={module.id} className={className + ' network-panel'}>
       <div className="panel-heading">
         <div>
-          <p className="kicker">Deployment</p>
-          <h2>{deployment.host}</h2>
+          <p className="kicker">Network</p>
+          <h2>Connection</h2>
         </div>
         <span className={deployment.ready ? 'status-badge ok' : 'status-badge warn'}>
           {deployment.ready ? 'Connected' : 'Needs setup'}
@@ -30,7 +30,7 @@ export function NetworkWidget({
       <p>{widget.mode === 'details' && network?.usage.period ? deployment.note + ' ' + network.usage.period + ' usage shown below.' : deployment.note}</p>
       <div className="stack-list">
         <a className="plain-row" href={deployment.origin} target="_blank" rel="noreferrer">
-          <strong>Open current host</strong>
+          <strong>Current app host</strong>
           <span>{deployment.origin}</span>
         </a>
         <a className="plain-row" href="/docs/cloudflare-hosting.md">

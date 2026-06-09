@@ -57,11 +57,10 @@ test.describe('home dashboard', () => {
 
     await signIn(page)
 
-    await expect(page.locator('.home-dashboard .panel')).toHaveCount(6)
+    await expect(page.locator('.home-dashboard .panel')).toHaveCount(5)
     await expect(page.getByRole('button', { name: 'Lists' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Notes' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Pages' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Network' })).toBeVisible()
 
     await expectNoConsoleErrors(page, consoleErrors)
   })
@@ -81,7 +80,7 @@ test.describe('home dashboard', () => {
       toggled = true
       await page.getByRole('button', { name: 'Close' }).click()
       await page.getByRole('button', { name: 'Home' }).click()
-      await expect(page.locator('.home-dashboard .panel')).toHaveCount(5)
+      await expect(page.locator('.home-dashboard .panel')).toHaveCount(4)
       await expect(page.getByRole('button', { name: 'Notes' })).toBeVisible()
     } finally {
       if (toggled) {
@@ -115,6 +114,7 @@ test.describe('home dashboard', () => {
 
     await openAdmin(page)
     await setModuleMode(page, 'Notes', 'large')
+    await setModuleWidgetEnabled(page, 'Network', true)
     await setModuleMode(page, 'Network', 'details')
     await page.getByRole('button', { name: 'Close' }).click()
 
@@ -124,6 +124,7 @@ test.describe('home dashboard', () => {
 
     await openAdmin(page)
     await setModuleMode(page, 'Notes', 'small')
+    await setModuleWidgetEnabled(page, 'Network', false)
     await setModuleMode(page, 'Network', 'status')
     await page.getByRole('button', { name: 'Close' }).click()
 

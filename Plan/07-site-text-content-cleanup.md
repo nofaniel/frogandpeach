@@ -1,4 +1,6 @@
-# Site Text and Content Cleanup
+# Site Text and Content Cleanup — DONE
+
+> **Status: DONE** — Implemented 2026-06-09. All acceptance criteria met. `npm test` (140 tests) and `npm run build` pass.
 
 ## Goal
 

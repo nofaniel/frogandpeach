@@ -19,11 +19,12 @@ export function ListsWidget({
   return (
     <article id={module.id} className={'panel module-' + module.size}>
       <p className="kicker">Lists</p>
-      <h2>{widget.mode === 'starred' ? 'Starred first' : 'Active lists'}</h2>
+      <h2>{widget.mode === 'starred' ? 'Starred' : 'Active lists'}</h2>
       <div className="stack-list">
         {orderedLists.map(({ list, starred, incompleteCount }) => (
           <button key={list.id} type="button" className="plain-row" onClick={() => onSetActiveTab('lists')}>
-            <strong>{starred ? '? ' : ''}{list.name}</strong>
+            {starred && <span aria-label="Starred" className="star-marker" aria-hidden="true">★ </span>}
+            <strong>{list.name}</strong>
             <span>
               {widget.mode === 'starred'
                 ? `${incompleteCount} open`

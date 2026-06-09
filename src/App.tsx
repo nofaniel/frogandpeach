@@ -50,7 +50,6 @@ function App() {
     <AppShellLayout
       displayName={displayName}
       now={now}
-      deploymentOrigin={home?.deployment.origin ?? null}
       adminUnlockLabel={adminUnlockLabel}
       adminUnlockRemainingMs={adminUnlockRemainingMs}
       busy={busy}

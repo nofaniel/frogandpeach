@@ -9,7 +9,6 @@ import { TopNavigation } from './TopNavigation'
 export function AppShellLayout({
   displayName,
   now,
-  deploymentOrigin,
   adminUnlockLabel,
   adminUnlockRemainingMs,
   busy,
@@ -37,7 +36,6 @@ export function AppShellLayout({
 }: {
   displayName: string
   now: number
-  deploymentOrigin: string | null
   adminUnlockLabel: string | null
   adminUnlockRemainingMs: number
   busy: boolean
@@ -68,7 +66,6 @@ export function AppShellLayout({
       <TopNavigation
         displayName={displayName}
         now={now}
-        deploymentOrigin={deploymentOrigin}
         adminUnlockLabel={adminUnlockLabel}
         adminUnlockRemainingMs={adminUnlockRemainingMs}
         busy={busy}

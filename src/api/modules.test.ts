@@ -12,7 +12,7 @@ describe('module registry normalisation', () => {
 
   it('enables homepage widgets by default for suitable built-in modules', () => {
     const modules = normaliseModules(new Map())
-    const widgetIds = ['weather', 'tides', 'lists', 'notes', 'pages', 'network']
+    const widgetIds = ['weather', 'tides', 'lists', 'notes', 'pages']
 
     for (const id of widgetIds) {
       const module = modules.find((entry) => entry.id === id)
@@ -22,6 +22,18 @@ describe('module registry normalisation', () => {
         mode: module?.homeWidget?.defaultMode,
       })
     }
+  })
+
+  it('disables the network home widget by default while keeping the module enabled', () => {
+    const modules = normaliseModules(new Map())
+    const network = modules.find((entry) => entry.id === 'network')
+
+    expect(network?.enabled).toBe(true)
+    expect(network?.homeWidget).toBeDefined()
+    expect(network?.options.homeWidget).toMatchObject({
+      enabled: false,
+      mode: 'status',
+    })
   })
 
   it('defaults navigation bar visibility from the module registry', () => {

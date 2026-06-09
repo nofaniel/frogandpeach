@@ -246,7 +246,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
       defaultEnabled: true,
       defaultMode: 'starred',
       modes: [
-        { id: 'starred', label: 'Starred first', description: 'Pinned lists first, then recent active lists.' },
+        { id: 'starred', label: 'Starred', description: 'Starred lists first, then recent active lists.' },
         { id: 'active', label: 'Active lists', description: 'Recently updated active lists with incomplete counts.' },
       ],
     },
@@ -306,7 +306,7 @@ export const moduleDefinitions: ModuleDefinition[] = [
     homeWidget: {
       label: 'Homepage network widget',
       description: 'Controls whether deployment and network information appears on the home screen.',
-      defaultEnabled: true,
+      defaultEnabled: false,
       defaultMode: 'status',
       modes: [
         { id: 'status', label: 'Status', description: 'Deployment, router, and admin links.' },

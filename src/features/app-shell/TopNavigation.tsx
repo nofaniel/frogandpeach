@@ -4,7 +4,6 @@ import { formatFullDateTime, greetingForNow } from '../../shared/format'
 export function TopNavigation({
   displayName,
   now,
-  deploymentOrigin,
   adminUnlockLabel,
   adminUnlockRemainingMs,
   busy,
@@ -19,7 +18,6 @@ export function TopNavigation({
 }: {
   displayName: string
   now: number
-  deploymentOrigin: string | null
   adminUnlockLabel: string | null
   adminUnlockRemainingMs: number
   busy: boolean
@@ -40,11 +38,6 @@ export function TopNavigation({
         <p>{formatFullDateTime(now)}</p>
       </div>
       <div className="top-actions">
-        {deploymentOrigin && (
-          <a className="origin-link" href={deploymentOrigin} target="_blank" rel="noreferrer">
-            {deploymentOrigin}
-          </a>
-        )}
         {adminUnlockLabel && (
           <span className={adminUnlockRemainingMs <= 120000 ? 'unlock-status warning' : 'unlock-status'}>
             {adminUnlockLabel}
