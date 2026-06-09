@@ -1,13 +1,27 @@
 # Frog & Peach Home Hub
 
-Frog & Peach is a private-by-default modular home hub built for Cloudflare Pages and D1, with a React/Vite frontend and Cloudflare Functions API.
+Private-by-default home hub for households, built with React + TypeScript on Cloudflare Pages Functions and D1.
+
+## Live Links
+
+- Live app: `https://frog-peach-home-hub.pages.dev`
+- GitHub Pages project site: `https://nofaniel.github.io/frogandpeach/`
+- Cloudflare setup guide: `docs/cloudflare-hosting.md`
 
 ## What It Includes
 
-- Single-admin login for external hosting.
-- Built-in modules for weather, tide trends, shopping lists, notes, editable markdown pages, static page launchers, settings, and deployment help.
-- D1-backed persistence.
-- Open-Meteo weather and marine data with local cache records.
+- Modular dashboard with weather, tides, lists, notes, pages, network, and admin tools.
+- Role-based auth (`admin` and `member`) plus timed admin re-auth unlock.
+- D1-backed persistence for module settings, content, sessions, activity, cache, and users.
+- Open-Meteo weather + marine integration with local cache records.
+- Theme system with JSON themes (`themes/*`) and no-FOUC snapshot restore.
+
+## Stack
+
+- Frontend: React 19, TypeScript, Vite
+- Backend/runtime: Cloudflare Pages Functions (Workers runtime)
+- Database: Cloudflare D1 (SQLite)
+- Tests: Vitest (unit) and Playwright (E2E)
 
 ## Screenshots
 
@@ -21,60 +35,66 @@ Captured locally with Playwright against the worker runtime.
 
 ## Local Setup
 
+1) Install dependencies and generate an admin password hash.
+
 ```powershell
 npm install
 npm run hash-password -- "your-admin-password"
 ```
 
-Create `.dev.vars`:
+2) Copy `.env.example` to `.dev.vars` and set at least:
 
 ```text
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD_HASH=pbkdf2_sha256$...
 APP_ORIGIN=http://localhost:8788
 SETUP_TOKEN=
-TEST_USERNAME=<local-test-username>
-TEST_PASSWORD=<local-test-password>
+SESSION_TTL_DAYS=14
 ```
 
-Create and apply the local D1 database schema:
+3) Apply local D1 migrations.
 
 ```powershell
-npx wrangler d1 create frog-peach-db
 npm run cf:migrate:local
 ```
 
-Build the frontend and run the Cloudflare Pages emulator:
+4) Build and run the full local stack.
 
 ```powershell
 npm run build
 npm run dev:worker
 ```
 
-Open `http://localhost:8788`. After login, the admin area is the root page at `/`.
+Open `http://localhost:8788`.
 
-On Windows you can use the included batch files:
+## Development Commands
 
-- `build.bat` installs missing dependencies and builds the app.
-- `run.bat` builds, then starts the full local app/API at `http://localhost:8788` and prints LAN URLs for phones/tablets on the same Wi-Fi.
-- `start-test-site.bat` starts the quick Vite frontend-only test site at `http://localhost:5173`. Login and API features need `run.bat`.
+- `npm run dev` - frontend-only Vite dev server (`:5173`, no API)
+- `npm run dev:worker` - full app runtime on Pages emulator (`:8788`)
+- `npm test` - unit tests
+- `npm run test:e2e` - E2E tests (requires `E2E_BASE_URL`, `TEST_USERNAME`, `TEST_PASSWORD`)
+- `npm run build` - sync scripts + TypeScript build + Vite build
 
-If another device on the local network cannot connect to the printed LAN URL, check that Windows Firewall allows Node.js/Wrangler on private networks.
+## Deploy
 
-## Development
+- Cloudflare live app: `npm run cf:deploy`
+- Remote migrations (when needed): `npm run cf:migrate:remote`
+- GitHub Pages site deploys from `.github/workflows/gh-pages.yml` when files in `gh-pages-site/` change on `main`.
 
-The Vite-only dev server can render the frontend quickly:
+## Architecture Snapshot
 
-```powershell
-npm run dev
-```
+- App composition root: `src/App.tsx`
+- App state/controller: `src/features/app-shell/useAppController.ts`
+- Feature UI: `src/features/*`
+- API routes: `src/api/router.ts`
+- Module definitions: `src/api/modules.ts`
+- Shared types: `src/shared/api-types.ts`
 
-API calls need `wrangler pages dev` because they depend on Cloudflare bindings.
+## CI
 
-## Automated Checks
+GitHub Actions runs:
 
-GitHub Actions runs `npm ci`, `npm test`, and `npm run build` on pull requests and pushes to `main`. E2E tests are intentionally not part of CI because they modify app data and must be run only against an explicit local or staging target with `E2E_BASE_URL`, `TEST_USERNAME`, and `TEST_PASSWORD` set.
+1. `npm test`
+2. `npm run build`
 
-## Deployment Notes
-
-Set `APP_ORIGIN` to the deployed origin, for example `https://frog-peach-home-hub.pages.dev`. Set `SETUP_TOKEN` as a Cloudflare secret before first-run setup; production admin creation is blocked without it. Keep everything private unless you intentionally add public page behavior later.
+E2E is intentionally excluded from CI because tests mutate app data.

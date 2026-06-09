@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Frog &amp; Peach — Home Hub</title>
-  <meta name="description" content="A private, modular home hub for households. Weather, tides, shared lists, household notes — hosted free on Cloudflare Pages." />
+  <meta name="description" content="A private, modular home hub for households. Weather, tides, lists, notes, pages, network, and admin tools on Cloudflare Pages + D1." />
   <meta property="og:title" content="Frog &amp; Peach — Home Hub" />
-  <meta property="og:description" content="A private, modular home hub for households. Weather, tides, shared lists, household notes — hosted free on Cloudflare Pages." />
+  <meta property="og:description" content="A private, modular home hub for households. Weather, tides, lists, notes, pages, network, and admin tools on Cloudflare Pages + D1." />
   <meta property="og:image" content="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-desktop.png" />
   <meta property="og:url" content="https://nofaniel.github.io/frogandpeach/" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -560,7 +560,8 @@
     <a href="#" class="wordmark">Frog <span class="amp">&amp;</span> Peach</a>
     <div class="nav-links">
       <a href="#modules" class="nav-link">Modules</a>
-      <a href="#setup"   class="nav-link">Get started</a>
+      <a href="#setup" class="nav-link">Get started</a>
+      <a href="https://frog-peach-home-hub.pages.dev" class="nav-link" target="_blank" rel="noopener">Live app</a>
       <a
         href="https://github.com/nofaniel/frogandpeach"
         class="nav-github"
@@ -587,7 +588,8 @@
 <!-- MOBILE DRAWER -->
 <div class="mobile-drawer" id="mobile-drawer" aria-hidden="true">
   <a href="#modules" class="mobile-drawer-link">Modules</a>
-  <a href="#setup"   class="mobile-drawer-link">Get started</a>
+  <a href="#setup" class="mobile-drawer-link">Get started</a>
+  <a href="https://frog-peach-home-hub.pages.dev" class="mobile-drawer-link" target="_blank" rel="noopener">Live app</a>
   <a
     href="https://github.com/nofaniel/frogandpeach"
     class="mobile-drawer-gh"
@@ -605,7 +607,7 @@
 <section class="hero">
   <div class="hero-badge">
     <span class="badge-dot"></span>
-    Open source &nbsp;·&nbsp; Cloudflare Pages &nbsp;·&nbsp; React 19
+    Open source &nbsp;·&nbsp; Cloudflare Pages + D1 &nbsp;·&nbsp; React 19
   </div>
   <h1>Your household,<br /><em>beautifully</em> organised.</h1>
   <p class="hero-sub">
@@ -613,16 +615,17 @@
     everything your home needs, hosted free.
   </p>
   <div class="hero-btns">
+    <a href="https://frog-peach-home-hub.pages.dev" class="btn-dark" target="_blank" rel="noopener">Open live app</a>
     <a
       href="https://github.com/nofaniel/frogandpeach"
-      class="btn-dark"
+      class="btn-outline"
       target="_blank"
       rel="noopener"
     >
       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
       </svg>
-      View on GitHub
+      View source
     </a>
     <a href="#modules" class="btn-outline">See what's included ↓</a>
   </div>
@@ -652,7 +655,7 @@
         <p class="sec-label">Built-in modules</p>
         <h2 class="sec-title">Everything your<br />home needs.</h2>
       </div>
-      <p class="sec-body">Six built-in modules cover the essentials. Enable only what matters to your household — more on the way.</p>
+      <p class="sec-body">Six core household modules plus admin tools cover the essentials. Enable only what matters for your home.</p>
     </div>
     <div class="modules-grid">
 
@@ -766,7 +769,7 @@
       <div class="pillar">
         <div class="pillar-icon">🔒</div>
         <p class="pillar-name">Private by default</p>
-        <p class="pillar-desc">Single household login. Nothing is public unless you choose it. No third-party analytics or tracking.</p>
+        <p class="pillar-desc">Role-based login with timed admin unlock. Nothing is public unless you choose it. No third-party analytics or tracking.</p>
       </div>
 
       <div class="pillar">
@@ -807,7 +810,7 @@
           </div>
           <div class="setup-step">
             <div class="step-n">2</div>
-            <p class="step-t"><strong>Create the D1 database.</strong> One wrangler command applies the full schema locally.</p>
+            <p class="step-t"><strong>Apply local migrations.</strong> Run the D1 migration script to prepare local SQLite state.</p>
           </div>
           <div class="setup-step">
             <div class="step-n">3</div>
@@ -815,7 +818,7 @@
           </div>
           <div class="setup-step">
             <div class="step-n">4</div>
-            <p class="step-t"><strong>Deploy to Cloudflare.</strong> Push to GitHub — Cloudflare Pages CI does the rest.</p>
+            <p class="step-t"><strong>Deploy to Cloudflare.</strong> Run <code>npm run cf:deploy</code> or use your linked Pages Git deploy flow.</p>
           </div>
         </div>
       </div>
@@ -837,8 +840,7 @@
 <span class="tc"># Generate your admin password hash</span>
 <span class="tk">npm run hash-password</span> <span class="tv">-- "your-password"</span>
 
-<span class="tc"># Create and migrate the D1 database</span>
-<span class="tk">npx wrangler d1 create</span> <span class="tv">frog-peach-db</span>
+<span class="tc"># Apply local D1 migrations</span>
 <span class="tk">npm run</span> <span class="tv">cf:migrate:local</span>
 
 <span class="tc"># Build and run locally</span>
@@ -858,6 +860,7 @@
     <p class="foot-logo">Frog <span class="amp">&amp;</span> Peach</p>
     <div class="foot-links">
       <a href="https://github.com/nofaniel/frogandpeach"                                                  target="_blank" rel="noopener">GitHub</a>
+      <a href="https://frog-peach-home-hub.pages.dev"                                                     target="_blank" rel="noopener">Live app</a>
       <a href="https://github.com/nofaniel/frogandpeach/blob/main/README.md"                              target="_blank" rel="noopener">README</a>
       <a href="https://github.com/nofaniel/frogandpeach/blob/main/docs/cloudflare-hosting.md"             target="_blank" rel="noopener">Hosting guide</a>
       <a href="https://github.com/nofaniel/frogandpeach/blob/main/docs/router-hosting.md"                 target="_blank" rel="noopener">Router hosting</a>
