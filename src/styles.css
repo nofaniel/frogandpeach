@@ -1960,17 +1960,12 @@ body {
   padding-bottom: 4px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
   scroll-snap-type: x proximity;
 }
 
 .weather-hourly-track::-webkit-scrollbar {
-  height: 4px;
-}
-
-.weather-hourly-track::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
+  display: none;
 }
 
 .weather-hourly-tooltip {
