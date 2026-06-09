@@ -128,9 +128,14 @@ function App() {
           setListDraft={listsGroup.setListDraft}
           itemDrafts={listsGroup.itemDrafts}
           setItemDrafts={listsGroup.setItemDrafts}
+          itemMetadataDrafts={listsGroup.itemMetadataDrafts}
+          setItemMetadataDrafts={listsGroup.setItemMetadataDrafts}
+          listFilter={listsGroup.listFilter}
+          setListFilter={listsGroup.setListFilter}
           onCreateList={listsGroup.createList}
           onCreateItem={listsGroup.createItem}
           onToggleItem={listsGroup.toggleItem}
+          onUpdateItemMetadata={listsGroup.updateItemMetadata}
           onRemoveItem={listsGroup.removeItem}
           onRemoveList={listsGroup.removeList}
           onToggleListStar={listsGroup.toggleListStar}

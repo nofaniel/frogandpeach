@@ -106,6 +106,8 @@ export function useAppController() {
   const [passwordSetupDraft, setPasswordSetupDraft] = useState({ password: '', confirmPassword: '' })
   const [listDraft, setListDraft] = useState({ name: '', listType: 'shopping' })
   const [itemDrafts, setItemDrafts] = useState<Record<string, string>>({})
+  const [itemMetadataDrafts, setItemMetadataDrafts] = useState<Record<string, Record<string, unknown>>>({})
+  const [listFilter, setListFilter] = useState<Record<string, string>>({})
   const [noteDraft, setNoteDraft] = useState({ title: '', body: '', tags: '' })
   const [pageDraft, setPageDraft] = useState({ title: '', slug: '', body: '', theme: 'shell', occasion: '', emoji: '' })
   const [linkDraft, setLinkDraft] = useState({ title: '', href: 'index.html', description: '', kind: 'static' })
@@ -311,9 +313,11 @@ export function useAppController() {
     event.preventDefault()
     const text = itemDrafts[listId]?.trim()
     if (!text) return
+    const metadata = itemMetadataDrafts[listId]
     await run(async () => {
-      await api(`/api/lists/${listId}/items`, { method: 'POST', body: { text } })
+      await api(`/api/lists/${listId}/items`, { method: 'POST', body: { text, metadata: metadata && Object.keys(metadata).length > 0 ? metadata : undefined } })
       setItemDrafts((drafts) => ({ ...drafts, [listId]: '' }))
+      setItemMetadataDrafts((drafts) => ({ ...drafts, [listId]: {} }))
       await refreshAll()
     })
   }
@@ -321,6 +325,13 @@ export function useAppController() {
   async function toggleItem(item: ListItem) {
     await run(async () => {
       await api(`/api/items/${item.id}`, { method: 'PATCH', body: { done: !item.done } })
+      await refreshAll()
+    })
+  }
+
+  async function updateItemMetadata(item: ListItem, patch: { metadata?: unknown }) {
+    await run(async () => {
+      await api(`/api/items/${item.id}`, { method: 'PATCH', body: patch })
       await refreshAll()
     })
   }
@@ -639,9 +650,14 @@ export function useAppController() {
       setListDraft,
       itemDrafts,
       setItemDrafts,
+      itemMetadataDrafts,
+      setItemMetadataDrafts,
+      listFilter,
+      setListFilter,
       createList,
       createItem,
       toggleItem,
+      updateItemMetadata,
       removeItem,
       removeList,
       toggleListStar,

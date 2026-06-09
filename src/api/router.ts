@@ -225,8 +225,8 @@ async function routeLists(context: ApiContext, parts: string[], session: Session
 
   const listId = parts[0]
   if (parts[1] === 'items' && context.request.method === 'POST') {
-    const body = await readJson<{ text?: string }>(context.request)
-    const item = await createListItem(context.env, listId, String(body.text ?? ''), session.userId)
+    const body = await readJson<{ text?: string; metadata?: unknown }>(context.request)
+    const item = await createListItem(context.env, listId, String(body.text ?? ''), session.userId, body.metadata)
     if (item) await recordActivity(context, session, 'created', 'list_item', item.id, `Added item to list`, { listId: item.listId })
     return item ? json(item, { status: 201 }) : json({ error: 'List not found' }, { status: 404 })
   }

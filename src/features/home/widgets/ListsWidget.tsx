@@ -1,4 +1,5 @@
 import type { Module, SharedList, Tab } from '../../../shared/api-types'
+import { computeListStatus, type ListTypeId } from '../../../shared/lists'
 import { formatDate } from '../../../shared/format'
 import { getHomeListEntries, resolveHomeWidgetState } from '../../app-shell/homeWidgets'
 
@@ -21,17 +22,24 @@ export function ListsWidget({
       <p className="kicker">Lists</p>
       <h2>{widget.mode === 'starred' ? 'Starred' : 'Active lists'}</h2>
       <div className="stack-list">
-        {orderedLists.map(({ list, starred, incompleteCount }) => (
-          <button key={list.id} type="button" className="plain-row" onClick={() => onSetActiveTab('lists')}>
-            {starred && <span aria-label="Starred" className="star-marker" aria-hidden="true">★ </span>}
-            <strong>{list.name}</strong>
-            <span>
-              {widget.mode === 'starred'
-                ? `${incompleteCount} open`
-                : `${incompleteCount} open, updated ${formatDate(list.updatedAt)}`}
-            </span>
-          </button>
-        ))}
+        {orderedLists.map(({ list, starred, incompleteCount }) => {
+          const listType = list.listType as ListTypeId
+          const overdueCount = list.items.filter((item) => !item.done && computeListStatus(item, listType) === 'overdue').length
+          const dueSoonCount = list.items.filter((item) => !item.done && computeListStatus(item, listType) === 'due_soon').length
+          return (
+            <button key={list.id} type="button" className="plain-row" onClick={() => onSetActiveTab('lists')}>
+              {starred && <span aria-label="Starred" className="star-marker" aria-hidden="true">★ </span>}
+              <strong>{list.name}</strong>
+              <span>
+                {widget.mode === 'starred'
+                  ? `${incompleteCount} open`
+                  : `${incompleteCount} open, updated ${formatDate(list.updatedAt)}`}
+                {overdueCount > 0 && <span className="home-status-overdue"> {overdueCount} overdue</span>}
+                {dueSoonCount > 0 && <span className="home-status-due-soon"> {dueSoonCount} due soon</span>}
+              </span>
+            </button>
+          )
+        })}
         {orderedLists.length === 0 && <div className="plain-row"><strong>No active lists</strong><span>Create or update a list to surface it here.</span></div>}
       </div>
     </article>

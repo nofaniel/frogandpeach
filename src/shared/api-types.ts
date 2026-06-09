@@ -69,6 +69,7 @@ export type ListItem = {
   text: string
   done: boolean
   completedAt: string | null
+  metadata: Record<string, unknown>
   createdByName: string | null
   updatedByName: string | null
 }

@@ -380,12 +380,12 @@ export async function deleteList(env: Env, listId: string) {
   await env.DB.prepare('DELETE FROM lists WHERE id = ?').bind(listId).run()
 }
 
-export async function createListItem(env: Env, listId: string, text: string, userId?: string) {
+export async function createListItem(env: Env, listId: string, text: string, userId?: string, metadata?: unknown) {
   if (!(await getList(env, listId))) return null
   const stamp = nowIso()
   const itemId = id('item')
-  await env.DB.prepare('INSERT INTO list_items (id, list_id, text, done, completed_at, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?)')
-    .bind(itemId, listId, text.trim() || 'Something useful', userId ?? null, userId ?? null, stamp, stamp)
+  await env.DB.prepare('INSERT INTO list_items (id, list_id, text, done, completed_at, metadata_json, created_by, updated_by, created_at, updated_at) VALUES (?, ?, ?, 0, NULL, ?, ?, ?, ?, ?)')
+    .bind(itemId, listId, text.trim() || 'Something useful', safeJson(normaliseListMetadata(metadata)), userId ?? null, userId ?? null, stamp, stamp)
     .run()
   await env.DB.prepare('UPDATE lists SET updated_by = ?, updated_at = ? WHERE id = ?').bind(userId ?? null, stamp, listId).run()
   return getListItem(env, itemId)
@@ -396,16 +396,17 @@ export async function getListItem(env: Env, itemId: string) {
   return row ? toListItem(row, await getUserNameMap(env)) : null
 }
 
-export async function updateListItem(env: Env, itemId: string, patch: { text?: string; done?: boolean }, userId?: string) {
+export async function updateListItem(env: Env, itemId: string, patch: { text?: string; done?: boolean; metadata?: unknown }, userId?: string) {
   const existing = await getListItem(env, itemId)
   if (!existing) return null
   const stamp = nowIso()
   const text = patch.text === undefined ? existing.text : String(patch.text).trim() || 'Something useful'
   const done = patch.done === undefined ? existing.done : Boolean(patch.done)
   const completedAt = done ? existing.completedAt ?? stamp : null
+  const metadata = patch.metadata === undefined ? existing.metadata : normaliseListMetadata(patch.metadata)
 
-  await env.DB.prepare('UPDATE list_items SET text = ?, done = ?, completed_at = ?, updated_by = ?, updated_at = ? WHERE id = ?')
-    .bind(text, done ? 1 : 0, completedAt, userId ?? existing.updatedBy ?? null, stamp, itemId)
+  await env.DB.prepare('UPDATE list_items SET text = ?, done = ?, completed_at = ?, metadata_json = ?, updated_by = ?, updated_at = ? WHERE id = ?')
+    .bind(text, done ? 1 : 0, completedAt, safeJson(metadata), userId ?? existing.updatedBy ?? null, stamp, itemId)
     .run()
   await env.DB.prepare('UPDATE lists SET updated_by = ?, updated_at = ? WHERE id = ?').bind(userId ?? null, stamp, existing.listId).run()
   return getListItem(env, itemId)
@@ -877,6 +878,7 @@ function toListItem(row: DbRow, users = new Map<string, string>()) {
     text: rowString(row, 'text'),
     done: rowNumber(row, 'done') === 1,
     completedAt: rowString(row, 'completed_at') || null,
+    metadata: parseJsonObject(rowString(row, 'metadata_json')),
     createdBy: createdBy || null,
     createdByName: displayNameFor(users, createdBy),
     updatedBy: updatedBy || null,

@@ -2605,6 +2605,155 @@ body {
   font-style: normal;
 }
 
+.item-row {
+  display: grid;
+  gap: 4px;
+}
+
+.item-row .item {
+  margin-bottom: 0;
+}
+
+.item-metadata-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 8px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+}
+
+.item-metadata-form .metadata-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-metadata-form .metadata-field input {
+  min-width: 80px;
+  max-width: 120px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
+.item-metadata-form .metadata-label {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+
+.item-metadata-inline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 2px 12px 6px;
+}
+
+.item-metadata-inline .metadata-chip {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  background: color-mix(in srgb, var(--color-line) 40%, transparent);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.item-metadata-inline .metadata-add,
+.item-metadata-inline .metadata-edit {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  min-height: unset;
+  min-width: unset;
+}
+
+.item-metadata-edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: flex-end;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+}
+
+.item-metadata-edit .metadata-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.item-metadata-edit .metadata-field input {
+  min-width: 80px;
+  max-width: 120px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+}
+
+.item-metadata-edit .metadata-label {
+  font-size: 0.7rem;
+  color: var(--color-muted);
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  margin-left: 6px;
+  vertical-align: middle;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-overdue {
+  background: var(--color-danger);
+  color: var(--color-surface);
+}
+
+.status-due_soon {
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.status-missed {
+  background: var(--color-muted);
+  color: var(--color-surface);
+}
+
+.list-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.list-filter-row .ghost {
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  min-height: unset;
+}
+
+.list-filter-row .ghost.active {
+  background: var(--color-accent);
+  color: var(--color-surface);
+  border-color: var(--color-accent);
+}
+
+.home-status-overdue {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.home-status-due-soon {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 @media (max-width: 920px) {
   .workspace-grid.admin-grid {
     grid-template-columns: 1fr;
