@@ -200,7 +200,6 @@ export function useAppController() {
       setPageLinks(linkData)
       setDisplayModules(homeData.modules)
       setPublicSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
-      setNetwork(null)
       let themeToApply = appearanceData.themeId
       try {
         const userOverride = window.localStorage.getItem(USER_THEME_KEY)
@@ -276,6 +275,12 @@ export function useAppController() {
     const data = await api<NetworkOverview>('/api/network')
     setNetwork(data)
   }
+
+  useEffect(() => {
+    if (activeTab === 'network' && network === null) {
+      void loadFullNetwork()
+    }
+  }, [activeTab, network])
 
   async function openAdmin() {
     if (!session?.adminUnlocked) {
@@ -685,7 +690,6 @@ export function useAppController() {
     },
     network: {
       network,
-      loadFullNetwork,
     },
     admin: {
       adminSettingsDraft,

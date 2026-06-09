@@ -6,22 +6,14 @@ import { formatDateTime, normaliseExternalUrl, toWifiPayload } from '../../share
 export function NetworkWorkspace({
   networkSummary,
   fullNetwork,
-  adminUnlocked,
-  onLoadFullNetwork,
-  onUnlockAdmin,
   deployment,
 }: {
   networkSummary: NetworkSummary | null
   fullNetwork: NetworkOverview | null
-  adminUnlocked: boolean
-  onLoadFullNetwork: () => Promise<void>
-  onUnlockAdmin: () => void
   deployment: HomeData['deployment'] | null
 }) {
   const [qrDataUrl, setQrDataUrl] = useState('')
   const [copyState, setCopyState] = useState('')
-  const [loadingNetwork, setLoadingNetwork] = useState(false)
-  const [loadError, setLoadError] = useState('')
   const hasWifi = Boolean(fullNetwork?.wifiName)
   const wifiPayload = useMemo(() => {
     if (!fullNetwork?.wifiName) return ''
@@ -55,18 +47,6 @@ export function NetworkWorkspace({
     } catch {
       setCopyState('Clipboard blocked')
       window.setTimeout(() => setCopyState(''), 1400)
-    }
-  }
-
-  async function handleLoadNetwork() {
-    setLoadingNetwork(true)
-    setLoadError('')
-    try {
-      await onLoadFullNetwork()
-    } catch (error) {
-      setLoadError(error instanceof Error ? error.message : 'Failed to load network details')
-    } finally {
-      setLoadingNetwork(false)
     }
   }
 
@@ -122,17 +102,7 @@ export function NetworkWorkspace({
             <p>Set Wi-Fi details in Admin settings to enable one-scan join sharing.</p>
           )
         ) : (
-          <div className="network-locked">
-            <p>Admin unlock required to view Wi-Fi credentials and device details.</p>
-            {loadError && <p className="small-note">{loadError}</p>}
-            {adminUnlocked ? (
-              <button type="button" className="button-link" onClick={() => void handleLoadNetwork()} disabled={loadingNetwork}>
-                {loadingNetwork ? 'Loading...' : 'Load network details'}
-              </button>
-            ) : (
-              <button type="button" className="button-link" onClick={onUnlockAdmin}>Unlock admin to view</button>
-            )}
-          </div>
+          <p>Loading network details...</p>
         )}
       </article>
 
@@ -151,7 +121,7 @@ export function NetworkWorkspace({
         <div className="stack-list">
           {fullNetwork && routerUrl && <a className="plain-row" href={routerUrl} target="_blank" rel="noreferrer"><strong>Router</strong><span>{routerUrl}</span></a>}
           {fullNetwork && adminUrl && <a className="plain-row" href={adminUrl} target="_blank" rel="noreferrer"><strong>Admin</strong><span>{adminUrl}</span></a>}
-          {!fullNetwork && <p className="small-note">{adminUnlocked ? 'Load network details to see router links.' : 'Unlock admin to see router links.'}</p>}
+          {!fullNetwork && <p className="small-note">Loading network details...</p>}
           <a className="plain-row" href={deployment?.origin ?? '/'}><strong>Current app host</strong><span>{deployment?.origin ?? 'No host loaded'}</span></a>
         </div>
       </article>
@@ -178,9 +148,7 @@ export function NetworkWorkspace({
             {devices.length === 0 && <p>No devices configured yet. Add JSON entries in Admin settings.</p>}
           </div>
         ) : (
-          <p className="small-note">
-            {adminUnlocked ? "Click 'Load network details' above to view connected devices with IP and MAC addresses." : 'Admin unlock required to view device details including IP and MAC addresses.'}
-          </p>
+          <p className="small-note">Loading network details...</p>
         )}
       </article>
     </section>

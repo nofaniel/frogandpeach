@@ -173,9 +173,6 @@ function App() {
         <NetworkWorkspace
           networkSummary={home?.network ?? null}
           fullNetwork={networkGroup.network}
-          adminUnlocked={auth.session?.adminUnlocked ?? false}
-          onLoadFullNetwork={networkGroup.loadFullNetwork}
-          onUnlockAdmin={navigation.openAdmin}
           deployment={home?.deployment ?? null}
         />
       )}
