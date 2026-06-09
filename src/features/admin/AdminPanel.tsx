@@ -110,6 +110,7 @@ export function AdminPanel({
         <p className="kicker">Site review</p>
         <h2>Review notes</h2>
         <div className="stack-list">
+          <a className="plain-row" href="/docs/project-purpose.md"><strong>Project purpose</strong><span>Goals, scope, module direction, and hosting principles</span></a>
           <a className="plain-row" href="/docs/site-review.md"><strong>Current review</strong><span>Bugs, risks, and visual improvement ideas</span></a>
           <a className="plain-row" href="/docs/modular-hub-upgrade-plan.md"><strong>Plan progress</strong><span>Completed, partial, and deferred work</span></a>
         </div>

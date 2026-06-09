@@ -2,6 +2,10 @@
 
 Private-by-default home hub for households, built with React + TypeScript on Cloudflare Pages Functions and D1.
 
+## Project Purpose
+
+The durable product direction lives in [`docs/project-purpose.md`](docs/project-purpose.md). Use it as the reference for goals, scope, module strategy, hosting principles, and privacy/security boundaries.
+
 ## Live Links
 
 - Live app: `https://frog-peach-home-hub.pages.dev`

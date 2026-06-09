@@ -8,6 +8,8 @@ This checkpoint implements the first modular hub pass: D1-backed household users
 
 The implementation intentionally keeps modules as built-in registry entries. Third-party downloadable module packages remain deferred.
 
+For durable product direction, future module scope decisions should use `docs/project-purpose.md`. This file remains a checkpoint/progress record.
+
 ## Completed
 
 - Replaced env-only admin login with D1 `users` records.

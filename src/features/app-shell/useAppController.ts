@@ -23,6 +23,7 @@ import type {
 import { formatDuration } from '../../shared/format'
 import { isLocationConfigured, resolveBrowserTimeZone } from '../../shared/location'
 import { useTheme } from '../../theme/ThemeProvider'
+import { USER_THEME_KEY, applyDensity, readDensity } from './SettingsPanel'
 
 export type AppScreen = 'loading' | 'password-setup' | 'login' | 'app'
 
@@ -71,6 +72,7 @@ export function useAppController() {
   const [session, setSession] = useState<Session | null>(null)
   const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network'>('home')
   const [adminOpen, setAdminOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [home, setHome] = useState<HomeData | null>(null)
@@ -197,7 +199,13 @@ export function useAppController() {
       setDisplayModules(homeData.modules)
       setPublicSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
       setNetwork(null)
-      void setTheme(appearanceData.themeId)
+      let themeToApply = appearanceData.themeId
+      try {
+        const userOverride = window.localStorage.getItem(USER_THEME_KEY)
+        if (userOverride) themeToApply = userOverride
+      } catch { /* noop */ }
+      void setTheme(themeToApply)
+      applyDensity(readDensity())
       if (window.location.pathname.startsWith('/page/')) {
         const slug = window.location.pathname.replace(/^\/page\//, '')
         setViewedPage(await api<Page>(`/api/pages/${slug}`))
@@ -586,6 +594,8 @@ export function useAppController() {
       setActiveTab,
       adminOpen,
       setAdminOpen,
+      settingsOpen,
+      setSettingsOpen,
       editMode,
       setEditMode,
       viewedPage,

@@ -994,6 +994,52 @@ button.danger:not(.ghost) {
   width: min(460px, 100%);
 }
 
+.icon-settings {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+.density-fieldset {
+  border: none;
+  padding: 0;
+  margin: 16px 0 0;
+}
+
+.density-fieldset legend {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.density-options {
+  display: flex;
+  gap: 6px;
+}
+
+.density-btn {
+  flex: 1;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.density-btn:hover {
+  background: var(--color-surface-2);
+}
+
+.density-btn.active {
+  background: var(--color-ink);
+  border-color: var(--color-ink);
+  color: var(--color-surface);
+}
+
 .error,
 .form-error {
   border-color: color-mix(in srgb, var(--color-danger) 50%, var(--color-line));

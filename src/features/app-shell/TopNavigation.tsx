@@ -13,6 +13,7 @@ export function TopNavigation({
   editMode,
   setEditMode,
   onRefresh,
+  onOpenSettings,
   onOpenAdmin,
   onLogout,
 }: {
@@ -27,6 +28,7 @@ export function TopNavigation({
   editMode: boolean
   setEditMode: Dispatch<SetStateAction<boolean>>
   onRefresh: () => void
+  onOpenSettings: () => void
   onOpenAdmin: () => void
   onLogout: () => void
 }) {
@@ -58,6 +60,7 @@ export function TopNavigation({
           </button>
         )}
         <button type="button" onClick={onRefresh} disabled={busy}>Refresh</button>
+        <button type="button" className="icon-settings" aria-label="Settings" title="Settings" onClick={onOpenSettings}>⚙️</button>
         <button type="button" className="icon-cog" aria-label="Admin settings" title="Admin settings" onClick={onOpenAdmin}>Admin</button>
         <button type="button" className="ghost" onClick={onLogout}>Logout</button>
       </div>

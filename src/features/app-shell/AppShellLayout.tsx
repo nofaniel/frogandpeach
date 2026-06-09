@@ -3,6 +3,7 @@ import { ToastTray } from '../../components/ToastTray'
 import type { Tab, Toast } from '../../shared/api-types'
 import { isNavigationEntryActive, type NavigationEntry } from './navigation'
 import { AdminUnlockModal } from './AdminUnlockModal'
+import { SettingsPanel } from './SettingsPanel'
 import { TopNavigation } from './TopNavigation'
 
 export function AppShellLayout({
@@ -13,11 +14,14 @@ export function AppShellLayout({
   adminUnlockRemainingMs,
   busy,
   onRefresh,
+  onOpenSettings,
+  onCloseSettings,
   onOpenAdmin,
   onLogout,
   navigationEntries,
   activeTab,
   adminOpen,
+  settingsOpen,
   editMode,
   setEditMode,
   onNavigate,
@@ -38,11 +42,14 @@ export function AppShellLayout({
   adminUnlockRemainingMs: number
   busy: boolean
   onRefresh: () => void
+  onOpenSettings: () => void
+  onCloseSettings: () => void
   onOpenAdmin: () => void
   onLogout: () => void
   navigationEntries: NavigationEntry[]
   activeTab: Tab
   adminOpen: boolean
+  settingsOpen: boolean
   editMode: boolean
   setEditMode: Dispatch<SetStateAction<boolean>>
   onNavigate: (entry: NavigationEntry) => void
@@ -70,6 +77,7 @@ export function AppShellLayout({
         editMode={editMode}
         setEditMode={setEditMode}
         onRefresh={onRefresh}
+        onOpenSettings={onOpenSettings}
         onOpenAdmin={onOpenAdmin}
         onLogout={onLogout}
       />
@@ -95,6 +103,7 @@ export function AppShellLayout({
           onCancel={onCancelUnlock}
         />
       )}
+      {settingsOpen && <SettingsPanel onClose={onCloseSettings} />}
       {children}
       <ToastTray toasts={toasts} onDismiss={onDismissToast} />
     </main>
