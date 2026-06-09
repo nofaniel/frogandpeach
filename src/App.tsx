@@ -162,6 +162,7 @@ function App() {
           onAddStroke={whiteboardGroup.addStroke}
           onRemoveStroke={whiteboardGroup.removeStroke}
           onClearAll={whiteboardGroup.clearAll}
+          onRefresh={whiteboardGroup.refresh}
         />
       )}
 

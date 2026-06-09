@@ -1,9 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildMarineCacheKey, getMarine, getNetworkSummary, getSettings, getWeather, normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport, updateList, updateSettings } from './data'
+import { buildMarineCacheKey, getDashboard, getMarine, getNetworkSummary, getSettings, getWeather, listWhiteboardStrokes, normaliseThemeId, parseCustomPageManifest, parseCustomPageManifestReport, updateList, updateSettings } from './data'
 
 type FakeDbState = {
   settings: Map<string, string>
   cache: Array<{ cache_key: string; payload: string; expires_at: string; updated_at: string }>
+  users: Array<{ id: string; display_name: string }>
+  whiteboardStrokes: Array<{
+    id: string
+    points: string
+    color: string
+    width: number
+    tool: string
+    opacity: number
+    created_by: string | null
+    created_at: string
+  }>
   lists: Array<{
     id: string
     name: string
@@ -15,13 +26,28 @@ type FakeDbState = {
     created_at: string
     updated_at: string
   }>
-  listItems: Array<Record<string, string | number | null>>
+  listItems: Array<{
+    id: string
+    list_id: string
+    text: string
+    done: number
+    completed_at: string | null
+    metadata_json: string
+    created_by: string
+    updated_by: string
+    created_at: string
+    updated_at: string
+  }>
 }
 
 function createFakeEnv(
   initialSettings: Record<string, string> = {},
   cacheKeys: string[] = [],
   initialLists: Array<Partial<FakeDbState['lists'][number]> & { id: string; name: string; list_type: string; reset_key?: string; metadata_json?: string }> = [],
+  options: {
+    users?: FakeDbState['users']
+    whiteboardStrokes?: FakeDbState['whiteboardStrokes']
+  } = {},
 ) {
   const state: FakeDbState = {
     settings: new Map(Object.entries(initialSettings)),
@@ -31,6 +57,8 @@ function createFakeEnv(
       expires_at: '2999-01-01T00:00:00.000Z',
       updated_at: '2999-01-01T00:00:00.000Z',
     })),
+    users: [...(options.users ?? [])],
+    whiteboardStrokes: [...(options.whiteboardStrokes ?? [])],
     lists: initialLists.map((list) => ({
       id: list.id,
       name: list.name,
@@ -60,14 +88,24 @@ function createFakeEnv(
           if (sql === 'SELECT * FROM cache ORDER BY updated_at DESC') {
             return { results: [...state.cache] }
           }
+          if (sql === 'SELECT id, display_name FROM users') {
+            return { results: [...state.users] }
+          }
           if (sql === 'SELECT * FROM lists ORDER BY updated_at DESC') {
             return { results: [...state.lists] }
+          }
+          if (sql === 'SELECT * FROM whiteboard_strokes ORDER BY created_at ASC') {
+            return { results: [...state.whiteboardStrokes] }
           }
           if (sql === 'SELECT * FROM list_items ORDER BY done ASC, created_at ASC') {
             return { results: [...state.listItems] }
           }
           if (sql === 'SELECT id, list_type, reset_key, metadata_json FROM lists') {
             return { results: [...state.lists] }
+          }
+          if (sql === 'SELECT id, done, completed_at, metadata_json FROM list_items WHERE list_id = ?') {
+            const [listId] = statement.params as [string]
+            return { results: state.listItems.filter((item) => item.list_id === listId) }
           }
           return { results: [] }
         },
@@ -79,6 +117,10 @@ function createFakeEnv(
           }
           if (sql === 'SELECT id, display_name FROM users') {
             return null
+          }
+          if (sql === 'SELECT * FROM list_items WHERE id = ?') {
+            const [id] = statement.params as [string]
+            return state.listItems.find((item) => item.id === id) ?? null
           }
           return null
         },
@@ -96,6 +138,55 @@ function createFakeEnv(
               row.list_type = listType
               row.reset_key = resetKey
               row.metadata_json = metadataJson
+              row.updated_by = updatedBy
+              row.updated_at = updatedAt
+            }
+            return { success: true }
+          }
+          if (sql.startsWith('INSERT INTO list_items')) {
+            const [itemId, listId, text, metadataJson, createdBy, updatedBy, createdAt, updatedAt] = statement.params as [string, string, string, string, string, string, string, string]
+            state.listItems.push({
+              id: itemId,
+              list_id: listId,
+              text,
+              done: 0,
+              completed_at: null,
+              metadata_json: metadataJson,
+              created_by: createdBy,
+              updated_by: updatedBy,
+              created_at: createdAt,
+              updated_at: updatedAt,
+            })
+            return { success: true }
+          }
+          if (sql.startsWith('UPDATE list_items SET') && sql.includes('WHERE id = ?') && sql.includes('done = 0, completed_at = NULL')) {
+            const [metadataJson, updatedAt, id] = statement.params as [string, string, string]
+            const row = state.listItems.find((entry) => entry.id === id)
+            if (row) {
+              row.metadata_json = metadataJson
+              row.updated_at = updatedAt
+              row.done = 0
+              row.completed_at = null
+            }
+            return { success: true }
+          }
+          if (sql.startsWith('UPDATE list_items SET') && sql.includes('WHERE id = ?') && sql.includes('text = ?')) {
+            const [text, done, completedAt, metadataJson, updatedBy, updatedAt, id] = statement.params as [string, number, string | null, string, string, string, string]
+            const row = state.listItems.find((entry) => entry.id === id)
+            if (row) {
+              row.text = text
+              row.done = done
+              row.completed_at = completedAt
+              row.metadata_json = metadataJson
+              row.updated_by = updatedBy
+              row.updated_at = updatedAt
+            }
+            return { success: true }
+          }
+          if (sql === 'UPDATE lists SET updated_by = ?, updated_at = ? WHERE id = ?') {
+            const [updatedBy, updatedAt, id] = statement.params as [string, string, string]
+            const row = state.lists.find((entry) => entry.id === id)
+            if (row) {
               row.updated_by = updatedBy
               row.updated_at = updatedAt
             }
@@ -468,5 +559,117 @@ describe('list starring metadata', () => {
       note: 'keep',
       starred: true,
     })
+  })
+})
+
+describe('whiteboard data', () => {
+  it('maps stroke author ids to display names', async () => {
+    const env = createFakeEnv(
+      {},
+      [],
+      [],
+      {
+        users: [{ id: 'user-1', display_name: 'Peach' }],
+        whiteboardStrokes: [
+          {
+            id: 'stroke-1',
+            points: JSON.stringify([{ x: 12, y: 24 }]),
+            color: '#111111',
+            width: 4,
+            tool: 'pen',
+            opacity: 1,
+            created_by: 'user-1',
+            created_at: '2026-06-09T10:00:00.000Z',
+          },
+        ],
+      },
+    )
+
+    await expect(listWhiteboardStrokes(env)).resolves.toEqual([
+      {
+        id: 'stroke-1',
+        points: [{ x: 12, y: 24 }],
+        color: '#111111',
+        width: 4,
+        tool: 'pen',
+        opacity: 1,
+        createdByName: 'Peach',
+        createdAt: '2026-06-09T10:00:00.000Z',
+      },
+    ])
+  })
+
+  it('keeps the most recent strokes in the dashboard preview payload', async () => {
+    const env = createFakeEnv(
+      {},
+      [],
+      [],
+      {
+        whiteboardStrokes: Array.from({ length: 14 }, (_, index) => ({
+          id: `stroke-${index + 1}`,
+          points: JSON.stringify([{ x: index, y: index + 1 }]),
+          color: '#111111',
+          width: 4,
+          tool: 'pen',
+          opacity: 1,
+          created_by: null,
+          created_at: `2026-06-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`,
+        })),
+      },
+    )
+
+    const dashboard = await getDashboard(env, new Request('https://frogpeach.example/api/home'))
+
+    expect(dashboard.whiteboardStrokes).toHaveLength(12)
+    expect(dashboard.whiteboardStrokes[0]?.id).toBe('stroke-3')
+    expect(dashboard.whiteboardStrokes.at(-1)?.id).toBe('stroke-14')
+  })
+})
+
+describe('list item metadata', () => {
+  it('stores and returns metadata for created items', async () => {
+    const env = createFakeEnv(
+      {},
+      [],
+      [{ id: 'list-1', name: 'Shopping', list_type: 'shopping' }],
+    )
+
+    const { createListItem } = await import('./data')
+    const item = await createListItem(env, 'list-1', 'Milk', 'user-1', { quantity: '2', category: 'dairy' })
+
+    expect(item).not.toBeNull()
+    expect(item?.text).toBe('Milk')
+    expect(item?.metadata).toMatchObject({ quantity: '2', category: 'dairy' })
+  })
+
+  it('preserves metadata when updating item text', async () => {
+    const env = createFakeEnv(
+      {},
+      [],
+      [{ id: 'list-1', name: 'Shopping', list_type: 'shopping' }],
+    )
+
+    const { createListItem, updateListItem } = await import('./data')
+    const item = await createListItem(env, 'list-1', 'Milk', 'user-1', { quantity: '2' })
+    expect(item).not.toBeNull()
+
+    const updated = await updateListItem(env, item!.id, { text: 'Oat milk' }, 'user-2')
+    expect(updated?.text).toBe('Oat milk')
+    expect(updated?.metadata).toMatchObject({ quantity: '2' })
+  })
+
+  it('replaces metadata when metadata patch is provided', async () => {
+    const env = createFakeEnv(
+      {},
+      [],
+      [{ id: 'list-1', name: 'Shopping', list_type: 'shopping' }],
+    )
+
+    const { createListItem, updateListItem } = await import('./data')
+    const item = await createListItem(env, 'list-1', 'Milk', 'user-1', { quantity: '2' })
+    expect(item).not.toBeNull()
+
+    const updated = await updateListItem(env, item!.id, { metadata: { quantity: '3', category: 'dairy' } }, 'user-2')
+    expect(updated?.metadata).toMatchObject({ quantity: '3', category: 'dairy' })
   })
 })

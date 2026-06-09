@@ -20,9 +20,11 @@ import type {
   UserPatch,
   UserRecord,
   WhiteboardStroke,
+  WhiteboardStrokeInput,
 } from '../../shared/api-types'
 import { formatDuration } from '../../shared/format'
 import { isLocationConfigured, resolveBrowserTimeZone } from '../../shared/location'
+import { getWhiteboardPreviewStrokes } from '../../shared/whiteboard'
 import { useTheme } from '../../theme/ThemeProvider'
 import { USER_THEME_KEY, applyDensity, readDensity } from './SettingsPanel'
 
@@ -601,6 +603,27 @@ export function useAppController() {
     () => displayModules.filter((module) => module.installed && module.enabled),
     [displayModules],
   )
+  const whiteboardPreviewStrokes = useMemo(
+    () => getWhiteboardPreviewStrokes(whiteboardStrokes, 12),
+    [whiteboardStrokes],
+  )
+
+  useEffect(() => {
+    setHome((current) => {
+      if (!current) return current
+      return {
+        ...current,
+        whiteboardStrokes: whiteboardPreviewStrokes,
+        whiteboardStrokeCount: whiteboardStrokes.length,
+      }
+    })
+  }, [whiteboardPreviewStrokes])
+
+  async function refreshWhiteboard() {
+    const data = await api<WhiteboardStroke[]>('/api/whiteboard')
+    setWhiteboardStrokes(data)
+    return data
+  }
 
   return {
     auth: {
@@ -694,24 +717,35 @@ export function useAppController() {
     },
     whiteboard: {
       strokes: whiteboardStrokes,
-      addStroke: async (stroke: Omit<WhiteboardStroke, 'id' | 'createdByName' | 'createdAt'>) => {
-        await run(async () => {
-          await api('/api/whiteboard', { method: 'POST', body: stroke })
-          await refreshAll()
-        })
+      addStroke: async (stroke: WhiteboardStrokeInput) => {
+        try {
+          const created = await api<WhiteboardStroke>('/api/whiteboard', { method: 'POST', body: stroke })
+          setWhiteboardStrokes((current) => [...current, created])
+          return created
+        } catch (err) {
+          addToast(err instanceof Error ? err.message : 'Something went wrong', 'warn')
+          throw err
+        }
       },
       removeStroke: async (id: string) => {
-        await run(async () => {
+        try {
           await api(`/api/whiteboard/${id}`, { method: 'DELETE' })
-          await refreshAll()
-        })
+          setWhiteboardStrokes((current) => current.filter((stroke) => stroke.id !== id))
+        } catch (err) {
+          addToast(err instanceof Error ? err.message : 'Something went wrong', 'warn')
+          throw err
+        }
       },
       clearAll: async () => {
-        await run(async () => {
+        try {
           await api('/api/whiteboard/clear', { method: 'DELETE' })
-          await refreshAll()
-        })
+          setWhiteboardStrokes([])
+        } catch (err) {
+          addToast(err instanceof Error ? err.message : 'Something went wrong', 'warn')
+          throw err
+        }
       },
+      refresh: refreshWhiteboard,
     },
     network: {
       network,

@@ -136,7 +136,8 @@ export async function getDashboard(env: Env, request: Request) {
     notes: notes.slice(0, 12),
     lists: lists.slice(0, 12),
     pages: pages.slice(0, 12),
-    whiteboardStrokes: whiteboardStrokes.slice(0, 12),
+    whiteboardStrokes: getWhiteboardPreviewStrokes(whiteboardStrokes, 12),
+    whiteboardStrokeCount: whiteboardStrokes.length,
     network,
     settings,
     modules,
@@ -730,14 +731,30 @@ export async function clearCache(env: Env, key?: string) {
 async function refreshPeriodicLists(env: Env) {
   const rows = (await env.DB.prepare('SELECT id, list_type, reset_key, metadata_json FROM lists').all<DbRow>()).results ?? []
   for (const row of rows) {
+    const listId = rowString(row, 'id')
     const listType = normaliseListType(rowString(row, 'list_type'))
     if (!shouldRefreshList(listType, rowString(row, 'reset_key'))) continue
     const nextKey = resetKeyForListType(listType)
     const metadata = parseJsonObject(rowString(row, 'metadata_json'))
     metadata.lastResetAt = nowIso()
     metadata.lastResetKey = rowString(row, 'reset_key')
-    await env.DB.prepare('UPDATE list_items SET done = 0, completed_at = NULL, updated_at = ? WHERE list_id = ?').bind(nowIso(), rowString(row, 'id')).run()
-    await env.DB.prepare('UPDATE lists SET reset_key = ?, metadata_json = ?, updated_at = ? WHERE id = ?').bind(nextKey, JSON.stringify(metadata), nowIso(), rowString(row, 'id')).run()
+
+    const itemRows = (await env.DB.prepare('SELECT id, done, completed_at, metadata_json FROM list_items WHERE list_id = ?').bind(listId).all<DbRow>()).results ?? []
+    const stamp = nowIso()
+    for (const itemRow of itemRows) {
+      const itemMeta = parseJsonObject(rowString(itemRow, 'metadata_json'))
+      const wasDone = rowNumber(itemRow, 'done') === 1
+      if (wasDone) {
+        itemMeta.missedOnLastReset = false
+        itemMeta.lastCompletedAt = rowString(itemRow, 'completed_at') || stamp
+      } else {
+        itemMeta.missedOnLastReset = true
+      }
+      await env.DB.prepare('UPDATE list_items SET done = 0, completed_at = NULL, metadata_json = ?, updated_at = ? WHERE id = ?')
+        .bind(safeJson(itemMeta), stamp, rowString(itemRow, 'id')).run()
+    }
+
+    await env.DB.prepare('UPDATE lists SET reset_key = ?, metadata_json = ?, updated_at = ? WHERE id = ?').bind(nextKey, JSON.stringify(metadata), nowIso(), listId).run()
   }
 }
 
@@ -1091,27 +1108,43 @@ type DbWhiteboardStroke = {
   created_at: string
 }
 
-function toWhiteboardStroke(row: DbWhiteboardStroke): WhiteboardStroke {
-  return {
-    id: row.id,
-    points: JSON.parse(row.points || '[]'),
-    color: row.color,
-    width: row.width,
-    tool: (row.tool === 'eraser' ? 'eraser' : 'pen') as 'pen' | 'eraser',
-    opacity: row.opacity,
-    createdByName: row.created_by ?? null,
-    createdAt: row.created_at,
+function toWhiteboardStroke(row: DbWhiteboardStroke): WhiteboardStroke | null {
+  try {
+    const stroke = normaliseWhiteboardStrokeInput({
+      points: JSON.parse(row.points || '[]'),
+      color: row.color,
+      width: row.width,
+      tool: row.tool,
+      opacity: row.opacity,
+    })
+    return {
+      id: row.id,
+      ...stroke,
+      createdByName: null,
+      createdAt: row.created_at,
+    }
+  } catch (error) {
+    console.warn(`Skipping invalid whiteboard stroke ${row.id}`, error)
+    return null
   }
 }
 
 export async function listWhiteboardStrokes(env: Env): Promise<WhiteboardStroke[]> {
   const { results } = await env.DB.prepare('SELECT * FROM whiteboard_strokes ORDER BY created_at ASC').all<DbWhiteboardStroke>()
-  return results.map(toWhiteboardStroke)
+  const users = await getUserNameMap(env)
+  return results.flatMap((row) => {
+    const stroke = toWhiteboardStroke(row)
+    if (!stroke) return []
+    return [{
+      ...stroke,
+      createdByName: displayNameFor(users, row.created_by ?? ''),
+    }]
+  })
 }
 
 export async function createWhiteboardStroke(
   env: Env,
-  patch: Omit<WhiteboardStroke, 'id' | 'createdByName' | 'createdAt'>,
+  patch: WhiteboardStrokeInput,
   userId?: string,
   userName?: string | null,
 ): Promise<WhiteboardStroke> {
@@ -1147,3 +1180,5 @@ export async function clearWhiteboardStrokes(env: Env): Promise<void> {
 }
 
 import type { WhiteboardStroke } from '../shared/api-types'
+import type { WhiteboardStrokeInput } from '../shared/api-types'
+import { getWhiteboardPreviewStrokes, normaliseWhiteboardStrokeInput } from '../shared/whiteboard'

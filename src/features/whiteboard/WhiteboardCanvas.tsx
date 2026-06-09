@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from 'react'
+import type { WhiteboardSurface } from './rendering'
 
 type Tool = 'pen' | 'eraser' | 'pan'
 
@@ -8,14 +9,20 @@ export function WhiteboardCanvas({
   tool,
   boardSize,
   isPanning,
+  zoom,
+  surface,
   handleResize,
+  empty,
 }: {
   containerRef: RefObject<HTMLDivElement | null>
   canvasRef: RefObject<HTMLCanvasElement | null>
   tool: Tool
   boardSize: { width: number; height: number }
   isPanning: boolean
+  zoom: number
+  surface: WhiteboardSurface
   handleResize: () => void
+  empty: boolean
 }) {
   useEffect(() => {
     handleResize()
@@ -34,7 +41,7 @@ export function WhiteboardCanvas({
       window.removeEventListener('resize', handleResize)
       resizeObserver?.disconnect()
     }
-  }, [canvasRef, handleResize, boardSize.width, boardSize.height])
+  }, [boardSize.height, boardSize.width, canvasRef, handleResize, zoom])
 
   const cursor = tool === 'pan'
     ? (isPanning ? 'grabbing' : 'grab')
@@ -42,11 +49,19 @@ export function WhiteboardCanvas({
 
   return (
     <div ref={containerRef} className="wb-canvas-container">
-      <canvas
-        ref={canvasRef}
-        className="wb-canvas"
-        style={{ width: boardSize.width, height: boardSize.height, cursor }}
-      />
+      <div className={`wb-canvas-stage surface-${surface}`} style={{ width: boardSize.width * zoom, height: boardSize.height * zoom }}>
+        <canvas
+          ref={canvasRef}
+          className="wb-canvas"
+          style={{ width: boardSize.width * zoom, height: boardSize.height * zoom, cursor }}
+        />
+        {empty && (
+          <div className="wb-empty-state">
+            <strong>Blank board</strong>
+            <span>Pick a tool and start sketching. The board expands as you move across it.</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

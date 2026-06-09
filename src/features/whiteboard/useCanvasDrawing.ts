@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { WhiteboardStroke } from '../../shared/api-types'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { WhiteboardStroke, WhiteboardStrokeInput } from '../../shared/api-types'
+import type { WhiteboardSurface } from './rendering'
+import { drawWhiteboardStroke, paintWhiteboardSurface } from './rendering'
 
 const POINT_SAMPLING_DISTANCE = 5
 const DEFAULT_BOARD_SIZE = { width: 2400, height: 1700 }
@@ -14,65 +16,37 @@ type DrawingOptions = {
   tool: Tool
   color: string
   width: number
+  opacity: number
 }
 
 type Point = { x: number; y: number }
-type RenderStroke = { points: Point[]; color: string; width: number; tool: string; opacity: number }
-type LocalStroke = RenderStroke & { tempId: string }
-type UndoEntry =
-  | { id: string; isServer: false; stroke: LocalStroke }
-  | { id: string; isServer: true }
+type LocalStroke = WhiteboardStrokeInput & { tempId: string }
+type HistoryEntry = {
+  historyId: string
+  tempId: string
+  stroke: WhiteboardStrokeInput
+  persistedId: string | null
+  status: 'pending' | 'saved' | 'cancelled'
+  epoch: number
+}
 
 function distance(a: Point, b: Point): number {
   return Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2)
-}
-
-function drawStroke(ctx: CanvasRenderingContext2D, stroke: RenderStroke) {
-  const { points, color, width, tool, opacity } = stroke
-  if (points.length === 0) return
-
-  ctx.save()
-  ctx.globalAlpha = opacity
-  if (tool === 'eraser') {
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.strokeStyle = '#000000'
-  } else {
-    ctx.strokeStyle = color
-  }
-  ctx.lineWidth = width
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-
-  ctx.beginPath()
-  ctx.moveTo(points[0].x, points[0].y)
-
-  if (points.length === 1) {
-    ctx.lineTo(points[0].x + 0.1, points[0].y + 0.1)
-  } else if (points.length === 2) {
-    ctx.lineTo(points[1].x, points[1].y)
-  } else {
-    for (let i = 1; i < points.length - 1; i++) {
-      const mx = (points[i].x + points[i + 1].x) / 2
-      const my = (points[i].y + points[i + 1].y) / 2
-      ctx.quadraticCurveTo(points[i].x, points[i].y, mx, my)
-    }
-    const last = points[points.length - 1]
-    ctx.lineTo(last.x, last.y)
-  }
-
-  ctx.stroke()
-  ctx.restore()
 }
 
 function isDrawingTool(tool: Tool): tool is DrawingTool {
   return tool === 'pen' || tool === 'eraser'
 }
 
+function createTempId(prefix: string) {
+  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
 export function useCanvasDrawing(
   serverStrokes: WhiteboardStroke[],
   options: DrawingOptions,
-  onAddStroke: (stroke: Omit<WhiteboardStroke, 'id' | 'createdByName' | 'createdAt'>) => void,
-  onRemoveStroke: (id: string) => void,
+  onAddStroke: (stroke: WhiteboardStrokeInput) => Promise<WhiteboardStroke>,
+  onRemoveStroke: (id: string) => Promise<void>,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -81,31 +55,22 @@ export function useCanvasDrawing(
   const panStart = useRef<{ x: number; y: number; scrollLeft: number; scrollTop: number } | null>(null)
   const currentPoints = useRef<Point[]>([])
   const lastPoint = useRef<Point | null>(null)
-  const localStrokesRef = useRef<LocalStroke[]>([])
-  const undoStackRef = useRef<UndoEntry[]>([])
-  const redoStackRef = useRef<UndoEntry[]>([])
-  const [undoRedoVersion, setUndoRedoVersion] = useState(0)
+  const hiddenServerStrokeIdsRef = useRef<Set<string>>(new Set())
+  const undoStackRef = useRef<HistoryEntry[]>([])
+  const redoStackRef = useRef<WhiteboardStrokeInput[]>([])
+  const clearEpochRef = useRef(0)
+  const [optimisticStrokes, setOptimisticStrokes] = useState<LocalStroke[]>([])
+  const [version, setVersion] = useState(0)
   const [boardSize, setBoardSize] = useState(DEFAULT_BOARD_SIZE)
   const [isPanning, setIsPanning] = useState(false)
 
-  const allStrokesForRender = useCallback(() => {
-    const result: RenderStroke[] = []
-    const undoneServerIds = new Set(
-      undoStackRef.current.filter((entry) => entry.isServer).map((entry) => entry.id),
-    )
-
-    for (const stroke of serverStrokes) {
-      if (!undoneServerIds.has(stroke.id)) {
-        result.push(stroke)
-      }
-    }
-
-    for (const stroke of localStrokesRef.current) {
-      result.push(stroke)
-    }
-
-    return result
-  }, [serverStrokes])
+  const renderStrokes = useMemo(
+    () => [
+      ...serverStrokes.filter((stroke) => !hiddenServerStrokeIdsRef.current.has(stroke.id)),
+      ...optimisticStrokes,
+    ],
+    [optimisticStrokes, serverStrokes, version],
+  )
 
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -118,22 +83,22 @@ export function useCanvasDrawing(
     ctx.save()
     ctx.scale(dpr, dpr)
 
-    for (const stroke of allStrokesForRender()) {
-      drawStroke(ctx, stroke)
+    for (const stroke of renderStrokes) {
+      drawWhiteboardStroke(ctx, stroke)
     }
 
     if (isDrawingTool(options.tool) && currentPoints.current.length > 0) {
-      drawStroke(ctx, {
+      drawWhiteboardStroke(ctx, {
         points: currentPoints.current,
         color: options.color,
         width: options.width,
         tool: options.tool,
-        opacity: 1,
+        opacity: options.opacity,
       })
     }
 
     ctx.restore()
-  }, [allStrokesForRender, options.color, options.tool, options.width])
+  }, [options.color, options.opacity, options.tool, options.width, renderStrokes])
 
   const handleResize = useCallback(() => {
     const canvas = canvasRef.current
@@ -151,7 +116,7 @@ export function useCanvasDrawing(
 
   useEffect(() => {
     redrawCanvas()
-  }, [serverStrokes, undoRedoVersion, redrawCanvas])
+  }, [redrawCanvas, version])
 
   useEffect(() => {
     handleResize()
@@ -161,7 +126,7 @@ export function useCanvasDrawing(
     let maxX = DEFAULT_BOARD_SIZE.width
     let maxY = DEFAULT_BOARD_SIZE.height
 
-    for (const stroke of serverStrokes) {
+    for (const stroke of renderStrokes) {
       for (const point of stroke.points) {
         maxX = Math.max(maxX, point.x + BOARD_PADDING)
         maxY = Math.max(maxY, point.y + BOARD_PADDING)
@@ -169,13 +134,13 @@ export function useCanvasDrawing(
     }
 
     setBoardSize((current) => {
-      const nextWidth = Math.ceil(Math.max(current.width, maxX))
-      const nextHeight = Math.ceil(Math.max(current.height, maxY))
+      const nextWidth = Math.ceil(Math.max(DEFAULT_BOARD_SIZE.width, maxX))
+      const nextHeight = Math.ceil(Math.max(DEFAULT_BOARD_SIZE.height, maxY))
       return nextWidth === current.width && nextHeight === current.height
         ? current
         : { width: nextWidth, height: nextHeight }
     })
-  }, [serverStrokes])
+  }, [renderStrokes])
 
   const expandBoardIfNeeded = useCallback((point: Point) => {
     setBoardSize((current) => {
@@ -195,8 +160,51 @@ export function useCanvasDrawing(
   const getCanvasPoint = useCallback((event: PointerEvent): Point => {
     const canvas = canvasRef.current!
     const rect = canvas.getBoundingClientRect()
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top }
-  }, [])
+    const scaleX = boardSize.width / Math.max(rect.width, 1)
+    const scaleY = boardSize.height / Math.max(rect.height, 1)
+    return {
+      x: (event.clientX - rect.left) * scaleX,
+      y: (event.clientY - rect.top) * scaleY,
+    }
+  }, [boardSize.height, boardSize.width])
+
+  const queueStrokePersistence = useCallback(async (entry: HistoryEntry, localStroke: LocalStroke) => {
+    try {
+      const created = await onAddStroke(entry.stroke)
+      if (entry.status === 'cancelled' || entry.epoch !== clearEpochRef.current) {
+        await onRemoveStroke(created.id)
+        return
+      }
+
+      entry.persistedId = created.id
+      entry.status = 'saved'
+      setOptimisticStrokes((current) => current.filter((stroke) => stroke.tempId !== localStroke.tempId))
+      setVersion((current) => current + 1)
+    } catch {
+      setOptimisticStrokes((current) => current.filter((stroke) => stroke.tempId !== localStroke.tempId))
+      undoStackRef.current = undoStackRef.current.filter((candidate) => candidate.historyId !== entry.historyId)
+      setVersion((current) => current + 1)
+    }
+  }, [onAddStroke, onRemoveStroke])
+
+  const commitStroke = useCallback((stroke: WhiteboardStrokeInput) => {
+    const tempId = createTempId('local')
+    const localStroke: LocalStroke = { tempId, ...stroke }
+    const entry: HistoryEntry = {
+      historyId: createTempId('history'),
+      tempId,
+      stroke,
+      persistedId: null,
+      status: 'pending',
+      epoch: clearEpochRef.current,
+    }
+
+    setOptimisticStrokes((current) => [...current, localStroke])
+    undoStackRef.current.push(entry)
+    redoStackRef.current = []
+    setVersion((current) => current + 1)
+    void queueStrokePersistence(entry, localStroke)
+  }, [queueStrokePersistence])
 
   const handlePointerDown = useCallback((event: PointerEvent) => {
     const canvas = canvasRef.current
@@ -225,7 +233,8 @@ export function useCanvasDrawing(
     currentPoints.current = [point]
     lastPoint.current = point
     expandBoardIfNeeded(point)
-  }, [expandBoardIfNeeded, getCanvasPoint, options.tool])
+    redrawCanvas()
+  }, [expandBoardIfNeeded, getCanvasPoint, options.tool, redrawCanvas])
 
   const handlePointerMove = useCallback((event: PointerEvent) => {
     if (isPanningRef.current) {
@@ -240,52 +249,17 @@ export function useCanvasDrawing(
     }
 
     if (!isDrawing.current || !isDrawingTool(options.tool)) return
-    const canvas = canvasRef.current
-    if (!canvas) return
 
     event.preventDefault()
     const point = getCanvasPoint(event)
-    const prev = lastPoint.current
-    if (prev && distance(prev, point) < POINT_SAMPLING_DISTANCE) return
+    const previous = lastPoint.current
+    if (previous && distance(previous, point) < POINT_SAMPLING_DISTANCE) return
 
     currentPoints.current.push(point)
     lastPoint.current = point
     expandBoardIfNeeded(point)
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const dpr = window.devicePixelRatio || 1
-    ctx.save()
-    ctx.scale(dpr, dpr)
-    if (options.tool === 'eraser') {
-      ctx.globalCompositeOperation = 'destination-out'
-      ctx.strokeStyle = '#000000'
-    } else {
-      ctx.strokeStyle = options.color
-    }
-    ctx.lineWidth = options.width
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-
-    const points = currentPoints.current
-    const length = points.length
-    if (length >= 2) {
-      ctx.beginPath()
-      if (length === 2) {
-        ctx.moveTo(points[0].x, points[0].y)
-        ctx.lineTo(points[1].x, points[1].y)
-      } else {
-        ctx.moveTo(points[length - 3].x, points[length - 3].y)
-        const mx = (points[length - 2].x + points[length - 1].x) / 2
-        const my = (points[length - 2].y + points[length - 1].y) / 2
-        ctx.quadraticCurveTo(points[length - 2].x, points[length - 2].y, mx, my)
-      }
-      ctx.stroke()
-    }
-
-    ctx.restore()
-  }, [expandBoardIfNeeded, getCanvasPoint, options.color, options.tool, options.width])
+    redrawCanvas()
+  }, [expandBoardIfNeeded, getCanvasPoint, options.tool, redrawCanvas])
 
   const finishPointerInteraction = useCallback((event: PointerEvent) => {
     const canvas = canvasRef.current
@@ -304,33 +278,26 @@ export function useCanvasDrawing(
     isDrawing.current = false
 
     if (currentPoints.current.length > 0) {
-      const tempId = 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
-      const strokeData = {
+      commitStroke({
         points: [...currentPoints.current],
         color: options.color,
         width: options.width,
         tool: options.tool,
-        opacity: 1,
-      }
-
-      const localStroke = { ...strokeData, tempId }
-      localStrokesRef.current.push(localStroke)
-      undoStackRef.current.push({ id: tempId, isServer: false, stroke: localStroke })
-      redoStackRef.current = []
-      onAddStroke(strokeData)
-      setUndoRedoVersion((version) => version + 1)
+        opacity: options.opacity,
+      })
     }
 
     currentPoints.current = []
     lastPoint.current = null
+    redrawCanvas()
     if (canvas?.hasPointerCapture(event.pointerId)) {
       canvas.releasePointerCapture(event.pointerId)
     }
-  }, [options.color, options.tool, options.width, onAddStroke])
+  }, [commitStroke, options.color, options.opacity, options.tool, options.width, redrawCanvas])
 
   useEffect(() => {
     const canvas = canvasRef.current
-    if (!canvas) return
+    if (!canvas) return undefined
 
     canvas.addEventListener('pointerdown', handlePointerDown)
     canvas.addEventListener('pointermove', handlePointerMove)
@@ -345,44 +312,55 @@ export function useCanvasDrawing(
     }
   }, [finishPointerInteraction, handlePointerDown, handlePointerMove])
 
-  const undo = useCallback(() => {
+  const undo = useCallback(async () => {
     const entry = undoStackRef.current.pop()
     if (!entry) return
 
-    if (entry.isServer) {
-      onRemoveStroke(entry.id)
-    } else {
-      const index = localStrokesRef.current.findIndex((stroke) => stroke.tempId === entry.id)
-      if (index !== -1) localStrokesRef.current.splice(index, 1)
-    }
+    redoStackRef.current.push(entry.stroke)
 
-    redoStackRef.current.push(entry)
-    setUndoRedoVersion((version) => version + 1)
-  }, [onRemoveStroke])
-
-  const redo = useCallback(() => {
-    const entry = redoStackRef.current.pop()
-    if (!entry) return
-
-    if (entry.isServer) {
-      redoStackRef.current.push(entry)
+    if (entry.status === 'pending') {
+      entry.status = 'cancelled'
+      setOptimisticStrokes((current) => current.filter((stroke) => stroke.tempId !== entry.tempId))
+      setVersion((current) => current + 1)
       return
     }
 
-    localStrokesRef.current.push(entry.stroke)
-    undoStackRef.current.push(entry)
-    setUndoRedoVersion((version) => version + 1)
-  }, [])
+    if (!entry.persistedId) {
+      setVersion((current) => current + 1)
+      return
+    }
+
+    hiddenServerStrokeIdsRef.current.add(entry.persistedId)
+    setVersion((current) => current + 1)
+    try {
+      await onRemoveStroke(entry.persistedId)
+    } catch {
+      hiddenServerStrokeIdsRef.current.delete(entry.persistedId)
+      redoStackRef.current.pop()
+      undoStackRef.current.push(entry)
+      setVersion((current) => current + 1)
+    }
+  }, [onRemoveStroke])
+
+  const redo = useCallback(async () => {
+    const stroke = redoStackRef.current.pop()
+    if (!stroke) return
+    commitStroke(stroke)
+  }, [commitStroke])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key === 'z') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault()
         if (event.shiftKey) {
-          redo()
+          void redo()
         } else {
-          undo()
+          void undo()
         }
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'y') {
+        event.preventDefault()
+        void redo()
       }
     }
 
@@ -390,13 +368,42 @@ export function useCanvasDrawing(
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [redo, undo])
 
-  function clearAll() {
-    localStrokesRef.current = []
+  const clearAll = useCallback(() => {
+    const previousHiddenIds = new Set(hiddenServerStrokeIdsRef.current)
+    const nextHiddenIds = new Set(previousHiddenIds)
+    for (const stroke of serverStrokes) {
+      nextHiddenIds.add(stroke.id)
+    }
+    hiddenServerStrokeIdsRef.current = nextHiddenIds
+
+    clearEpochRef.current += 1
+    currentPoints.current = []
+    lastPoint.current = null
+    setOptimisticStrokes([])
     undoStackRef.current = []
     redoStackRef.current = []
     setBoardSize(DEFAULT_BOARD_SIZE)
-    setUndoRedoVersion((version) => version + 1)
-  }
+    setVersion((current) => current + 1)
+
+    return () => {
+      hiddenServerStrokeIdsRef.current = previousHiddenIds
+      setVersion((current) => current + 1)
+    }
+  }, [serverStrokes])
+
+  const exportPng = useCallback((surface: WhiteboardSurface) => {
+    const offscreen = document.createElement('canvas')
+    offscreen.width = boardSize.width
+    offscreen.height = boardSize.height
+    const ctx = offscreen.getContext('2d')
+    if (!ctx) return ''
+
+    paintWhiteboardSurface(ctx, boardSize.width, boardSize.height, surface)
+    for (const stroke of renderStrokes) {
+      drawWhiteboardStroke(ctx, stroke)
+    }
+    return offscreen.toDataURL('image/png')
+  }, [boardSize.height, boardSize.width, renderStrokes])
 
   return {
     containerRef,
@@ -406,6 +413,7 @@ export function useCanvasDrawing(
     undo,
     redo,
     clearAll,
+    exportPng,
     handleResize,
     canUndo: undoStackRef.current.length > 0,
     canRedo: redoStackRef.current.length > 0,

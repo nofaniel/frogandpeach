@@ -47,6 +47,7 @@ import { ApiError, json, methodNotAllowed, notFound, readJson } from './http'
 import { listModules, updateModules, redactModuleOptions, moduleDefinitions, type ModulePatch } from './modules'
 import type { ApiContext } from './types'
 import type { Session } from './auth'
+import { normaliseWhiteboardStrokeInput } from '../shared/whiteboard'
 
 export async function handleApi(context: ApiContext): Promise<Response> {
   try {
@@ -336,15 +337,15 @@ async function routeWhiteboard(context: ApiContext, parts: string[], session: Se
   if (parts.length === 0) {
     if (method === 'GET') return json(await listWhiteboardStrokes(context.env))
     if (method === 'POST') {
-      const body = await readJson(context.request) as Record<string, unknown>
-      const points = Array.isArray(body.points) ? body.points : []
-      const color = typeof body.color === 'string' ? body.color : '#000000'
-      const width = typeof body.width === 'number' ? body.width : 2
-      const tool = body.tool === 'eraser' ? 'eraser' : 'pen'
-      const opacity = typeof body.opacity === 'number' ? body.opacity : 1
+      let strokeInput
+      try {
+        strokeInput = normaliseWhiteboardStrokeInput(await readJson(context.request))
+      } catch (error) {
+        throw new ApiError(400, error instanceof Error ? error.message : 'Whiteboard stroke is invalid.')
+      }
       const stroke = await createWhiteboardStroke(
         context.env,
-        { points, color, width, tool, opacity },
+        strokeInput,
         session.userId,
         session.displayName || session.userName,
       )

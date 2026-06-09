@@ -201,6 +201,7 @@ export type HomeData = {
   lists: SharedList[]
   pages: PageLink[]
   whiteboardStrokes: WhiteboardStroke[]
+  whiteboardStrokeCount: number
   network: NetworkSummary | null
   settings: Partial<Settings>
   modules: Module[]
@@ -276,12 +277,27 @@ export type UserPatch = Partial<UserRecord> & {
   password?: string
 }
 
-export type WhiteboardStroke = {
-  id: string
-  points: Array<{ x: number; y: number }>
+export type WhiteboardPoint = {
+  x: number
+  y: number
+}
+
+export type WhiteboardTool = 'pen' | 'eraser'
+
+export type WhiteboardStrokeInput = {
+  points: WhiteboardPoint[]
   color: string
   width: number
-  tool: 'pen' | 'eraser'
+  tool: WhiteboardTool
+  opacity: number
+}
+
+export type WhiteboardStroke = {
+  id: string
+  points: WhiteboardPoint[]
+  color: string
+  width: number
+  tool: WhiteboardTool
   opacity: number
   createdByName: string | null
   createdAt: string
@@ -290,7 +306,7 @@ export type WhiteboardStroke = {
 export type WhiteboardStrokePatch = {
   color?: string
   width?: number
-  tool?: 'pen' | 'eraser'
+  tool?: WhiteboardTool
   opacity?: number
 }
 

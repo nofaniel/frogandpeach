@@ -127,7 +127,7 @@ function renderWidget(
     case 'notes':
       return <NotesWidget key={module.id} module={module} notes={home.notes} onSetActiveTab={onSetActiveTab} />
     case 'whiteboard':
-      return <WhiteboardWidget key={module.id} module={module} strokes={home.whiteboardStrokes} onSetActiveTab={onSetActiveTab} />
+      return <WhiteboardWidget key={module.id} module={module} strokes={home.whiteboardStrokes} strokeCount={home.whiteboardStrokeCount} onSetActiveTab={onSetActiveTab} />
     case 'pages':
       return <PagesWidget key={module.id} module={module} pages={home.pages} />
     case 'network':
