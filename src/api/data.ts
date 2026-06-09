@@ -5,6 +5,7 @@ import { sha256Hex } from './crypto'
 import { id, normaliseTags, nowIso, rowNumber, rowString, slugify } from './http'
 import type { DbRow, Env } from './types'
 
+
 export type Settings = {
   wifiName: string
   wifiPassword: string
@@ -693,6 +694,8 @@ export async function deleteModuleData(env: Env, moduleId: string) {
     await env.DB.prepare('DELETE FROM page_links').run()
   } else if (moduleId === 'weather' || moduleId === 'tides') {
     await env.DB.prepare("DELETE FROM cache WHERE cache_key LIKE 'weather-%' OR cache_key LIKE 'marine-%' OR cache_key LIKE 'weather-v%' OR cache_key LIKE 'marine-v%'").run()
+  } else if (moduleId === 'whiteboard') {
+    await env.DB.prepare('DELETE FROM whiteboard_strokes').run()
   }
 }
 
@@ -1069,6 +1072,76 @@ function parseNetworkDevices(value: string): NetworkDevice[] {
         lastSeen: String(record.lastSeen ?? '').trim(),
         usageGb: record.usageGb === undefined || record.usageGb === null ? null : parseOptionalNumber(String(record.usageGb)),
       }
-    })
+     })
     .filter((entry): entry is NetworkDevice => Boolean(entry))
 }
+
+// ── Whiteboard strokes ────────────────────────────────────────────────────────
+
+type DbWhiteboardStroke = {
+  id: string
+  points: string
+  color: string
+  width: number
+  tool: string
+  opacity: number
+  created_by: string | null
+  created_at: string
+}
+
+function toWhiteboardStroke(row: DbWhiteboardStroke): WhiteboardStroke {
+  return {
+    id: row.id,
+    points: JSON.parse(row.points || '[]'),
+    color: row.color,
+    width: row.width,
+    tool: (row.tool === 'eraser' ? 'eraser' : 'pen') as 'pen' | 'eraser',
+    opacity: row.opacity,
+    createdByName: row.created_by ?? null,
+    createdAt: row.created_at,
+  }
+}
+
+export async function listWhiteboardStrokes(env: Env): Promise<WhiteboardStroke[]> {
+  const { results } = await env.DB.prepare('SELECT * FROM whiteboard_strokes ORDER BY created_at ASC').all<DbWhiteboardStroke>()
+  return results.map(toWhiteboardStroke)
+}
+
+export async function createWhiteboardStroke(
+  env: Env,
+  patch: Omit<WhiteboardStroke, 'id' | 'createdByName' | 'createdAt'>,
+  userId?: string,
+  userName?: string | null,
+): Promise<WhiteboardStroke> {
+  const now = nowIso()
+  const row: DbWhiteboardStroke = {
+    id: id('stroke_'),
+    points: JSON.stringify(patch.points),
+    color: patch.color,
+    width: patch.width,
+    tool: patch.tool,
+    opacity: patch.opacity,
+    created_by: userId ?? null,
+    created_at: now,
+  }
+  await env.DB.prepare('INSERT INTO whiteboard_strokes (id, points, color, width, tool, opacity, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(row.id, row.points, row.color, row.width, row.tool, row.opacity, row.created_by, row.created_at)
+    .run()
+  return {
+    ...patch,
+    id: row.id,
+    createdByName: userName ?? null,
+    createdAt: now,
+  }
+}
+
+export async function deleteWhiteboardStroke(env: Env, strokeId: string): Promise<boolean> {
+  const { meta } = await env.DB.prepare('DELETE FROM whiteboard_strokes WHERE id = ?').bind(strokeId).run()
+  return (meta.changes ?? 0) > 0
+}
+
+export async function clearWhiteboardStrokes(env: Env): Promise<void> {
+  await env.DB.prepare('DELETE FROM whiteboard_strokes').run()
+}
+
+import type { WhiteboardStroke } from '../shared/api-types'

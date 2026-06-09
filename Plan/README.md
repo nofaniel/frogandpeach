@@ -35,19 +35,25 @@ This folder stores implementation plans for Frog & Peach Home Hub. Each markdown
 - Remaining notes: ...
 ```
 
-## Entries
+## Active Entries
 
-1. `01-hover-tooltips-weather-info.md`
-2. `02-tide-module.md`
-3. `03-module-settings-customisation.md`
-4. `04-project-goals-aims-purpose.md`
-5. `05-ui-display-modes.md`
-6. `06-admin-mode.md`
-7. `07-site-text-content-cleanup.md`
-8. `08-notes-module.md`
-9. `09-list-module.md`
-10. `10-network-module.md`
-11. `11-little-notes.md`
-12. `11-settings.md`
-13. `12-brainstorm.md`
-14. `13-repo-update.md`
+1. `02-tide-module.md`
+2. `05-ui-display-modes.md`
+3. `09-list-module.md`
+4. `11-little-notes.md`
+5. `12-brainstorm.md`
+6. `13-repo-update.md`
+
+## Archived Completed Entries
+
+Completed plans live in `Archive/`.
+
+1. `Archive/01-hover-tooltips-weather-info-DONE.md`
+2. `Archive/03-module-settings-customisation-DONE.md`
+3. `Archive/04-project-goals-aims-purpose-DONE.md`
+4. `Archive/06-admin-mode-DONE.md`
+5. `Archive/07-site-text-content-cleanup-DONE.md`
+6. `Archive/08-notes-module-DONE.md`
+7. `Archive/10-network-module-DONE.md`
+8. `Archive/11-settings-DONE.md`
+9. `Archive/14-break-monolith-DONE.md`

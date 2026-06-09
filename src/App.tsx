@@ -9,10 +9,12 @@ import { ListsWorkspace } from './features/lists/ListsWorkspace'
 import { NetworkWorkspace } from './features/network/NetworkWorkspace'
 import { NotesWorkspace } from './features/notes/NotesWorkspace'
 import { PagesWorkspace } from './features/pages/PagesWorkspace'
+import { WhiteboardWorkspace } from './features/whiteboard/WhiteboardWorkspace'
+
 
 function App() {
   const ctrl = useAppController()
-  const { auth, shell, navigation, adminUnlock, home: homeGroup, lists: listsGroup, notes: notesGroup, pages: pagesGroup, network: networkGroup, admin, toasts: toastsGroup } = ctrl
+  const { auth, shell, navigation, adminUnlock, home: homeGroup, lists: listsGroup, notes: notesGroup, pages: pagesGroup, whiteboard: whiteboardGroup, network: networkGroup, admin, toasts: toastsGroup } = ctrl
 
   if (shell.screen === 'loading') {
     return <main className="loading-screen">Opening Frog & Peach...</main>
@@ -151,6 +153,15 @@ function App() {
           onToggleNote={(note) => void notesGroup.toggleNote(note)}
           onUpdateNote={(id, patch) => void notesGroup.updateNote(id, patch)}
           onRemoveNote={(id) => void notesGroup.removeNote(id)}
+        />
+      )}
+
+      {!viewedPage && !adminOpen && activeTab === 'whiteboard' && (
+        <WhiteboardWorkspace
+          strokes={whiteboardGroup.strokes}
+          onAddStroke={whiteboardGroup.addStroke}
+          onRemoveStroke={whiteboardGroup.removeStroke}
+          onClearAll={whiteboardGroup.clearAll}
         />
       )}
 

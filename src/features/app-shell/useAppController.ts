@@ -19,6 +19,7 @@ import type {
   Toast,
   UserPatch,
   UserRecord,
+  WhiteboardStroke,
 } from '../../shared/api-types'
 import { formatDuration } from '../../shared/format'
 import { isLocationConfigured, resolveBrowserTimeZone } from '../../shared/location'
@@ -70,7 +71,7 @@ function clearAdminState(
 export function useAppController() {
   const [setupNeeded, setSetupNeeded] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
-  const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard'>('home')
   const [adminOpen, setAdminOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)
@@ -81,6 +82,7 @@ export function useAppController() {
   const [notes, setNotes] = useState<Note[]>([])
   const [pages, setPages] = useState<Page[]>([])
   const [pageLinks, setPageLinks] = useState<PageLink[]>([])
+  const [whiteboardStrokes, setWhiteboardStrokes] = useState<WhiteboardStroke[]>([])
   const [viewedPage, setViewedPage] = useState<Page | null>(null)
   const [publicSettings, setPublicSettings] = useState<Settings>(emptySettings)
   const [adminSettingsDraft, setAdminSettingsDraft] = useState<Settings>(emptySettings)
@@ -185,19 +187,21 @@ export function useAppController() {
     setBusy(true)
     setError('')
     try {
-      const [homeData, listData, noteData, pageData, linkData, appearanceData] = await Promise.all([
+      const [homeData, listData, noteData, pageData, linkData, appearanceData, whiteboardData] = await Promise.all([
         api<HomeData>('/api/home'),
         api<SharedList[]>('/api/lists'),
         api<Note[]>('/api/notes'),
         api<Page[]>('/api/pages'),
         api<PageLink[]>('/api/page-links'),
         api<Appearance>('/api/appearance'),
+        api<WhiteboardStroke[]>('/api/whiteboard'),
       ])
       setHome(homeData)
       setLists(listData)
       setNotes(noteData)
       setPages(pageData)
       setPageLinks(linkData)
+      setWhiteboardStrokes(whiteboardData)
       setDisplayModules(homeData.modules)
       setPublicSettings((current) => ({ ...current, ...homeData.settings, ...appearanceData }))
       let themeToApply = appearanceData.themeId
@@ -687,6 +691,27 @@ export function useAppController() {
       removePage,
       createPageLink,
       removePageLink,
+    },
+    whiteboard: {
+      strokes: whiteboardStrokes,
+      addStroke: async (stroke: Omit<WhiteboardStroke, 'id' | 'createdByName' | 'createdAt'>) => {
+        await run(async () => {
+          await api('/api/whiteboard', { method: 'POST', body: stroke })
+          await refreshAll()
+        })
+      },
+      removeStroke: async (id: string) => {
+        await run(async () => {
+          await api(`/api/whiteboard/${id}`, { method: 'DELETE' })
+          await refreshAll()
+        })
+      },
+      clearAll: async () => {
+        await run(async () => {
+          await api('/api/whiteboard/clear', { method: 'DELETE' })
+          await refreshAll()
+        })
+      },
     },
     network: {
       network,

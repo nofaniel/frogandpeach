@@ -16,6 +16,7 @@ export const coreNavigation: NavigationEntry[] = [
   { id: 'home', label: 'Home', icon: '🏠', target: { kind: 'tab', tab: 'home' } },
   { id: 'lists', label: 'Lists', icon: '🛒', target: { kind: 'tab', tab: 'lists' } },
   { id: 'notes', label: 'Notes', icon: '📝', target: { kind: 'tab', tab: 'notes' } },
+  { id: 'whiteboard', label: 'Whiteboard', icon: '🎨', target: { kind: 'tab', tab: 'whiteboard' } },
   { id: 'pages', label: 'Pages', icon: '🌺', target: { kind: 'tab', tab: 'pages' } },
   { id: 'network', label: 'Network', icon: '📡', target: { kind: 'tab', tab: 'network' } },
 ]
@@ -25,6 +26,7 @@ export const moduleNavigationTargets: Record<string, NavigationTarget> = {
   notes: { kind: 'tab', tab: 'notes' },
   pages: { kind: 'tab', tab: 'pages' },
   network: { kind: 'tab', tab: 'network' },
+  whiteboard: { kind: 'tab', tab: 'whiteboard' },
   weather: { kind: 'home', moduleId: 'weather' },
   tides: { kind: 'home', moduleId: 'tides' },
   settings: { kind: 'admin' },
@@ -34,6 +36,7 @@ export function navigationIconForModule(moduleId: string): string {
   if (moduleId === 'weather') return '🌦️'
   if (moduleId === 'tides') return '🌊'
   if (moduleId === 'settings') return '⚙️'
+  if (moduleId === 'whiteboard') return '🎨'
   return '▣'
 }
 

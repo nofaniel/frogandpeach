@@ -38,6 +38,10 @@ import {
   updateNote,
   updatePage,
   updateSettings,
+  listWhiteboardStrokes,
+  createWhiteboardStroke,
+  deleteWhiteboardStroke,
+  clearWhiteboardStrokes,
 } from './data'
 import { ApiError, json, methodNotAllowed, notFound, readJson } from './http'
 import { listModules, updateModules, redactModuleOptions, moduleDefinitions, type ModulePatch } from './modules'
@@ -78,6 +82,7 @@ export async function handleApi(context: ApiContext): Promise<Response> {
     if (resource === 'items') return await routeItems(context, parts.slice(1), session)
     if (resource === 'pages') return await routePages(context, parts.slice(1), session)
     if (resource === 'page-links') return await routePageLinks(context, parts.slice(1), session)
+    if (resource === 'whiteboard') return await routeWhiteboard(context, parts.slice(1), session)
     if (resource === 'settings') return await routeSettings(context)
 
     return notFound()
@@ -323,6 +328,43 @@ async function routeSettings(context: ApiContext) {
     await recordActivity(context, session, 'updated', 'settings', 'private', 'Updated household settings')
     return json(settings)
   }
+  return methodNotAllowed()
+}
+
+async function routeWhiteboard(context: ApiContext, parts: string[], session: Session) {
+  const method = context.request.method
+  if (parts.length === 0) {
+    if (method === 'GET') return json(await listWhiteboardStrokes(context.env))
+    if (method === 'POST') {
+      const body = await readJson(context.request) as Record<string, unknown>
+      const points = Array.isArray(body.points) ? body.points : []
+      const color = typeof body.color === 'string' ? body.color : '#000000'
+      const width = typeof body.width === 'number' ? body.width : 2
+      const tool = body.tool === 'eraser' ? 'eraser' : 'pen'
+      const opacity = typeof body.opacity === 'number' ? body.opacity : 1
+      const stroke = await createWhiteboardStroke(
+        context.env,
+        { points, color, width, tool, opacity },
+        session.userId,
+        session.displayName || session.userName,
+      )
+      return json(stroke, { status: 201 })
+    }
+    return methodNotAllowed()
+  }
+
+  const [sub] = parts
+  if (sub === 'clear' && method === 'DELETE') {
+    await clearWhiteboardStrokes(context.env)
+    return json({ ok: true })
+  }
+
+  if (method === 'DELETE') {
+    const deleted = await deleteWhiteboardStroke(context.env, sub)
+    if (!deleted) throw new ApiError(404, 'Stroke not found.')
+    return json({ ok: true })
+  }
+
   return methodNotAllowed()
 }
 

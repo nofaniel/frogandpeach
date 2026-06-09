@@ -1,4 +1,4 @@
-export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network'
+export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard'
 
 export type ModuleSettingDefinition = {
   key: string
@@ -200,6 +200,7 @@ export type HomeData = {
   notes: Note[]
   lists: SharedList[]
   pages: PageLink[]
+  whiteboardStrokes: WhiteboardStroke[]
   network: NetworkSummary | null
   settings: Partial<Settings>
   modules: Module[]
@@ -273,6 +274,24 @@ export type UserRecord = {
 
 export type UserPatch = Partial<UserRecord> & {
   password?: string
+}
+
+export type WhiteboardStroke = {
+  id: string
+  points: Array<{ x: number; y: number }>
+  color: string
+  width: number
+  tool: 'pen' | 'eraser'
+  opacity: number
+  createdByName: string | null
+  createdAt: string
+}
+
+export type WhiteboardStrokePatch = {
+  color?: string
+  width?: number
+  tool?: 'pen' | 'eraser'
+  opacity?: number
 }
 
 export type Toast = {

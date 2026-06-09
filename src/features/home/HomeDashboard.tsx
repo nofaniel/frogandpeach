@@ -6,6 +6,8 @@ import { NotesWidget } from './widgets/NotesWidget'
 import { PagesWidget } from './widgets/PagesWidget'
 import { TidesWidget } from './widgets/TidesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
+import { WhiteboardWidget } from './widgets/WhiteboardWidget'
+
 
 export function HomeDashboard({
   home,
@@ -124,6 +126,8 @@ function renderWidget(
       return <ListsWidget key={module.id} module={module} lists={home.lists} onSetActiveTab={onSetActiveTab} />
     case 'notes':
       return <NotesWidget key={module.id} module={module} notes={home.notes} onSetActiveTab={onSetActiveTab} />
+    case 'whiteboard':
+      return <WhiteboardWidget key={module.id} module={module} strokes={home.whiteboardStrokes} onSetActiveTab={onSetActiveTab} />
     case 'pages':
       return <PagesWidget key={module.id} module={module} pages={home.pages} />
     case 'network':

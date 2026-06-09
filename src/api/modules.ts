@@ -314,6 +314,27 @@ export const moduleDefinitions: ModuleDefinition[] = [
       ],
     },
   },
+  {
+    id: 'whiteboard',
+    title: 'Whiteboard',
+    description: 'Shared drawing board for the household.',
+    category: 'content',
+    defaultPosition: 35,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'wide',
+    navigationBar: { defaultEnabled: true },
+    homeWidget: {
+      label: 'Homepage whiteboard widget',
+      description: 'Controls whether a whiteboard preview appears on the home screen.',
+      defaultEnabled: true,
+      defaultMode: 'compact',
+      modes: [
+        { id: 'compact', label: 'Compact', description: 'Stroke count and last drawn time.' },
+        { id: 'expanded', label: 'Expanded', description: 'More detail about recent activity.' },
+      ],
+    },
+  },
   { id: 'settings', title: 'Admin tools', description: 'Users, modules, appearance, household settings, cache, and review tools.', category: 'admin', defaultPosition: 70, defaultEnabled: false, defaultInstalled: true, defaultSize: 'wide', navigationBar: { defaultEnabled: false } },
 ]
 

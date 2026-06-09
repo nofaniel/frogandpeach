@@ -77,6 +77,9 @@ function createFakeEnv(
             const row = state.cache.find((entry: FakeDbState['cache'][number]) => entry.cache_key === key && entry.expires_at > now)
             return row ? { payload: row.payload } : null
           }
+          if (sql === 'SELECT id, display_name FROM users') {
+            return null
+          }
           return null
         },
         async run() {

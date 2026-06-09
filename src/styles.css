@@ -2763,3 +2763,194 @@ body {
     justify-content: flex-start;
   }
 }
+
+/* Whiteboard — Canvas Drawing Board */
+
+.whiteboard-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.wb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--panel-bg, #fff);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  flex-wrap: wrap;
+  min-height: 48px;
+}
+
+.wb-tool-group,
+.wb-color-group,
+.wb-width-group,
+.wb-action-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wb-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border, #e5e7eb);
+  margin: 0 4px;
+}
+
+.wb-tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  background: var(--panel-bg, #fff);
+  cursor: pointer;
+  font-size: 18px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.wb-tool-btn:hover {
+  background: var(--hover-bg, #f3f4f6);
+}
+
+.wb-tool-btn.active {
+  background: var(--active-bg, #e5e7eb);
+  border-color: var(--accent, #3b82f6);
+}
+
+.wb-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.wb-color-swatch:hover {
+  transform: scale(1.15);
+}
+
+.wb-color-swatch.active {
+  border-color: var(--text, #111827);
+  transform: scale(1.15);
+}
+
+.wb-custom-color {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px dashed var(--border, #d1d5db);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.wb-custom-color input[type="color"] {
+  width: 40px;
+  height: 40px;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  margin: -6px;
+}
+
+.wb-width-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  background: var(--panel-bg, #fff);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.wb-width-btn:hover {
+  background: var(--hover-bg, #f3f4f6);
+}
+
+.wb-width-btn.active {
+  background: var(--active-bg, #e5e7eb);
+  border-color: var(--accent, #3b82f6);
+}
+
+.wb-width-dot {
+  display: block;
+  border-radius: 50%;
+  background: var(--text, #111827);
+}
+
+.wb-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  background: var(--panel-bg, #fff);
+  cursor: pointer;
+  font-size: 16px;
+  transition: background 0.15s;
+}
+
+.wb-action-btn:hover:not(:disabled) {
+  background: var(--hover-bg, #f3f4f6);
+}
+
+.wb-action-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.wb-clear-btn:hover:not(:disabled) {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+.wb-canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.wb-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+@media (max-width: 768px) {
+  .wb-toolbar {
+    gap: 4px;
+    padding: 6px 8px;
+  }
+
+  .wb-divider {
+    display: none;
+  }
+
+  .wb-color-swatch {
+    width: 24px;
+    height: 24px;
+  }
+
+  .wb-tool-btn,
+  .wb-width-btn,
+  .wb-action-btn {
+    width: 32px;
+    height: 32px;
+  }
+}
