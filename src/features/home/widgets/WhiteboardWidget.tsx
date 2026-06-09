@@ -14,7 +14,8 @@ export function WhiteboardWidget({
   const widget = resolveHomeWidgetState(module)
   if (!widget) return null
 
-  const lastStroke = strokes.length > 0 ? strokes[strokes.length - 1] : null
+  const safeStrokes = strokes ?? []
+  const lastStroke = safeStrokes.length > 0 ? safeStrokes[safeStrokes.length - 1] : null
   const lastDrawnAgo = lastStroke ? formatDuration(Date.now() - new Date(lastStroke.createdAt).getTime()) : null
 
   return (
@@ -23,7 +24,7 @@ export function WhiteboardWidget({
       <h2>Drawing board</h2>
       <div className="stack-list">
         <button type="button" className="plain-row" onClick={() => onSetActiveTab('whiteboard')}>
-          <strong>{strokes.length} stroke{strokes.length === 1 ? '' : 's'}</strong>
+          <strong>{safeStrokes.length} stroke{safeStrokes.length === 1 ? '' : 's'}</strong>
           <span>
             {lastDrawnAgo
               ? `Last drawn ${lastDrawnAgo} ago`

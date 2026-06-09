@@ -117,7 +117,7 @@ const LOCATION_SETTING_KEYS: Array<keyof Settings> = ['locationName', 'locationR
 const LEGACY_THEME_KEY = 'colourTheme'
 
 export async function getDashboard(env: Env, request: Request) {
-  const [weather, tides, notes, lists, pages, network, settings, modules, appearance] = await Promise.all([
+  const [weather, tides, notes, lists, pages, network, settings, modules, appearance, whiteboardStrokes] = await Promise.all([
     optionalData('weather', () => getWeather(env)),
     optionalData('marine', () => getMarine(env)),
     listNotes(env, {}),
@@ -127,6 +127,7 @@ export async function getDashboard(env: Env, request: Request) {
     getPublicSettings(env),
     import('./modules').then(({ listModules }) => listModules(env)),
     getAppearance(env),
+    listWhiteboardStrokes(env),
   ])
 
   return {
@@ -135,6 +136,7 @@ export async function getDashboard(env: Env, request: Request) {
     notes: notes.slice(0, 12),
     lists: lists.slice(0, 12),
     pages: pages.slice(0, 12),
+    whiteboardStrokes: whiteboardStrokes.slice(0, 12),
     network,
     settings,
     modules,
