@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Frog &amp; Peach Home Hub</title>
-  <meta name="description" content="A private home hub for households. Weather, tides, lists, notes, pages, network details, themes, and admin tools on Cloudflare Pages and D1." />
+  <meta name="description" content="A private home dashboard for the ordinary things a household checks every day: weather, tides, lists, notes, pages, and Wi-Fi details. Built with React and Cloudflare." />
   <meta property="og:title" content="Frog &amp; Peach Home Hub" />
-  <meta property="og:description" content="A private home hub for households, built with React, Cloudflare Pages Functions, and D1." />
-  <meta property="og:image" content="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-desktop.png" />
+  <meta property="og:description" content="A private home dashboard for the ordinary things a household checks every day. Weather, tides, lists, notes, and Wi-Fi details — all in one calm screen." />
+  <meta property="og:image" content="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/weather-animations.gif" />
   <meta property="og:url" content="https://nofaniel.github.io/frogandpeach/" />
   <meta name="twitter:card" content="summary_large_image" />
   <style>
@@ -595,7 +595,7 @@
         <p class="eyebrow">Private household hub</p>
         <h1>Run the house from one calm screen.</h1>
         <p class="hero-copy">
-          Frog &amp; Peach is a self-hosted dashboard for the ordinary things a household checks every day: weather, tides, shopping lists, notes, pages, Wi-Fi details, and admin settings.
+          A self-hosted dashboard for the things your household actually checks — weather with animated conditions, tides, shopping lists, notes, Wi-Fi details, and whatever else keeps the place running.
         </p>
         <div class="hero-actions">
           <a class="button" href="https://github.com/nofaniel/frogandpeach" target="_blank" rel="noopener">View source</a>
@@ -603,8 +603,8 @@
         </div>
         <div class="stats" aria-label="Project summary">
           <div class="stat"><strong>7</strong><span>built-in modules</span></div>
+          <div class="stat"><strong>18</strong><span>weather animations</span></div>
           <div class="stat"><strong>D1</strong><span>SQLite persistence</span></div>
-          <div class="stat"><strong>5</strong><span>included themes</span></div>
         </div>
       </div>
       <div class="hero-media" aria-label="Frog and Peach product screenshots">
@@ -626,14 +626,14 @@
             <p class="eyebrow">What it includes</p>
             <h2>Household tools that stay out of the way.</h2>
           </div>
-          <p class="lead">Enable the modules you need, hide the ones you do not, and keep the dashboard focused on the information your home actually uses.</p>
+          <p class="lead">Turn on what you need, hide what you don't. The dashboard only shows the information your home actually uses.</p>
         </div>
         <div class="module-grid">
           <article class="module-card">
             <div>
               <span class="module-kicker">weather</span>
-              <h3>Forecasts with useful detail</h3>
-              <p>Current conditions, hourly outlook, wind, precipitation, feels-like temperature, and a five-day row.</p>
+              <h3>Forecasts with animated skies</h3>
+              <p>18 hand-drawn weather conditions — rain, snow, fog, wind, storms — each with day and night versions. Plus hourly outlook, wind, feels-like temp, and a five-day row.</p>
             </div>
             <span class="module-meta">Open-Meteo cached locally</span>
           </article>
@@ -641,15 +641,15 @@
             <div>
               <span class="module-kicker">tides</span>
               <h3>Coastal timing at a glance</h3>
-              <p>Rising or falling state, a tide scale, the next event, and configurable upcoming tide entries.</p>
+              <p>Rising or falling state, the next tide event, and a five-day timeline. Approximate data from the Open-Meteo marine model — not official tide tables.</p>
             </div>
             <span class="module-meta">marine model data</span>
           </article>
           <article class="module-card">
             <div>
               <span class="module-kicker">lists</span>
-              <h3>Shared lists with reset rules</h3>
-              <p>Shopping, daily, weekly, monthly, and goal lists with starred items and scheduled clearing.</p>
+              <h3>Shared lists that reset themselves</h3>
+              <p>Shopping, daily, weekly, monthly, and goal lists. Star the important items, set a schedule, and let the list clear when you're done.</p>
             </div>
             <span class="module-meta">D1 backed content</span>
           </article>
@@ -657,7 +657,7 @@
             <div>
               <span class="module-kicker">notes</span>
               <h3>Pinned notes for the home</h3>
-              <p>Tagged markdown notes for reminders, handovers, plans, and the small details people forget.</p>
+              <p>Tagged markdown notes for reminders, handovers, plans, and the small details people forget between visits.</p>
             </div>
             <span class="module-meta">markdown rendering</span>
           </article>
@@ -665,15 +665,15 @@
             <div>
               <span class="module-kicker">pages</span>
               <h3>Custom pages and launchers</h3>
-              <p>Publish household guides, local links, instructions, or simple static pages with themed shells.</p>
+              <p>Household guides, local links, instructions, or simple static pages — all themed to match the rest of the hub.</p>
             </div>
             <span class="module-meta">custom page inventory</span>
           </article>
           <article class="module-card">
             <div>
               <span class="module-kicker">network</span>
-              <h3>Wi-Fi and router information</h3>
-              <p>Share Wi-Fi credentials with a QR code, keep router links handy, and track connected devices.</p>
+              <h3>Wi-Fi and router info</h3>
+              <p>Share Wi-Fi credentials with a QR code, keep router links handy, and track connected devices without digging through admin panels.</p>
             </div>
             <span class="module-meta">local network notes</span>
           </article>
@@ -688,20 +688,20 @@
             <p class="eyebrow">Screenshots</p>
             <h2>Built for checking, editing, and getting on with the day.</h2>
           </div>
-          <p class="lead">The current screenshots are captured from the worker runtime with Playwright, so the page shows the same interface the Cloudflare build serves.</p>
+          <p class="lead">Screenshots are captured from the worker runtime with Playwright — what you see here is what the Cloudflare build actually serves.</p>
         </div>
         <div class="shot-grid">
           <figure class="shot-card wide">
-            <img src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/frog-peach-preview.gif" alt="Animated preview moving through Frog and Peach dashboards and modules" loading="lazy" />
-            <figcaption class="shot-caption"><strong>Product walkthrough</strong><span>animated preview</span></figcaption>
+            <img src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/weather-animations.gif" alt="All 18 weather animation conditions — clear, partly cloudy, overcast, rain, storm, snow, fog, wind, and default — each with day and night variants" loading="lazy" />
+            <figcaption class="shot-caption"><strong>Dynamic weather animations</strong><span>18 conditions, day and night</span></figcaption>
           </figure>
           <figure class="shot-card small">
-            <img src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/admin-desktop.png" alt="Frog and Peach admin settings screen on desktop" loading="lazy" />
+            <img src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/home-desktop.png" alt="Home dashboard with weather forecast and tide data" loading="lazy" />
+            <figcaption class="shot-caption"><strong>Home dashboard</strong><span>desktop</span></figcaption>
+          </figure>
+          <figure class="shot-card small">
+            <img src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/admin-desktop.png" alt="Admin panel for managing users and modules" loading="lazy" />
             <figcaption class="shot-caption"><strong>Admin workspace</strong><span>desktop</span></figcaption>
-          </figure>
-          <figure class="shot-card small">
-            <img src="https://raw.githubusercontent.com/nofaniel/frogandpeach/main/docs/readme-screenshots/admin-mobile.png" alt="Frog and Peach admin settings screen on mobile" loading="lazy" />
-            <figcaption class="shot-caption"><strong>Admin on mobile</strong><span>phone</span></figcaption>
           </figure>
         </div>
       </div>
@@ -716,19 +716,19 @@
         <div class="principle-list">
           <article class="principle">
             <b>01</b>
-            <div><h3>No analytics or tracking</h3><p>The hub is for your household. It does not need visitor funnels, ad pixels, or product telemetry.</p></div>
+            <div><h3>No analytics or tracking</h3><p>This is a household tool, not a product. No visitor funnels, no ad pixels, no telemetry. The data stays on your Cloudflare account.</p></div>
           </article>
           <article class="principle">
             <b>02</b>
-            <div><h3>Admin actions need a fresh unlock</h3><p>Regular sessions and admin re-auth are separate, with a timed unlock window for sensitive changes.</p></div>
+            <div><h3>Admin actions need a fresh unlock</h3><p>Regular sessions and admin access are separate things. Sensitive changes require a timed re-authentication — no cached admin privileges hanging around.</p></div>
           </article>
           <article class="principle">
             <b>03</b>
-            <div><h3>Themes are data, not scripts</h3><p>JSON themes map tokens to CSS custom properties, with a no-flash snapshot applied before React mounts.</p></div>
+            <div><h3>Themes are data, not scripts</h3><p>JSON themes map tokens to CSS custom properties. A snapshot in localStorage prevents the flash of unstyled content before React loads.</p></div>
           </article>
           <article class="principle">
             <b>04</b>
-            <div><h3>Free-tier friendly</h3><p>Cloudflare Pages Functions and D1 keep the deployment small, fast, and inexpensive to run.</p></div>
+            <div><h3>Runs on the free tier</h3><p>Cloudflare Pages Functions and D1 keep hosting cheap. No servers to manage, no database to babysit, no surprise bills at the end of the month.</p></div>
           </article>
         </div>
       </div>
@@ -740,9 +740,9 @@
           <p class="eyebrow">Run it locally</p>
           <h2>Clone, configure, migrate, run.</h2>
           <div class="steps">
-            <div class="step"><span>1</span><p>Install dependencies and generate a PBKDF2 admin password hash.</p></div>
-            <div class="step"><span>2</span><p>Copy `.env.example` to `.dev.vars` and set the local app origin.</p></div>
-            <div class="step"><span>3</span><p>Apply D1 migrations before starting the full worker runtime.</p></div>
+            <div class="step"><span>1</span><p>Install dependencies and generate a PBKDF2 password hash for the admin account.</p></div>
+            <div class="step"><span>2</span><p>Copy <code>.env.example</code> to <code>.dev.vars</code> and set the local app origin.</p></div>
+            <div class="step"><span>3</span><p>Apply D1 migrations, then start the full worker runtime.</p></div>
           </div>
         </div>
         <div class="terminal" aria-label="Quick start commands">
