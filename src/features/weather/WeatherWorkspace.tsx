@@ -1,8 +1,9 @@
-import { type CSSProperties } from 'react'
+import { type CSSProperties, type ReactNode } from 'react'
 import type { Module, Settings, WeatherSummary } from '../../shared/api-types'
 import { formatDate, formatNumber, formatTemperature, formatTime, weatherIcon } from '../../shared/format'
 import { formatLocationLabel } from '../../shared/location'
 import { airQualityLevel, formatCurrentPrecipitationMm, overallPollenLevel, pollenAvailable, pollenLevel, uvLevel } from '../../shared/weather'
+import { WeatherScene, type SkyCondition } from './WeatherScene'
 
 function formatWeatherHour(time: string, index: number): string {
   if (index === 0) return 'Now'
@@ -20,8 +21,13 @@ function formatObservationTime(iso: string | null): string {
   return `Observed ${formatTime(iso)}`
 }
 
-function formatRainLabel(value: number | null | undefined): string {
-  return value === null || value === undefined ? 'Rain data unavailable' : `${formatNumber(value)}% rain chance`
+function formatDaylight(sunrise: string | null, sunset: string | null): string {
+  if (!sunrise || !sunset) return '--'
+  const diff = new Date(sunset).getTime() - new Date(sunrise).getTime()
+  if (!Number.isFinite(diff) || diff <= 0) return '--'
+  const hours = Math.floor(diff / 3_600_000)
+  const minutes = Math.round((diff % 3_600_000) / 60_000)
+  return `${hours}h ${minutes}m`
 }
 
 const POLLEN_LABELS: Record<string, string> = {
@@ -33,12 +39,12 @@ const POLLEN_LABELS: Record<string, string> = {
   ragweed: 'Ragweed',
 }
 
-function deriveCondition(label: string): string {
+function deriveCondition(label: string): SkyCondition {
   const l = label.toLowerCase()
   if (l.includes('thunder') || l.includes('storm')) return 'storm'
-  if (l.includes('snow') || l.includes('blizzard')) return 'snow'
+  if (l.includes('snow') || l.includes('blizzard') || l.includes('sleet')) return 'snow'
   if (l.includes('rain') || l.includes('drizzle') || l.includes('shower')) return 'rain'
-  if (l.includes('fog') || l.includes('mist')) return 'fog'
+  if (l.includes('fog') || l.includes('mist') || l.includes('haze')) return 'fog'
   if (l.includes('clear') || l.includes('sun')) return 'clear'
   if (l.includes('overcast')) return 'overcast'
   if (l.includes('cloud')) return 'partly-cloudy'
@@ -50,6 +56,79 @@ function isNightTime(sunrise: string | null, sunset: string | null): boolean {
   if (sunrise && now < new Date(sunrise).getTime()) return true
   if (sunset && now > new Date(sunset).getTime()) return true
   return false
+}
+
+// ── Inline icon primitives (strokeWidth 1.6, currentColor) ──
+type IconProps = { className?: string }
+function Svg({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  )
+}
+const WindIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M3 8h10.5a2.5 2.5 0 1 0-2.5-2.5" /><path d="M3 12h14a2.5 2.5 0 1 1-2.5 2.5" /><path d="M3 16h8" /></Svg>
+)
+const GustIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M4 17a8 8 0 0 1 16 0" /><path d="M12 17l4.2-4.2" /><circle cx="12" cy="17" r="1.1" fill="currentColor" stroke="none" /></Svg>
+)
+const DropletIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M12 3.2s6 6.4 6 10.8a6 6 0 0 1-12 0c0-4.4 6-10.8 6-10.8Z" /></Svg>
+)
+const SunIcon = ({ className }: IconProps) => (
+  <Svg className={className}><circle cx="12" cy="12" r="4" /><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.1 5.1l1.6 1.6M17.3 17.3l1.6 1.6M18.9 5.1l-1.6 1.6M6.7 17.3l-1.6 1.6" /></Svg>
+)
+const SunriseIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M3 19h18" /><path d="M7 19a5 5 0 0 1 10 0" /><path d="M12 3.5v4" /><path d="M9 6l3-3 3 3" /></Svg>
+)
+const SunsetIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M3 19h18" /><path d="M7 19a5 5 0 0 1 10 0" /><path d="M12 7.5v-4" /><path d="M9 5l3 3 3-3" /></Svg>
+)
+const LeafIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M5 19c0-8 6.2-13.5 14-14-.5 7.8-6 14-14 14Z" /><path d="M5 19c4-4.2 7.2-7.4 10.5-8.6" /></Svg>
+)
+const FlowerIcon = ({ className }: IconProps) => (
+  <Svg className={className}><circle cx="12" cy="12" r="2.4" />{[0, 60, 120, 180, 240, 300].map((deg) => (
+    <ellipse key={deg} cx="12" cy="6.6" rx="1.9" ry="3.1" transform={`rotate(${deg} 12 12)`} />
+  ))}</Svg>
+)
+
+function HeroStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="weather-ws-stat">
+      <span className="weather-ws-stat-icon">{icon}</span>
+      <span className="weather-ws-stat-text">
+        <span className="weather-ws-stat-label">{label}</span>
+        <strong className="weather-ws-stat-value">{value}</strong>
+      </span>
+    </div>
+  )
+}
+
+function StaticWeatherScene({ condition, isNight }: { condition: SkyCondition; isNight: boolean }) {
+  return (
+    <div className={`wx-scene wx-scene--${condition}${isNight ? ' wx-scene--night' : ''} wx-scene--static`} aria-hidden="true">
+      <div className="wx-sky" />
+      <div className="wx-sky-glow" />
+      <div className="wx-scrim" />
+    </div>
+  )
+}
+
+function WeatherBackdrop({ condition, isNight, enhancedAnimations }: { condition: SkyCondition; isNight: boolean; enhancedAnimations: boolean }) {
+  return enhancedAnimations ? <WeatherScene condition={condition} isNight={isNight} /> : <StaticWeatherScene condition={condition} isNight={isNight} />
+}
+
+function EmptyShell({ condition, isNight, enhancedAnimations, children }: { condition: SkyCondition; isNight: boolean; enhancedAnimations: boolean; children: ReactNode }) {
+  return (
+    <section className={`workspace-grid weather-workspace weather-cond--${condition}${isNight ? ' weather-cond--night' : ''}`}>
+      <article className="weather-ws-empty">
+        <WeatherBackdrop condition={condition} isNight={isNight} enhancedAnimations={enhancedAnimations} />
+        <div className="weather-ws-empty-content">{children}</div>
+      </article>
+    </section>
+  )
 }
 
 export function WeatherWorkspace({
@@ -65,30 +144,26 @@ export function WeatherWorkspace({
   module: Module | undefined
   onOpenAdmin: () => void
 }) {
+  const enhancedAnimations = module?.options.enhancedAnimations === true
+
   if (!locationConfigured) {
     return (
-      <section className="workspace-grid weather-workspace">
-        <article className="weather-ws-empty">
-          <div className="weather-ws-empty-icon" aria-hidden="true">◎</div>
-          <p className="weather-ws-empty-kicker">Weather station offline</p>
-          <h2>Choose a home location</h2>
-          <p className="weather-ws-empty-desc">Set latitude, longitude, and timezone in Admin settings before the observatory can pull local weather.</p>
-          <button type="button" className="button-link" onClick={onOpenAdmin}>Open Admin settings</button>
-        </article>
-      </section>
+      <EmptyShell condition="default" isNight={false} enhancedAnimations={enhancedAnimations}>
+        <p className="weather-ws-empty-kicker">Weather station offline</p>
+        <h2>Choose a home location</h2>
+        <p className="weather-ws-empty-desc">Set latitude, longitude, and timezone in Admin settings before the observatory can pull local weather.</p>
+        <button type="button" className="button-link weather-ws-empty-action" onClick={onOpenAdmin}>Open Admin settings</button>
+      </EmptyShell>
     )
   }
 
   if (!weather) {
     return (
-      <section className="workspace-grid weather-workspace">
-        <article className="weather-ws-empty">
-          <div className="weather-ws-empty-icon" aria-hidden="true">!</div>
-          <p className="weather-ws-empty-kicker">Weather station quiet</p>
-          <h2>Weather unavailable</h2>
-          <p className="weather-ws-empty-desc">The latest forecast could not be loaded right now. Try again shortly or clear the weather cache from Admin.</p>
-        </article>
-      </section>
+      <EmptyShell condition="fog" isNight={false} enhancedAnimations={enhancedAnimations}>
+        <p className="weather-ws-empty-kicker">Weather station quiet</p>
+        <h2>Weather unavailable</h2>
+        <p className="weather-ws-empty-desc">The latest forecast could not be loaded right now. Try again shortly or clear the weather cache from Admin.</p>
+      </EmptyShell>
     )
   }
 
@@ -102,15 +177,13 @@ export function WeatherWorkspace({
 
   const condition = deriveCondition(weather.current.label)
   const isNight = isNightTime(today?.sunrise ?? null, today?.sunset ?? null)
-
-  // Determine gradient theme based on condition
   const conditionClass = `weather-cond--${condition}${isNight ? ' weather-cond--night' : ''}`
 
   return (
     <section className={`workspace-grid weather-workspace ${conditionClass}`}>
-      {/* Hero Section */}
+      {/* Hero — animated weather scene */}
       <article className="weather-ws-hero">
-        <div className="weather-ws-hero-bg" aria-hidden="true" />
+        <WeatherBackdrop condition={condition} isNight={isNight} enhancedAnimations={enhancedAnimations} />
         <div className="weather-ws-hero-content">
           <header className="weather-ws-hero-header">
             <div>
@@ -121,46 +194,27 @@ export function WeatherWorkspace({
           </header>
 
           <div className="weather-ws-hero-main">
-            <div className="weather-ws-hero-temp-group">
-              <span className="weather-ws-hero-icon">{weatherIcon(weather.current.label)}</span>
-              <span className="weather-ws-hero-temp">{formatTemperature(weather.current.temperature)}</span>
-            </div>
+            <span className="weather-ws-hero-temp">{formatTemperature(weather.current.temperature)}</span>
             <div className="weather-ws-hero-meta">
               <p className="weather-ws-hero-label">{weather.current.label}</p>
               <p className="weather-ws-hero-feels">Feels like {formatTemperature(weather.current.feelsLike)}</p>
-              <p className="weather-ws-hero-range">{formatTemperature(today?.max)} / {formatTemperature(today?.min)}</p>
+              <p className="weather-ws-hero-range">
+                <span className="weather-ws-hero-range-hi">H {formatTemperature(today?.max)}</span>
+                <span className="weather-ws-hero-range-lo">L {formatTemperature(today?.min)}</span>
+              </p>
             </div>
+          </div>
+
+          <div className="weather-ws-stats">
+            <HeroStat icon={<WindIcon />} label="Wind" value={`${formatNumber(weather.current.windSpeed)} km/h`} />
+            <HeroStat icon={<GustIcon />} label="Gusts" value={`${formatNumber(weather.current.windGusts)} km/h`} />
+            <HeroStat icon={<DropletIcon />} label="Precip" value={formatCurrentPrecipitationMm(weather.current.precipitationMm)} />
+            <HeroStat icon={<SunIcon />} label="UV max" value={today?.uvIndexMax != null ? formatNumber(today.uvIndexMax) : '--'} />
+            <HeroStat icon={<SunriseIcon />} label="Sunrise" value={formatSunriseSunset(today?.sunrise ?? null)} />
+            <HeroStat icon={<SunsetIcon />} label="Sunset" value={formatSunriseSunset(today?.sunset ?? null)} />
           </div>
         </div>
       </article>
-
-      {/* Metrics Grid */}
-      <div className="weather-ws-metrics">
-        <div className="weather-ws-metric">
-          <span className="weather-ws-metric-label">Wind</span>
-          <strong>{formatNumber(weather.current.windSpeed)} km/h</strong>
-        </div>
-        <div className="weather-ws-metric">
-          <span className="weather-ws-metric-label">Gusts</span>
-          <strong>{formatNumber(weather.current.windGusts)} km/h</strong>
-        </div>
-        <div className="weather-ws-metric">
-          <span className="weather-ws-metric-label">Precipitation</span>
-          <strong>{formatCurrentPrecipitationMm(weather.current.precipitationMm)}</strong>
-        </div>
-        <div className="weather-ws-metric">
-          <span className="weather-ws-metric-label">UV max</span>
-          <strong>{today?.uvIndexMax != null ? formatNumber(today.uvIndexMax) : '--'}</strong>
-        </div>
-        <div className="weather-ws-metric">
-          <span className="weather-ws-metric-label">Sunrise</span>
-          <strong>{formatSunriseSunset(today?.sunrise ?? null)}</strong>
-        </div>
-        <div className="weather-ws-metric">
-          <span className="weather-ws-metric-label">Sunset</span>
-          <strong>{formatSunriseSunset(today?.sunset ?? null)}</strong>
-        </div>
-      </div>
 
       {/* Hourly Forecast */}
       {weather.hourly.length > 0 && (
@@ -170,24 +224,25 @@ export function WeatherWorkspace({
             <h2>Hourly</h2>
           </header>
           <div className="weather-ws-hourly-track" tabIndex={0} aria-label="Hourly forecast">
-            {weather.hourly.map((hour, index) => (
-              <div className="weather-ws-hour-item" key={hour.time}>
-                <span className="weather-ws-hour-label">{formatWeatherHour(hour.time, index)}</span>
-                <span className="weather-ws-hour-emoji">{weatherIcon(hour.label)}</span>
-                <span className="weather-ws-hour-degrees">{formatTemperature(hour.temperature)}</span>
-                {hour.precipitationChance !== null && (
-                  <div className="weather-ws-hour-rain-bar">
+            {weather.hourly.map((hour, index) => {
+              const chance = hour.precipitationChance
+              return (
+                <div className={`weather-ws-hour-item${index === 0 ? ' weather-ws-hour-item--now' : ''}`} key={hour.time}>
+                  <span className="weather-ws-hour-label">{formatWeatherHour(hour.time, index)}</span>
+                  <span className="weather-ws-hour-emoji">{weatherIcon(hour.label)}</span>
+                  <span className="weather-ws-hour-degrees">{formatTemperature(hour.temperature)}</span>
+                  <div className="weather-ws-hour-rain-bar" title={chance !== null ? `${formatNumber(chance)}% rain chance` : 'No rain data'}>
                     <div
                       className="weather-ws-hour-rain-fill"
-                      style={{ '--rain': `${hour.precipitationChance}%` } as CSSProperties}
+                      style={{ '--rain': `${chance ?? 0}%` } as CSSProperties}
                     />
                   </div>
-                )}
-                <span className="weather-ws-hour-rain-label">
-                  {hour.precipitationChance !== null ? `${formatNumber(hour.precipitationChance)}%` : ''}
-                </span>
-              </div>
-            ))}
+                  <span className="weather-ws-hour-rain-label">
+                    {chance !== null ? `${formatNumber(chance)}%` : '--'}
+                  </span>
+                </div>
+              )
+            })}
           </div>
         </article>
       )}
@@ -207,7 +262,10 @@ export function WeatherWorkspace({
                   <span className="weather-ws-daily-date">{formatDate(day.date)}</span>
                   <span className="weather-ws-daily-icon">{weatherIcon(day.label)}</span>
                   <span className="weather-ws-daily-label">{day.label}</span>
-                  <span className="weather-ws-daily-temps">{formatTemperature(day.max)} / {formatTemperature(day.min)}</span>
+                  <span className="weather-ws-daily-temps">
+                    <span className="weather-ws-daily-max">{formatTemperature(day.max)}</span>
+                    <span className="weather-ws-daily-min">{formatTemperature(day.min)}</span>
+                  </span>
                   <span className="weather-ws-daily-uv">UV {day.uvIndexMax != null ? formatNumber(day.uvIndexMax) : '--'}</span>
                   <div className="weather-ws-daily-rain">
                     <div className="weather-ws-daily-rain-bar">
@@ -225,6 +283,28 @@ export function WeatherWorkspace({
         </article>
       )}
 
+      {/* Today summary strip */}
+      {today && (
+        <div className="weather-ws-summary">
+          <div className="weather-ws-summary-item">
+            <span className="weather-ws-summary-label">Daylight</span>
+            <strong>{formatDaylight(today.sunrise, today.sunset)}</strong>
+          </div>
+          <div className="weather-ws-summary-item">
+            <span className="weather-ws-summary-label">Today high</span>
+            <strong>{formatTemperature(today.max)}</strong>
+          </div>
+          <div className="weather-ws-summary-item">
+            <span className="weather-ws-summary-label">Today low</span>
+            <strong>{formatTemperature(today.min)}</strong>
+          </div>
+          <div className="weather-ws-summary-item">
+            <span className="weather-ws-summary-label">Rain chance</span>
+            <strong>{today.precipitationChance != null ? `${formatNumber(today.precipitationChance)}%` : '--'}</strong>
+          </div>
+        </div>
+      )}
+
       {/* Environment Section */}
       {(showUv || showAir || showPollen) && (
         <article className="weather-ws-section">
@@ -236,7 +316,7 @@ export function WeatherWorkspace({
             {showUv && (
               <div className="weather-ws-env-card">
                 <div className="weather-ws-env-card-header">
-                  <span className="weather-ws-env-card-icon">☀️</span>
+                  <span className="weather-ws-env-card-icon"><SunIcon /></span>
                   <span className="weather-ws-env-card-title">UV Index</span>
                 </div>
                 {env ? (
@@ -257,7 +337,7 @@ export function WeatherWorkspace({
             {showAir && (
               <div className="weather-ws-env-card">
                 <div className="weather-ws-env-card-header">
-                  <span className="weather-ws-env-card-icon">🍃</span>
+                  <span className="weather-ws-env-card-icon"><LeafIcon /></span>
                   <span className="weather-ws-env-card-title">Air Quality</span>
                 </div>
                 {env?.airQuality ? (
@@ -279,7 +359,7 @@ export function WeatherWorkspace({
             {showPollen && (
               <div className="weather-ws-env-card">
                 <div className="weather-ws-env-card-header">
-                  <span className="weather-ws-env-card-icon">🌾</span>
+                  <span className="weather-ws-env-card-icon"><FlowerIcon /></span>
                   <span className="weather-ws-env-card-title">Pollen</span>
                 </div>
                 {env?.pollen && pollenAvailable(env.pollen) ? (
