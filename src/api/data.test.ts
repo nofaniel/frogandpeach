@@ -691,6 +691,8 @@ describe('whiteboard data', () => {
   })
 
   it('keeps the most recent strokes in the dashboard preview payload', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 404 }))
+
     const env = createFakeEnv(
       {},
       [],

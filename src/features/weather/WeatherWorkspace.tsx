@@ -3,7 +3,6 @@ import type { Module, Settings, WeatherSummary } from '../../shared/api-types'
 import { formatDate, formatNumber, formatTemperature, formatTime, weatherIcon } from '../../shared/format'
 import { formatLocationLabel } from '../../shared/location'
 import { airQualityLevel, formatCurrentPrecipitationMm, overallPollenLevel, pollenAvailable, pollenLevel, uvLevel } from '../../shared/weather'
-import { InfoTooltip } from '../home/widgets/InfoTooltip'
 
 function formatWeatherHour(time: string, index: number): string {
   if (index === 0) return 'Now'
@@ -14,6 +13,19 @@ function formatWeatherHour(time: string, index: number): string {
 function formatSunriseSunset(iso: string | null): string {
   if (!iso) return '--'
   return formatTime(iso)
+}
+
+function formatObservationTime(iso: string | null): string {
+  if (!iso) return 'Live conditions'
+  return `Observed ${formatTime(iso)}`
+}
+
+function formatRainLabel(value: number | null | undefined): string {
+  return value === null || value === undefined ? 'Rain data unavailable' : `${formatNumber(value)}% rain chance`
+}
+
+function formatHourlyLabel(hour: { time: string; temperature: number | null; precipitationChance: number | null; label: string }, index: number): string {
+  return `${formatWeatherHour(hour.time, index)}: ${hour.label}, ${formatTemperature(hour.temperature)}, ${formatRainLabel(hour.precipitationChance)}`
 }
 
 const POLLEN_LABELS: Record<string, string> = {
@@ -41,10 +53,11 @@ export function WeatherWorkspace({
   if (!locationConfigured) {
     return (
       <section className="workspace-grid weather-workspace">
-        <article className="panel span-2">
-          <p className="kicker">Weather</p>
-          <h2>Location not set</h2>
-          <p>Set latitude, longitude, and timezone in Admin settings before weather data can load.</p>
+        <article className="panel span-2 weather-ws-empty">
+          <span className="weather-ws-empty-mark" aria-hidden="true">◎</span>
+          <p className="kicker">Weather station offline</p>
+          <h2>Choose a home location</h2>
+          <p>Set latitude, longitude, and timezone in Admin settings before the observatory can pull local weather.</p>
           <button type="button" className="button-link" onClick={onOpenAdmin}>Open Admin settings</button>
         </article>
       </section>
@@ -54,10 +67,11 @@ export function WeatherWorkspace({
   if (!weather) {
     return (
       <section className="workspace-grid weather-workspace">
-        <article className="panel span-2">
-          <p className="kicker">Weather</p>
+        <article className="panel span-2 weather-ws-empty">
+          <span className="weather-ws-empty-mark" aria-hidden="true">!</span>
+          <p className="kicker">Weather station quiet</p>
           <h2>Weather unavailable</h2>
-          <p>Weather data could not be loaded right now.</p>
+          <p>The latest forecast could not be loaded right now. Try again shortly or clear the weather cache from Admin.</p>
         </article>
       </section>
     )
@@ -70,26 +84,39 @@ export function WeatherWorkspace({
   const env = weather.environment
   const today = weather.daily[0]
   const nextDays = weather.daily.slice(1)
+  const observationTime = formatObservationTime(weather.current.time)
 
   return (
     <section className="workspace-grid weather-workspace">
+      <div className="weather-ws-atmosphere" aria-hidden="true" />
       <article className="panel span-2 weather-ws-current">
         <div className="weather-ws-orb" aria-hidden="true" />
-        <div className="weather-ws-header">
-          <div className="weather-ws-location">{weatherLocation.toUpperCase()}</div>
-          <div className="weather-ws-conditions">
-            <div className="weather-ws-icon">{weatherIcon(weather.current.label)}</div>
-            <div className="weather-ws-temp-group">
-              <strong className="weather-ws-temp">{formatTemperature(weather.current.temperature)}</strong>
-              <span className="weather-ws-label">{weather.current.label}</span>
+        <header className="weather-ws-header">
+          <div>
+            <p className="kicker">Local observatory</p>
+            <h2>{weatherLocation}</h2>
+            <p>{observationTime}</p>
+          </div>
+          <span className="weather-ws-signal">Live</span>
+        </header>
+        <div className="weather-ws-hero-grid">
+          <div className="weather-ws-conditions" aria-label={`Current conditions: ${weather.current.label}`}>
+            <div className="weather-ws-icon" aria-hidden="true">{weatherIcon(weather.current.label)}</div>
+            <div>
+              <div className="weather-ws-temp-group">
+                <strong className="weather-ws-temp">{formatTemperature(weather.current.temperature)}</strong>
+                <span className="weather-ws-label">{weather.current.label}</span>
+              </div>
+              <p className="weather-ws-feels">Feels like {formatTemperature(weather.current.feelsLike)}</p>
             </div>
+          </div>
+          <div className="weather-ws-day-card" aria-label="Today overview">
+            <span>Today</span>
+            <strong>{formatTemperature(today?.max)} / {formatTemperature(today?.min)}</strong>
+            <small>{formatRainLabel(today?.precipitationChance)}</small>
           </div>
         </div>
         <div className="weather-ws-metrics">
-          <div className="weather-ws-metric">
-            <span className="weather-ws-metric-label">Feels like</span>
-            <strong>{formatTemperature(weather.current.feelsLike)}</strong>
-          </div>
           <div className="weather-ws-metric">
             <span className="weather-ws-metric-label">Wind</span>
             <strong>{formatNumber(weather.current.windSpeed)} km/h</strong>
@@ -101,10 +128,6 @@ export function WeatherWorkspace({
           <div className="weather-ws-metric">
             <span className="weather-ws-metric-label">Precipitation</span>
             <strong>{formatCurrentPrecipitationMm(weather.current.precipitationMm)}</strong>
-          </div>
-          <div className="weather-ws-metric">
-            <span className="weather-ws-metric-label">High / Low</span>
-            <strong>{formatTemperature(today?.max)} / {formatTemperature(today?.min)}</strong>
           </div>
           <div className="weather-ws-metric">
             <span className="weather-ws-metric-label">Rain chance</span>
@@ -133,9 +156,9 @@ export function WeatherWorkspace({
               <h2>Hourly forecast</h2>
             </div>
           </div>
-          <div className="weather-ws-hourly-track">
+          <div className="weather-ws-hourly-track" tabIndex={0} aria-label="Scrollable hourly forecast">
             {weather.hourly.map((hour, index) => (
-              <article className="weather-ws-hour-card" key={hour.time}>
+              <article className="weather-ws-hour-card" key={hour.time} aria-label={formatHourlyLabel(hour, index)}>
                 <div className="weather-ws-hour-time">{formatWeatherHour(hour.time, index)}</div>
                 <div className="weather-ws-hour-icon">{weatherIcon(hour.label)}</div>
                 <div className="weather-ws-hour-temp">{formatTemperature(hour.temperature)}</div>
@@ -160,11 +183,12 @@ export function WeatherWorkspace({
             {nextDays.map((day) => {
               const precip = day.precipitationChance === null ? null : Math.max(0, Math.min(100, day.precipitationChance))
               return (
-                <div
-                  key={day.date}
-                  className="weather-ws-week-card"
-                  style={{ '--precip': `${precip ?? 0}%` } as CSSProperties}
-                >
+                  <div
+                    key={day.date}
+                    className="weather-ws-week-card"
+                    style={{ '--precip': `${precip ?? 0}%` } as CSSProperties}
+                    aria-label={`${formatDate(day.date)}: ${day.label}, high ${formatTemperature(day.max)}, low ${formatTemperature(day.min)}, ${formatRainLabel(precip)}`}
+                  >
                   <div className="weather-ws-week-date">{formatDate(day.date)}</div>
                   <div className="weather-ws-week-icon">{weatherIcon(day.label)}</div>
                   <div className="weather-ws-week-label">{day.label}</div>
