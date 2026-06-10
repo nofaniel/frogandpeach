@@ -2,6 +2,7 @@ import { type CSSProperties, type ReactNode } from 'react'
 import type { Module, Settings, WeatherSummary } from '../../shared/api-types'
 import { formatDate, formatNumber, formatTemperature, formatTime, weatherIcon } from '../../shared/format'
 import { formatLocationLabel } from '../../shared/location'
+import { computeLunarInfo, formatDaysUntilNext, formatIllumination } from '../../shared/lunar'
 import { airQualityLevel, formatCurrentPrecipitationMm, overallPollenLevel, pollenAvailable, pollenLevel, type AirQualityLevel, type PollenLevel, type UvLevel, uvLevel } from '../../shared/weather'
 import { WeatherScene, type SkyCondition } from './WeatherScene'
 
@@ -183,6 +184,12 @@ const FlowerIcon = ({ className }: IconProps) => (
   <Svg className={className}><circle cx="12" cy="12" r="2.4" />{[0, 60, 120, 180, 240, 300].map((deg) => (
     <ellipse key={deg} cx="12" cy="6.6" rx="1.9" ry="3.1" transform={`rotate(${deg} 12 12)`} />
   ))}</Svg>
+)
+const MoonIcon = ({ className }: IconProps) => (
+  <Svg className={className}><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1Z" /></Svg>
+)
+const ClockIcon = ({ className }: IconProps) => (
+  <Svg className={className}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></Svg>
 )
 
 function HeroStat({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
@@ -447,6 +454,60 @@ export function WeatherWorkspace({
           </div>
         </div>
       )}
+
+      {/* Lunar phase */}
+      {(() => {
+        const lunar = computeLunarInfo(new Date())
+        const orbClass = `weather-ws-lunar-orb weather-ws-lunar-orb--${lunar.name.toLowerCase().replace(/ /g, '-')}`
+        const segments = [
+          { label: 'New', key: 'new-moon' },
+          { label: '1st Q', key: 'first-quarter' },
+          { label: 'Full', key: 'full-moon' },
+          { label: 'Last Q', key: 'last-quarter' },
+        ]
+        const phaseIdx = ['New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous', 'Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent'].indexOf(lunar.name)
+        const activeSeg = phaseIdx < 4 ? 0 : phaseIdx < 6 ? 1 : phaseIdx < 7 ? 2 : 3
+        const fillPct = phaseIdx < 4
+          ? ((phaseIdx + (lunar.age % (29.53058867 / 4)) / (29.53058867 / 4)) / 4) * 100
+          : (((phaseIdx - 4) + (lunar.age % (29.53058867 / 4)) / (29.53058867 / 4)) / 4) * 100
+        return (
+          <article className="weather-ws-lunar" aria-label="Lunar phase">
+            <div className={orbClass}>
+              <div className="weather-ws-lunar-orb-glow" />
+              <div className="weather-ws-lunar-orb-face">
+                <div className="weather-ws-lunar-orb-shadow-waxing" />
+                <div className="weather-ws-lunar-orb-shadow-waning" />
+              </div>
+            </div>
+            <div className="weather-ws-lunar-data">
+              <div className="weather-ws-lunar-primary">
+                <p className="weather-ws-lunar-kicker">Lunar</p>
+                <h3 className="weather-ws-lunar-phase-name">{lunar.name}</h3>
+                <p className="weather-ws-lunar-illumination">{formatIllumination(lunar.illumination)} illuminated · {lunar.orientation}</p>
+              </div>
+              <div className="weather-ws-lunar-next">
+                <span className="weather-ws-lunar-next-icon"><ClockIcon /></span>
+                <div className="weather-ws-lunar-next-text">
+                  <span className="weather-ws-lunar-next-label">Next phase</span>
+                  <span className="weather-ws-lunar-next-value">{lunar.nextPhaseName} {formatDaysUntilNext(lunar.daysUntilNextPhase)}</span>
+                </div>
+              </div>
+              <div className="weather-ws-lunar-timeline" role="img" aria-label="Lunar cycle progress">
+                {segments.map((seg, i) => (
+                  <span key={seg.key}>
+                    {i > 0 && (
+                      <span className={`weather-ws-lunar-timeline-seg${i === activeSeg ? ' weather-ws-lunar-timeline-seg--active' : ''}`}
+                        style={i === activeSeg ? { '--lunar-fill': `${fillPct}%` } as CSSProperties : undefined}
+                      />
+                    )}
+                    <span className={`weather-ws-lunar-timeline-dot${i === activeSeg ? ' weather-ws-lunar-timeline-dot--active' : ''}`} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          </article>
+        )
+      })()}
 
       {/* Environment Section */}
       {(showUv || showAir || showPollen) && (
