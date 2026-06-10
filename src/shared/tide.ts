@@ -161,6 +161,8 @@ export function getTideWindow(events: TideEvent[], now: number, count: number): 
 export type TideCurrentState = {
   previousTide: TideEvent | null
   nextTide: TideEvent | null
+  lowTide: TideEvent | null
+  highTide: TideEvent | null
   progress: number
   direction: 'rising' | 'falling' | null
   estimatedHeight: number | null
@@ -180,8 +182,10 @@ export function getCurrentTideState(
 
   if (!previousTide || !nextTide) {
     return {
-      previousTide,
-      nextTide,
+      previousTide: previousTide,
+      nextTide: nextTide,
+      lowTide: null,
+      highTide: null,
       progress: 0,
       direction: null,
       estimatedHeight: currentSeaLevel,
@@ -192,14 +196,31 @@ export function getCurrentTideState(
   const nextTime = new Date(nextTide.time).getTime()
   const span = nextTime - prevTime
   const elapsed = now - prevTime
-  const progress = span > 0 ? Math.min(1, Math.max(0, elapsed / span)) : 0
+  const timeProgress = span > 0 ? Math.min(1, Math.max(0, elapsed / span)) : 0
 
   const direction = previousTide.type === 'low' ? 'rising' : 'falling'
 
   let estimatedHeight: number | null = currentSeaLevel
   if (estimatedHeight === null && previousTide.height !== null && nextTide.height !== null) {
-    estimatedHeight = previousTide.height + (nextTide.height - previousTide.height) * progress
+    estimatedHeight = previousTide.height + (nextTide.height - previousTide.height) * timeProgress
   }
 
-  return { previousTide, nextTide, progress, direction, estimatedHeight }
+  let lowTide: TideEvent
+  let highTide: TideEvent
+  if (previousTide.type === 'low') {
+    lowTide = previousTide
+    highTide = nextTide
+  } else {
+    lowTide = nextTide
+    highTide = previousTide
+  }
+
+  let progress: number
+  if (lowTide.height !== null && highTide.height !== null && lowTide.height !== highTide.height && estimatedHeight !== null) {
+    progress = Math.min(1, Math.max(0, (estimatedHeight - lowTide.height) / (highTide.height - lowTide.height)))
+  } else {
+    progress = timeProgress
+  }
+
+  return { previousTide, nextTide, lowTide, highTide, progress, direction, estimatedHeight }
 }

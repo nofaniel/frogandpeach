@@ -16,6 +16,10 @@ Built with React 19, TypeScript, Cloudflare Pages Functions, and D1.
 | --- | --- |
 | <img src="docs/readme-screenshots/home-mobile.png" alt="Home dashboard on a phone" width="640" /> | <img src="docs/readme-screenshots/admin-mobile.png" alt="Admin panel on a phone" width="640" /> |
 
+| Weather workspace | Weather details | Weather (mobile) |
+| --- | --- | --- |
+| <img src="docs/readme-screenshots/weather-desktop.png" alt="Weather workspace showing live conditions, environment chips, hourly forecast, and five-day outlook" width="640" /> | <img src="docs/readme-screenshots/weather-desktop-lower.png" alt="Lower section of the weather workspace showing the five-day forecast, tide summary, and lunar phase" width="640" /> | <img src="docs/readme-screenshots/weather-mobile.png" alt="Weather workspace on a phone" width="320" /> |
+
 ## Links
 
 - Live app: `https://frog-peach-home-hub.pages.dev`
