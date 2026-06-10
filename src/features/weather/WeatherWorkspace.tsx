@@ -37,6 +37,25 @@ const POLLEN_LABELS: Record<string, string> = {
   ragweed: 'Ragweed',
 }
 
+function deriveCondition(label: string): string {
+  const l = label.toLowerCase()
+  if (l.includes('thunder') || l.includes('storm')) return 'storm'
+  if (l.includes('snow') || l.includes('blizzard')) return 'snow'
+  if (l.includes('rain') || l.includes('drizzle') || l.includes('shower')) return 'rain'
+  if (l.includes('fog') || l.includes('mist')) return 'fog'
+  if (l.includes('clear') || l.includes('sun')) return 'clear'
+  if (l.includes('overcast')) return 'overcast'
+  if (l.includes('cloud')) return 'partly-cloudy'
+  return 'default'
+}
+
+function isNightTime(sunrise: string | null, sunset: string | null): boolean {
+  const now = Date.now()
+  if (sunrise && now < new Date(sunrise).getTime()) return true
+  if (sunset && now > new Date(sunset).getTime()) return true
+  return false
+}
+
 export function WeatherWorkspace({
   weather,
   locationConfigured,
@@ -81,14 +100,25 @@ export function WeatherWorkspace({
   const showUv = module?.options.showUvIndex === true
   const showAir = module?.options.showAirQuality === true
   const showPollen = module?.options.showPollen === true
+  const hasAnimations = module?.options.enhancedAnimations === true
   const env = weather.environment
   const today = weather.daily[0]
   const nextDays = weather.daily.slice(1)
   const observationTime = formatObservationTime(weather.current.time)
 
+  const condition = deriveCondition(weather.current.label)
+  const isNight = isNightTime(today?.sunrise ?? null, today?.sunset ?? null)
+  const isWindy = (weather.current.windSpeed ?? 0) > 30
+  const workspaceClass = [
+    'workspace-grid weather-workspace',
+    `weather-cond--${condition}`,
+    isNight ? 'weather-cond--night' : '',
+    isWindy ? 'weather-cond--windy' : '',
+    hasAnimations ? 'weather-anim' : '',
+  ].filter(Boolean).join(' ')
+
   return (
-    <section className="workspace-grid weather-workspace">
-      <div className="weather-ws-atmosphere" aria-hidden="true" />
+    <section className={workspaceClass}>
       <article className="panel span-2 weather-ws-current">
         <div className="weather-ws-orb" aria-hidden="true" />
         <header className="weather-ws-header">
@@ -128,10 +158,6 @@ export function WeatherWorkspace({
           <div className="weather-ws-metric">
             <span className="weather-ws-metric-label">Precipitation</span>
             <strong>{formatCurrentPrecipitationMm(weather.current.precipitationMm)}</strong>
-          </div>
-          <div className="weather-ws-metric">
-            <span className="weather-ws-metric-label">Rain chance</span>
-            <strong>{formatNumber(today?.precipitationChance)}%</strong>
           </div>
           <div className="weather-ws-metric">
             <span className="weather-ws-metric-label">UV max</span>
@@ -270,7 +296,7 @@ export function WeatherWorkspace({
               </div>
             )}
             {showPollen && (
-              <div className="weather-ws-env-card weather-ws-env-card--wide">
+              <div className="weather-ws-env-card">
                 <div className="weather-ws-env-card-header">
                   <span className="weather-ws-env-icon">🌾</span>
                   <strong>Pollen</strong>

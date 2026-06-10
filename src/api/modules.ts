@@ -170,6 +170,13 @@ export const moduleDefinitions: ModuleDefinition[] = [
         description: 'Show grass, birch, alder, mugwort, olive, and ragweed pollen counts. Data is available for European locations only.',
         defaultValue: false,
       },
+      {
+        key: 'enhancedAnimations',
+        type: 'boolean',
+        label: 'Weather animations',
+        description: 'Show immersive CSS animations that reflect current weather conditions on the observatory page.',
+        defaultValue: false,
+      },
     ],
   },
   {
