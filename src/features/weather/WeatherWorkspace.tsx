@@ -74,6 +74,7 @@ export function WeatherWorkspace({
   return (
     <section className="workspace-grid weather-workspace">
       <article className="panel span-2 weather-ws-current">
+        <div className="weather-ws-orb" aria-hidden="true" />
         <div className="weather-ws-header">
           <div className="weather-ws-location">{weatherLocation.toUpperCase()}</div>
           <div className="weather-ws-conditions">
