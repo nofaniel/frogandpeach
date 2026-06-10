@@ -8,10 +8,6 @@
  * app renders correctly before any theme JSON has loaded.
  */
 
-html {
-  scroll-behavior: smooth;
-}
-
 :root {
   /* Colour tokens (overridden per theme) */
   --color-bg: #f7f7f8;
@@ -25,7 +21,7 @@ html {
   --color-danger: #d64545;
 
   /* Typography tokens */
-  --font-body: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-heading: var(--font-body);
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Courier New", monospace;
 
@@ -33,7 +29,7 @@ html {
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-  --shadow-panel: 0 1px 2px rgba(28, 29, 31, 0.06), 0 4px 12px rgba(28, 29, 31, 0.04);
+  --shadow-panel: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 12px rgba(16, 24, 40, 0.04);
 
   /* Layout tokens */
   --space-scale: 1;
@@ -66,7 +62,6 @@ h1,
 h2,
 h3 {
   font-family: var(--font-heading);
-  text-wrap: balance;
 }
 
 button,
@@ -1555,6 +1550,12 @@ button.danger:not(.ghost) {
 }
 
 /* Compact app-style front page inspired by the reference mock. */
+body {
+  background:
+    radial-gradient(circle at 50% -10%, rgba(58, 111, 77, 0.08), transparent 32rem),
+    linear-gradient(180deg, #f9f8f5 0%, #f4f2ee 100%);
+}
+
 .app-shell {
   --app-green: #2f6645;
   --app-green-2: #477a57;
@@ -1568,7 +1569,7 @@ button.danger:not(.ghost) {
   min-height: 100svh;
   padding: 18px 0 112px;
   color: var(--app-ink);
-  font-family: "Outfit", "Trebuchet MS", sans-serif;
+  font-family: "Aptos", "Trebuchet MS", sans-serif;
 }
 
 .app-shell:has(.admin-grid) {
@@ -1593,7 +1594,7 @@ button.danger:not(.ghost) {
 
 .top-strip h1 {
   margin: 0;
-  font-family: "Outfit", "Trebuchet MS", sans-serif;
+  font-family: "Aptos Display", "Trebuchet MS", sans-serif;
   font-size: clamp(1.25rem, 4vw, 1.45rem);
   line-height: 1.1;
   letter-spacing: -0.04em;
@@ -1626,9 +1627,9 @@ button.danger:not(.ghost) {
 .top-actions .ghost {
   min-height: 30px;
   padding: 5px 9px;
-  border: 1px solid color-mix(in srgb, var(--color-accent-2) 28%, var(--color-line));
+  border: 1px solid rgba(47, 102, 69, 0.2);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-surface) 86%, transparent);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--app-green);
   font-size: 0.78rem;
   box-shadow: none;
@@ -1643,10 +1644,10 @@ button.danger:not(.ghost) {
   grid-auto-columns: minmax(0, 1fr);
   gap: 0;
   padding: 10px max(12px, calc((100vw - 568px) / 2)) calc(10px + env(safe-area-inset-bottom));
-  border-top: 1px solid color-mix(in srgb, var(--color-ink) 12%, transparent);
-  background: color-mix(in srgb, var(--color-bg) 92%, transparent);
+  border-top: 1px solid rgba(21, 25, 34, 0.12);
+  background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(18px);
-  box-shadow: 0 -10px 24px color-mix(in srgb, var(--color-ink) 5%, transparent);
+  box-shadow: 0 -10px 24px rgba(21, 25, 34, 0.05);
 }
 
 .tab-bar button {
@@ -1657,7 +1658,7 @@ button.danger:not(.ghost) {
   border: 0;
   border-radius: 16px;
   background: transparent;
-  color: var(--color-muted);
+  color: #807c75;
   font-size: 0.64rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -2108,18 +2109,22 @@ button.danger:not(.ghost) {
 
 /* Weather Workspace — redesigned light editorial weather page */
 .weather-workspace {
-  --wx-hero-1: #f0f4f1;
-  --wx-hero-2: #e8efe9;
-  --wx-hero-3: #dce5dd;
-  --wx-ink: #1a1f1c;
-  --wx-muted: #6b7a6f;
-  --wx-dim: #9aaa9e;
-  --wx-line: #d5ddd7;
-  --wx-accent: #2f6feb;
-  --wx-warm: #c47a2a;
-  --wx-cool: #3a8bc7;
-  --wx-card: #ffffff;
-  --wx-card-bg: #f7faf8;
+  /* Theme-derived tokens — adapt to any theme automatically */
+  --wx-ink: var(--color-ink);
+  --wx-muted: var(--color-muted);
+  --wx-line: var(--color-line);
+  --wx-card: var(--color-surface);
+  --wx-card-bg: var(--color-surface-2);
+  --wx-accent: var(--color-accent);
+
+  /* Weather-specific — richer than the page bg */
+  --wx-hero-1: #e2ede5;
+  --wx-hero-2: #d4e4d8;
+  --wx-hero-3: #c5d9cb;
+  --wx-dim: #7a8f80;
+  --wx-warm: #b06b1d;
+  --wx-cool: #2d7eb5;
+
   gap: 14px;
   width: 100%;
   padding: 0;
@@ -2147,39 +2152,39 @@ button.danger:not(.ghost) {
   pointer-events: none;
   opacity: 0.6;
   background:
-    radial-gradient(circle at 80% 20%, rgba(47, 111, 235, 0.06) 0 12rem, transparent 12.5rem),
-    radial-gradient(circle at 15% 80%, rgba(196, 122, 42, 0.05) 0 10rem, transparent 10.5rem);
+    radial-gradient(circle at 80% 20%, rgba(47, 111, 235, 0.12) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(196, 122, 42, 0.08) 0 10rem, transparent 10.5rem);
 }
 
 .weather-workspace.weather-cond--clear .weather-ws-hero-bg {
   background:
-    radial-gradient(circle at 80% 20%, rgba(233, 196, 106, 0.12) 0 12rem, transparent 12.5rem),
-    radial-gradient(circle at 15% 80%, rgba(126, 232, 177, 0.08) 0 10rem, transparent 10.5rem);
+    radial-gradient(circle at 80% 20%, rgba(233, 196, 106, 0.22) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(126, 232, 177, 0.14) 0 10rem, transparent 10.5rem);
 }
 
 .weather-workspace.weather-cond--clear.weather-cond--night .weather-ws-hero-bg {
   background:
-    radial-gradient(circle at 80% 20%, rgba(77, 160, 210, 0.1) 0 12rem, transparent 12.5rem),
-    radial-gradient(circle at 15% 80%, rgba(100, 140, 210, 0.06) 0 10rem, transparent 10.5rem);
+    radial-gradient(circle at 80% 20%, rgba(77, 160, 210, 0.18) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(100, 140, 210, 0.12) 0 10rem, transparent 10.5rem);
 }
 
 .weather-workspace.weather-cond--rain .weather-ws-hero-bg,
 .weather-workspace.weather-cond--storm .weather-ws-hero-bg {
   background:
-    radial-gradient(circle at 80% 20%, rgba(58, 139, 199, 0.1) 0 12rem, transparent 12.5rem),
-    radial-gradient(circle at 15% 80%, rgba(77, 150, 200, 0.06) 0 10rem, transparent 10.5rem);
+    radial-gradient(circle at 80% 20%, rgba(58, 139, 199, 0.18) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(77, 150, 200, 0.12) 0 10rem, transparent 10.5rem);
 }
 
 .weather-workspace.weather-cond--snow .weather-ws-hero-bg {
   background:
-    radial-gradient(circle at 80% 20%, rgba(180, 220, 255, 0.1) 0 12rem, transparent 12.5rem),
-    radial-gradient(circle at 15% 80%, rgba(140, 200, 240, 0.06) 0 10rem, transparent 10.5rem);
+    radial-gradient(circle at 80% 20%, rgba(180, 220, 255, 0.16) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(140, 200, 240, 0.1) 0 10rem, transparent 10.5rem);
 }
 
 .weather-workspace.weather-cond--fog .weather-ws-hero-bg {
   background:
-    radial-gradient(circle at 80% 20%, rgba(180, 200, 190, 0.08) 0 12rem, transparent 12.5rem),
-    radial-gradient(circle at 15% 80%, rgba(160, 180, 170, 0.05) 0 10rem, transparent 10.5rem);
+    radial-gradient(circle at 80% 20%, rgba(180, 200, 190, 0.14) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(160, 180, 170, 0.09) 0 10rem, transparent 10.5rem);
 }
 
 .weather-ws-hero-content {
@@ -2198,7 +2203,7 @@ button.danger:not(.ghost) {
 
 .weather-ws-hero-location {
   margin: 0;
-  color: var(--wx-muted);
+  color: var(--wx-dim);
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -2287,7 +2292,7 @@ button.danger:not(.ghost) {
 
 .weather-ws-hero-range {
   margin: 0;
-  color: var(--wx-dim);
+  color: var(--wx-muted);
   font-family: var(--font-mono);
   font-size: 0.82rem;
 }
@@ -2307,6 +2312,7 @@ button.danger:not(.ghost) {
   border: 1px solid var(--wx-line);
   border-radius: 16px;
   background: var(--wx-card);
+  box-shadow: var(--shadow-panel);
   transition: border-color 180ms ease, box-shadow 180ms ease;
 }
 
@@ -2337,6 +2343,7 @@ button.danger:not(.ghost) {
   border: 1px solid var(--wx-line);
   border-radius: 20px;
   background: var(--wx-card);
+  box-shadow: var(--shadow-panel);
 }
 
 .weather-ws-section-header {
@@ -2788,6 +2795,52 @@ button.danger:not(.ghost) {
   background: color-mix(in srgb, var(--wx-accent) 80%, #000);
 }
 
+/* ── Dark theme hero overrides ── */
+[data-theme-id="mono-dark"] .weather-ws-hero,
+[data-theme-id="slate"] .weather-ws-hero,
+[data-theme-id="dusk"] .weather-ws-hero,
+[data-theme-id="forest"] .weather-ws-hero {
+  --wx-hero-1: #1e2a22;
+  --wx-hero-2: #223028;
+  --wx-hero-3: #28382f;
+}
+
+[data-theme-id="mono-dark"] .weather-ws-hero-bg,
+[data-theme-id="slate"] .weather-ws-hero-bg,
+[data-theme-id="dusk"] .weather-ws-hero-bg,
+[data-theme-id="forest"] .weather-ws-hero-bg {
+  opacity: 0.8;
+}
+
+[data-theme-id="mono-dark"] .weather-cond--clear .weather-ws-hero-bg,
+[data-theme-id="slate"] .weather-cond--clear .weather-ws-hero-bg,
+[data-theme-id="dusk"] .weather-cond--clear .weather-ws-hero-bg,
+[data-theme-id="forest"] .weather-cond--clear .weather-ws-hero-bg {
+  background:
+    radial-gradient(circle at 80% 20%, rgba(233, 196, 106, 0.14) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(126, 232, 177, 0.1) 0 10rem, transparent 10.5rem);
+}
+
+[data-theme-id="mono-dark"] .weather-cond--rain .weather-ws-hero-bg,
+[data-theme-id="slate"] .weather-cond--rain .weather-ws-hero-bg,
+[data-theme-id="dusk"] .weather-cond--rain .weather-ws-hero-bg,
+[data-theme-id="forest"] .weather-cond--rain .weather-ws-hero-bg,
+[data-theme-id="mono-dark"] .weather-cond--storm .weather-ws-hero-bg,
+[data-theme-id="slate"] .weather-cond--storm .weather-ws-hero-bg,
+[data-theme-id="dusk"] .weather-cond--storm .weather-ws-hero-bg,
+[data-theme-id="forest"] .weather-cond--storm .weather-ws-hero-bg {
+  background:
+    radial-gradient(circle at 80% 20%, rgba(58, 139, 199, 0.12) 0 12rem, transparent 12.5rem),
+    radial-gradient(circle at 15% 80%, rgba(77, 150, 200, 0.08) 0 10rem, transparent 10.5rem);
+}
+
+[data-theme-id="mono-dark"] .weather-ws-empty .button-link,
+[data-theme-id="slate"] .weather-ws-empty .button-link,
+[data-theme-id="dusk"] .weather-ws-empty .button-link,
+[data-theme-id="forest"] .weather-ws-empty .button-link {
+  color: var(--wx-ink);
+}
+
 /* ── Responsive ── */
 @media (max-width: 980px) {
   .weather-ws-metrics {
@@ -3059,7 +3112,7 @@ button.danger:not(.ghost) {
 
 .tide-panel h2 {
   color: var(--app-ink);
-  font-family: "Outfit", "Trebuchet MS", sans-serif;
+  font-family: "Aptos Display", "Trebuchet MS", sans-serif;
   font-size: 1.22rem;
   letter-spacing: -0.04em;
 }
