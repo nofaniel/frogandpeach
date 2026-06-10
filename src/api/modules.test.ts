@@ -194,8 +194,8 @@ describe('module registry normalisation', () => {
     const modules = normaliseModules(new Map())
     const weather = modules.find((m) => m.id === 'weather')
     expect(weather?.settings).toBeDefined()
-    expect(weather?.settings?.length).toBe(5)
-    expect(weather?.settings?.map((s) => s.key)).toEqual(['iconStyle', 'showExtendedForecast', 'showUvIndex', 'showAirQuality', 'showPollen'])
+    expect(weather?.settings?.length).toBe(6)
+    expect(weather?.settings?.map((s) => s.key)).toEqual(['iconStyle', 'showExtendedForecast', 'showUvIndex', 'showAirQuality', 'showPollen', 'enhancedAnimations'])
 
     const tides = modules.find((m) => m.id === 'tides')
     expect(tides?.settings).toBeDefined()
