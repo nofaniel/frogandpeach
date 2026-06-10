@@ -2097,14 +2097,12 @@ body {
 /* Weather Workspace — full-page immersive view */
 .weather-workspace {
   position: relative;
-  background:
-    radial-gradient(circle at 80% 10%, rgba(214, 242, 226, 0.06) 0 10rem, transparent 10.5rem),
-    radial-gradient(circle at 20% 80%, rgba(67, 163, 132, 0.12), transparent 18rem),
-    linear-gradient(160deg, #1a3d2c 0%, #142d22 40%, #0f1f18 100%);
-  color: #fff;
-  padding: 20px;
-  border-radius: var(--radius-lg);
   gap: 16px;
+  width: 100%;
+}
+
+.app-shell:has(.weather-workspace) {
+  width: min(var(--shell-width), calc(100% - 28px));
 }
 
 .weather-workspace .panel {
@@ -2178,9 +2176,10 @@ body {
   position: relative;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
 }
 
 .weather-ws-location {
