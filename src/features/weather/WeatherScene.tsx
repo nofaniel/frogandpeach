@@ -1,6 +1,6 @@
 import { memo, useMemo, type CSSProperties } from 'react'
 
-export type SkyCondition = 'clear' | 'partly-cloudy' | 'overcast' | 'rain' | 'storm' | 'snow' | 'fog' | 'default'
+export type SkyCondition = 'clear' | 'partly-cloudy' | 'overcast' | 'rain' | 'storm' | 'snow' | 'fog' | 'wind' | 'default'
 
 // Deterministic pseudo-random in [0,1) from an integer seed. Keeps particle
 // layouts stable across renders (no re-randomising flicker) without useState.
@@ -72,6 +72,70 @@ function buildStars(count: number): Particle[] {
   })
 }
 
+function buildWindStreaks(count: number): Particle[] {
+  return Array.from({ length: count }, (_, i) => {
+    const top = 10 + rand(i + 101) * 80
+    const width = 40 + rand(i + 107) * 120
+    const delay = rand(i + 113) * -3
+    const duration = 1.8 + rand(i + 119) * 2.2
+    const opacity = 0.12 + rand(i + 127) * 0.2
+    return {
+      style: {
+        top: `${top}%`,
+        width: `${width}px`,
+        opacity,
+        animationDelay: `${delay}s`,
+        animationDuration: `${duration}s`,
+      } as CSSProperties,
+    }
+  })
+}
+
+function buildLeaves(count: number): Particle[] {
+  return Array.from({ length: count }, (_, i) => {
+    const top = 15 + rand(i + 201) * 70
+    const size = 8 + rand(i + 207) * 8
+    const delay = rand(i + 213) * -5
+    const duration = 3.5 + rand(i + 219) * 4
+    const drift = 200 + rand(i + 229) * 300
+    const rotate = rand(i + 239) * 360
+    const hue = rand(i + 249) > 0.5 ? `${28 + rand(i + 251) * 30}` : `${80 + rand(i + 253) * 40}`
+    const opacity = 0.5 + rand(i + 259) * 0.45
+    return {
+      style: {
+        top: `${top}%`,
+        width: `${size}px`,
+        height: `${size * 0.7}px`,
+        opacity,
+        animationDelay: `${delay}s`,
+        animationDuration: `${duration}s`,
+        '--wx-leaf-drift': `${drift}px`,
+        '--wx-leaf-rotate': `${rotate}deg`,
+        '--wx-leaf-hue': hue,
+      } as CSSProperties,
+    }
+  })
+}
+
+function buildSunBeams(count: number): Particle[] {
+  return Array.from({ length: count }, (_, i) => {
+    const angle = (i / count) * 360
+    const length = 60 + rand(i + 301) * 40
+    const width = 2 + rand(i + 307) * 3
+    const delay = rand(i + 313) * -6
+    const duration = 10 + rand(i + 319) * 8
+    return {
+      style: {
+        '--wx-beam-angle': `${angle}deg`,
+        '--wx-beam-length': `${length}px`,
+        '--wx-beam-width': `${width}px`,
+        animationDelay: `${delay}s`,
+        animationDuration: `${duration}s`,
+      } as CSSProperties,
+    }
+  })
+}
+
 // A soft, layered cloud built from overlapping blobs.
 function Cloud({ className, style }: { className: string; style: CSSProperties }) {
   return (
@@ -116,6 +180,7 @@ function WeatherSceneImpl({ condition, isNight }: { condition: SkyCondition; isN
       case 'storm': return 3
       case 'snow': return 2
       case 'partly-cloudy': return 2
+      case 'wind': return 2
       case 'default': return 1
       default: return 0
     }
@@ -128,6 +193,9 @@ function WeatherSceneImpl({ condition, isNight }: { condition: SkyCondition; isN
   )
   const flakes = useMemo(() => (condition === 'snow' ? buildFlakes(34) : []), [condition])
   const stars = useMemo(() => (showStars ? buildStars(34) : []), [showStars])
+  const windStreaks = useMemo(() => (condition === 'wind' ? buildWindStreaks(18) : []), [condition])
+  const leaves = useMemo(() => (condition === 'wind' ? buildLeaves(10) : []), [condition])
+  const sunBeams = useMemo(() => (showSun && condition !== 'partly-cloudy' ? buildSunBeams(12) : []), [showSun, condition])
 
   const sceneClass = `wx-scene wx-scene--${condition}${isNight ? ' wx-scene--night' : ''}`
 
@@ -157,6 +225,14 @@ function WeatherSceneImpl({ condition, isNight }: { condition: SkyCondition; isN
         </div>
       )}
 
+      {sunBeams.length > 0 && (
+        <div className="wx-sun-beams">
+          {sunBeams.map((b, i) => (
+            <span key={i} className="wx-beam" style={b.style} />
+          ))}
+        </div>
+      )}
+
       {clouds.length > 0 && (
         <div className="wx-clouds">
           {clouds.map((c, i) => (
@@ -177,6 +253,22 @@ function WeatherSceneImpl({ condition, isNight }: { condition: SkyCondition; isN
         <div className="wx-snow">
           {flakes.map((f, i) => (
             <span key={i} className="wx-flake" style={f.style} />
+          ))}
+        </div>
+      )}
+
+      {windStreaks.length > 0 && (
+        <div className="wx-wind">
+          {windStreaks.map((w, i) => (
+            <span key={i} className="wx-wind-streak" style={w.style} />
+          ))}
+        </div>
+      )}
+
+      {leaves.length > 0 && (
+        <div className="wx-leaves">
+          {leaves.map((l, i) => (
+            <span key={i} className="wx-leaf" style={l.style} />
           ))}
         </div>
       )}

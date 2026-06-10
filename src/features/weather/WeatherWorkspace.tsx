@@ -2,7 +2,7 @@ import { type CSSProperties, type ReactNode } from 'react'
 import type { Module, Settings, WeatherSummary } from '../../shared/api-types'
 import { formatDate, formatNumber, formatTemperature, formatTime, weatherIcon } from '../../shared/format'
 import { formatLocationLabel } from '../../shared/location'
-import { airQualityLevel, formatCurrentPrecipitationMm, overallPollenLevel, pollenAvailable, pollenLevel, uvLevel } from '../../shared/weather'
+import { airQualityLevel, formatCurrentPrecipitationMm, overallPollenLevel, pollenAvailable, pollenLevel, type AirQualityLevel, type PollenLevel, type UvLevel, uvLevel } from '../../shared/weather'
 import { WeatherScene, type SkyCondition } from './WeatherScene'
 
 function formatWeatherHour(time: string, index: number): string {
@@ -88,12 +88,54 @@ const POLLEN_LABELS: Record<string, string> = {
   ragweed: 'Ragweed',
 }
 
+function uvSafeExposure(level: UvLevel | null): { window: string; protection: string } {
+  switch (level) {
+    case 'Low': return { window: '60+ min', protection: 'SPF 15 optional' }
+    case 'Moderate': return { window: '30-45 min', protection: 'SPF 30 recommended' }
+    case 'High': return { window: '15-25 min', protection: 'SPF 30+ required' }
+    case 'Very high': return { window: '10-15 min', protection: 'SPF 50+ essential' }
+    case 'Extreme': return { window: 'Under 10 min', protection: 'Avoid sun exposure' }
+    default: return { window: '--', protection: 'Data unavailable' }
+  }
+}
+
+function airQualityAdvice(level: AirQualityLevel | null): string {
+  switch (level) {
+    case 'Good': return 'Air is clean. Open windows and enjoy outdoor time.'
+    case 'Fair': return 'Air quality is acceptable for most people.'
+    case 'Moderate': return 'Sensitive groups should reduce prolonged outdoor exertion.'
+    case 'Poor': return 'Reduce outdoor exertion. Sensitive groups should stay indoors.'
+    case 'Very poor': return 'Avoid outdoor activity. Keep windows closed.'
+    case 'Extremely poor': return 'Stay indoors. Use an air purifier if available.'
+    default: return 'Air quality guidance unavailable.'
+  }
+}
+
+function pollenAdvice(level: PollenLevel | null): string {
+  switch (level) {
+    case 'Low': return 'Airways should be clear. A good day to be outside.'
+    case 'Moderate': return 'Sensitive individuals may experience mild symptoms.'
+    case 'High': return 'Allergy sufferers should keep medication on hand.'
+    default: return 'Pollen guidance unavailable.'
+  }
+}
+
+function topAllergen(pollen: { [key: string]: number | null | undefined } | null | undefined) {
+  if (!pollen) return null
+  const ranked = Object.entries(POLLEN_LABELS)
+    .map(([key, label]) => ({ key, name: label, count: typeof pollen[key] === 'number' ? (pollen[key] as number) : 0 }))
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => b.count - a.count)
+  return ranked[0] ?? null
+}
+
 function deriveCondition(label: string): SkyCondition {
   const l = label.toLowerCase()
   if (l.includes('thunder') || l.includes('storm')) return 'storm'
   if (l.includes('snow') || l.includes('blizzard') || l.includes('sleet')) return 'snow'
   if (l.includes('rain') || l.includes('drizzle') || l.includes('shower')) return 'rain'
   if (l.includes('fog') || l.includes('mist') || l.includes('haze')) return 'fog'
+  if (l.includes('wind') || l.includes('gale') || l.includes('breeze') || l.includes('gusty')) return 'wind'
   if (l.includes('clear') || l.includes('sun')) return 'clear'
   if (l.includes('overcast')) return 'overcast'
   if (l.includes('cloud')) return 'partly-cloudy'
@@ -326,6 +368,7 @@ export function WeatherWorkspace({
                       <span className="weather-ws-hour-label">{formatWeatherHour(hour.time, index)}</span>
                       <span className="weather-ws-hour-emoji">{weatherIcon(hour.label)}</span>
                       <span className="weather-ws-hour-degrees">{formatTemperature(hour.temperature)}</span>
+                      <span className="weather-ws-hour-condition">{hour.label}</span>
                       <div className="weather-ws-hour-rain-bar" title={chance !== null ? `${formatNumber(chance)}% rain chance` : 'No rain data'}>
                         <div
                           className="weather-ws-hour-rain-fill"
@@ -395,7 +438,7 @@ export function WeatherWorkspace({
           <div className="weather-ws-summary-item">
             <span className="weather-ws-summary-label">Daylight</span>
             <strong>{daylightRemaining ?? formatDaylight(today.sunrise, today.sunset)}</strong>
-            <p>{daylightRemaining ? `Sunset at ${formatSunriseSunset(today.sunset)}.` : `Full daylight span today.`}</p>
+            <p>Sunset at {formatSunriseSunset(today.sunset)}.</p>
           </div>
           <div className="weather-ws-summary-item">
             <span className="weather-ws-summary-label">Week high</span>
@@ -409,25 +452,66 @@ export function WeatherWorkspace({
       {(showUv || showAir || showPollen) && (
         <article className="weather-ws-section">
           <header className="weather-ws-section-header">
-            <p className="weather-ws-section-kicker">Environment</p>
-            <h2>Atmosphere</h2>
+            <div className="weather-ws-section-header-titles">
+              <p className="weather-ws-section-kicker">Environment</p>
+              <h2>Atmosphere</h2>
+              <p className="weather-ws-section-subtitle">UV, air quality and pollen at a glance</p>
+            </div>
+            <span className="weather-ws-section-pill">
+              <span className="weather-ws-section-pill-dot" aria-hidden="true" />
+              Live readings
+            </span>
           </header>
           <div className="weather-ws-env-grid">
             {showUv && (
-              <div className="weather-ws-env-card">
+              <div className={`weather-ws-env-card weather-ws-env-card--uv-${env ? (uvLevel(env.uvIndex) ?? 'unavailable').toLowerCase().replace(' ', '-') : 'unavailable'}`}>
                 <div className="weather-ws-env-card-header">
                   <span className="weather-ws-env-card-icon"><SunIcon /></span>
                   <span className="weather-ws-env-card-title">UV Index</span>
                 </div>
                 {env ? (
                   <div className="weather-ws-env-card-body">
-                    <span className="weather-ws-env-card-value">
-                      {env.uvIndex !== null ? formatNumber(env.uvIndex) : '--'}
-                    </span>
-                    <span className={`weather-ws-env-card-badge weather-ws-env-card-badge--${(uvLevel(env.uvIndex) ?? 'unavailable').toLowerCase().replace(' ', '-')}`}>
-                      {uvLevel(env.uvIndex) ?? '--'}
-                    </span>
-                    <span className="weather-ws-env-card-detail">Max today: {env.uvIndexMax != null ? formatNumber(env.uvIndexMax) : '--'}</span>
+                    <div className="weather-ws-env-card-value-row">
+                      <span className="weather-ws-env-card-value">
+                        {env.uvIndex !== null ? formatNumber(env.uvIndex) : '--'}
+                      </span>
+                      <span className={`weather-ws-env-card-badge weather-ws-env-card-badge--${(uvLevel(env.uvIndex) ?? 'unavailable').toLowerCase().replace(' ', '-')}`}>
+                        {uvLevel(env.uvIndex) ?? '--'}
+                      </span>
+                    </div>
+                    <div className="weather-ws-env-card-gauge">
+                      <div className="weather-ws-env-card-gauge-track">
+                        <div className={`weather-ws-env-card-gauge-fill weather-ws-env-card-gauge-fill--${(uvLevel(env.uvIndex) ?? 'unavailable').toLowerCase().replace(' ', '-')}`} style={{ '--gauge': `${Math.min(((env.uvIndex ?? 0) / 11) * 100, 100)}%` } as CSSProperties} />
+                      </div>
+                      <div className="weather-ws-env-card-gauge-labels">
+                        <span>0</span>
+                        <span>11+</span>
+                      </div>
+                    </div>
+                    {(() => {
+                      const exposure = uvSafeExposure(uvLevel(env.uvIndex))
+                      return (
+                        <div className="weather-ws-env-card-stats">
+                          <div className="weather-ws-env-card-stat">
+                            <span className="weather-ws-env-card-stat-label">Safe exposure</span>
+                            <strong>{exposure.window}</strong>
+                          </div>
+                          <div className="weather-ws-env-card-stat">
+                            <span className="weather-ws-env-card-stat-label">Protection</span>
+                            <strong>{exposure.protection}</strong>
+                          </div>
+                        </div>
+                      )
+                    })()}
+                    <p className="weather-ws-env-card-advice">
+                      <span className="weather-ws-env-card-advice-icon" aria-hidden="true">
+                        <SunIcon />
+                      </span>
+                      <span>
+                        Max today <strong>{env.uvIndexMax != null ? formatNumber(env.uvIndexMax) : '--'}</strong>
+                        {' · '}Peak between 10:00 and 16:00
+                      </span>
+                    </p>
                   </div>
                 ) : (
                   <p className="weather-ws-env-card-unavailable">UV data unavailable</p>
@@ -435,21 +519,46 @@ export function WeatherWorkspace({
               </div>
             )}
             {showAir && (
-              <div className="weather-ws-env-card">
+              <div className={`weather-ws-env-card weather-ws-env-card--aqi-${env?.airQuality ? (airQualityLevel(env.airQuality.europeanAqi) ?? 'unavailable').toLowerCase().replace(' ', '-') : 'unavailable'}`}>
                 <div className="weather-ws-env-card-header">
                   <span className="weather-ws-env-card-icon"><LeafIcon /></span>
                   <span className="weather-ws-env-card-title">Air Quality</span>
                 </div>
                 {env?.airQuality ? (
                   <div className="weather-ws-env-card-body">
-                    <span className="weather-ws-env-card-value">
-                      {env.airQuality.europeanAqi !== null ? formatNumber(env.airQuality.europeanAqi) : '--'}
-                    </span>
-                    <span className={`weather-ws-env-card-badge weather-ws-env-card-badge--${(airQualityLevel(env.airQuality.europeanAqi) ?? 'unavailable').toLowerCase().replace(' ', '-')}`}>
-                      {airQualityLevel(env.airQuality.europeanAqi) ?? '--'}
-                    </span>
-                    <span className="weather-ws-env-card-detail">PM2.5 {env.airQuality.pm2_5 !== null ? `${formatNumber(env.airQuality.pm2_5)} µg/m³` : '--'}</span>
-                    <span className="weather-ws-env-card-detail">PM10 {env.airQuality.pm10 !== null ? `${formatNumber(env.airQuality.pm10)} µg/m³` : '--'}</span>
+                    <div className="weather-ws-env-card-value-row">
+                      <span className="weather-ws-env-card-value">
+                        {env.airQuality.europeanAqi !== null ? formatNumber(env.airQuality.europeanAqi) : '--'}
+                      </span>
+                      <span className={`weather-ws-env-card-badge weather-ws-env-card-badge--${(airQualityLevel(env.airQuality.europeanAqi) ?? 'unavailable').toLowerCase().replace(' ', '-')}`}>
+                        {airQualityLevel(env.airQuality.europeanAqi) ?? '--'}
+                      </span>
+                    </div>
+                    <div className="weather-ws-env-card-gauge">
+                      <div className="weather-ws-env-card-gauge-track">
+                        <div className={`weather-ws-env-card-gauge-fill weather-ws-env-card-gauge-fill--${(airQualityLevel(env.airQuality.europeanAqi) ?? 'unavailable').toLowerCase().replace(' ', '-')}`} style={{ '--gauge': `${Math.min(((env.airQuality.europeanAqi ?? 0) / 100) * 100, 100)}%` } as CSSProperties} />
+                      </div>
+                      <div className="weather-ws-env-card-gauge-labels">
+                        <span>0</span>
+                        <span>100+</span>
+                      </div>
+                    </div>
+                    <div className="weather-ws-env-card-stats">
+                      <div className="weather-ws-env-card-stat">
+                        <span className="weather-ws-env-card-stat-label">PM2.5</span>
+                        <strong>{env.airQuality.pm2_5 !== null ? `${formatNumber(env.airQuality.pm2_5)} µg/m³` : '--'}</strong>
+                      </div>
+                      <div className="weather-ws-env-card-stat">
+                        <span className="weather-ws-env-card-stat-label">PM10</span>
+                        <strong>{env.airQuality.pm10 !== null ? `${formatNumber(env.airQuality.pm10)} µg/m³` : '--'}</strong>
+                      </div>
+                    </div>
+                    <p className="weather-ws-env-card-advice">
+                      <span className="weather-ws-env-card-advice-icon" aria-hidden="true">
+                        <LeafIcon />
+                      </span>
+                      <span>{airQualityAdvice(airQualityLevel(env.airQuality.europeanAqi))}</span>
+                    </p>
                   </div>
                 ) : (
                   <p className="weather-ws-env-card-unavailable">Air quality data unavailable</p>
@@ -464,25 +573,57 @@ export function WeatherWorkspace({
                 </div>
                 {env?.pollen && pollenAvailable(env.pollen) ? (
                   <div className="weather-ws-env-card-body">
-                    <span className="weather-ws-env-card-value">{overallPollenLevel(env.pollen) ?? '--'}</span>
+                    <div className="weather-ws-env-card-pollen-summary">
+                      <div className="weather-ws-env-card-pollen-level">
+                        <span className="weather-ws-env-card-pollen-level-kicker">Overall</span>
+                        <span className="weather-ws-env-card-pollen-level-value">{overallPollenLevel(env.pollen) ?? '--'}</span>
+                      </div>
+                      {(() => {
+                        const top = topAllergen(env.pollen as unknown as Record<string, number | null>)
+                        if (!top) return null
+                        return (
+                          <div className="weather-ws-env-card-pollen-top">
+                            <span className="weather-ws-env-card-pollen-top-kicker">Top today</span>
+                            <span className="weather-ws-env-card-pollen-top-name">{top.name}</span>
+                            <span className="weather-ws-env-card-pollen-top-count">{formatNumber(top.count)} grains/m³</span>
+                          </div>
+                        )
+                      })()}
+                    </div>
                     <div className="weather-ws-pollen-list">
                       {Object.entries(POLLEN_LABELS).map(([key, label]) => {
                         const allergens = env.pollen as unknown as Record<string, number | null>
                         const value = allergens[key] ?? null
                         const level = pollenLevel(value)
+                        const lvlClass = (level ?? 'low').toLowerCase()
                         return (
                           <div className="weather-ws-pollen-row" key={key}>
-                            <span className="weather-ws-pollen-name">{label}</span>
-                            <span className="weather-ws-pollen-count">{value !== null ? `${formatNumber(value)}` : '--'}</span>
-                            {level && (
-                              <span className={`weather-ws-pollen-badge weather-ws-pollen-badge--${level.toLowerCase()}`}>
-                                {level}
-                              </span>
-                            )}
+                            <div className="weather-ws-pollen-info">
+                              <span className="weather-ws-pollen-name">{label}</span>
+                              <div className="weather-ws-pollen-bar">
+                                <div className="weather-ws-pollen-bar-track">
+                                  <div className={`weather-ws-pollen-bar-fill weather-ws-pollen-bar-fill--${lvlClass}`} style={{ '--pollen': `${Math.min(((value ?? 0) / 50) * 100, 100)}%` } as CSSProperties} />
+                                </div>
+                              </div>
+                            </div>
+                            <div className="weather-ws-pollen-meta">
+                              <span className="weather-ws-pollen-count">{value !== null ? `${formatNumber(value)}` : '--'}</span>
+                              {level && (
+                                <span className={`weather-ws-pollen-badge weather-ws-pollen-badge--${level.toLowerCase()}`}>
+                                  {level}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         )
                       })}
                     </div>
+                    <p className="weather-ws-env-card-advice">
+                      <span className="weather-ws-env-card-advice-icon" aria-hidden="true">
+                        <FlowerIcon />
+                      </span>
+                      <span>{pollenAdvice(overallPollenLevel(env.pollen))}</span>
+                    </p>
                   </div>
                 ) : (
                   <div className="weather-ws-env-card-unavailable">
