@@ -30,6 +30,55 @@ function formatDaylight(sunrise: string | null, sunset: string | null): string {
   return `${hours}h ${minutes}m`
 }
 
+type HourWithIndex = WeatherSummary['hourly'][number] & { index: number }
+
+function findPeakRainHour(hourly: HourWithIndex[]) {
+  return hourly.reduce<HourWithIndex | null>((best, hour) => {
+    if (hour.precipitationChance === null) return best
+    if (!best || best.precipitationChance === null || hour.precipitationChance > best.precipitationChance) return hour
+    return best
+  }, null)
+}
+
+function findDriestHour(hourly: HourWithIndex[]) {
+  return hourly.reduce<HourWithIndex | null>((best, hour) => {
+    if (hour.precipitationChance === null) return best
+    if (!best || best.precipitationChance === null || hour.precipitationChance < best.precipitationChance) return hour
+    return best
+  }, null)
+}
+
+function findNextConditionShift(currentLabel: string | undefined, hourly: HourWithIndex[]) {
+  const current = deriveCondition(currentLabel ?? '')
+  return hourly.find((hour) => hour.index > 0 && deriveCondition(hour.label) !== current) ?? null
+}
+
+function formatInsightHour(hour: HourWithIndex) {
+  return hour.index === 0 ? 'right now' : formatWeatherHour(hour.time, hour.index)
+}
+
+function formatDaylightRemaining(observed: string | null, sunset: string | null) {
+  if (!observed || !sunset) return null
+  const diff = new Date(sunset).getTime() - new Date(observed).getTime()
+  if (!Number.isFinite(diff) || diff <= 0) return null
+  const hours = Math.floor(diff / 3_600_000)
+  const minutes = Math.floor((diff % 3_600_000) / 60_000)
+  return `${hours}h ${minutes}m`
+}
+
+function formatRainPeakText(hour: HourWithIndex) {
+  const chance = `${formatNumber(hour.precipitationChance)}%`
+  return hour.index === 0 ? `Rain risk is ${chance} now` : `Rain peaks ${chance} at ${formatInsightHour(hour)}`
+}
+
+function formatRainBriefText(hour: HourWithIndex | null) {
+  if (!hour) return 'No strong precipitation signal is showing in the next few hours.'
+  const chance = `${formatNumber(hour.precipitationChance)}%`
+  return hour.index === 0
+    ? `Rain risk is currently ${chance}; watch for changes through the next few hours.`
+    : `The strongest rain signal is ${chance} around ${formatInsightHour(hour)}.`
+}
+
 const POLLEN_LABELS: Record<string, string> = {
   grass: 'Grass',
   birch: 'Birch',
@@ -174,6 +223,14 @@ export function WeatherWorkspace({
   const env = weather.environment
   const today = weather.daily[0]
   const nextDays = weather.daily.slice(1)
+  const hourlyWithIndex = weather.hourly.map((hour, index) => ({ ...hour, index }))
+  const peakRainHour = findPeakRainHour(hourlyWithIndex)
+  const driestHour = findDriestHour(hourlyWithIndex)
+  const nextConditionShift = findNextConditionShift(weather.current.label, hourlyWithIndex)
+  const daylightRemaining = formatDaylightRemaining(weather.current.time, today?.sunset ?? null)
+  const warmestDay = weather.daily.length > 0
+    ? weather.daily.reduce((best, day) => ((day.max ?? Number.NEGATIVE_INFINITY) > (best.max ?? Number.NEGATIVE_INFINITY) ? day : best), weather.daily[0])
+    : null
 
   const condition = deriveCondition(weather.current.label)
   const isNight = isNightTime(today?.sunrise ?? null, today?.sunset ?? null)
@@ -193,16 +250,53 @@ export function WeatherWorkspace({
             <span className="weather-ws-hero-live">Live</span>
           </header>
 
-          <div className="weather-ws-hero-main">
-            <span className="weather-ws-hero-temp">{formatTemperature(weather.current.temperature)}</span>
-            <div className="weather-ws-hero-meta">
-              <p className="weather-ws-hero-label">{weather.current.label}</p>
-              <p className="weather-ws-hero-feels">Feels like {formatTemperature(weather.current.feelsLike)}</p>
-              <p className="weather-ws-hero-range">
-                <span className="weather-ws-hero-range-hi">H {formatTemperature(today?.max)}</span>
-                <span className="weather-ws-hero-range-lo">L {formatTemperature(today?.min)}</span>
-              </p>
+          <div className="weather-ws-hero-shell">
+            <div className="weather-ws-hero-primary">
+              <div className="weather-ws-hero-main">
+                <span className="weather-ws-hero-temp">{formatTemperature(weather.current.temperature)}</span>
+                <div className="weather-ws-hero-meta">
+                  <p className="weather-ws-hero-label">{weather.current.label}</p>
+                  <p className="weather-ws-hero-feels">Feels like {formatTemperature(weather.current.feelsLike)}</p>
+                  <p className="weather-ws-hero-range">
+                    <span className="weather-ws-hero-range-hi">H {formatTemperature(today?.max)}</span>
+                    <span className="weather-ws-hero-range-lo">L {formatTemperature(today?.min)}</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="weather-ws-hero-pulse" aria-label="Current weather highlights">
+                {peakRainHour && (
+                  <span className="weather-ws-hero-pulse-item">
+                    {formatRainPeakText(peakRainHour)}
+                  </span>
+                )}
+                {driestHour && (
+                  <span className="weather-ws-hero-pulse-item">
+                    Best gap {formatInsightHour(driestHour)} at {formatNumber(driestHour.precipitationChance)}%
+                  </span>
+                )}
+                <span className="weather-ws-hero-pulse-item">
+                  {daylightRemaining ? `${daylightRemaining} of daylight left` : `Sunset ${formatSunriseSunset(today?.sunset ?? null)}`}
+                </span>
+              </div>
             </div>
+
+            <aside className="weather-ws-hero-brief" aria-label="Quick weather brief">
+              <div className="weather-ws-hero-brief-icon" aria-hidden="true">{weatherIcon(weather.current.label)}</div>
+              <div className="weather-ws-hero-brief-copy">
+                <p className="weather-ws-hero-brief-kicker">Quick read</p>
+                <p className="weather-ws-hero-brief-title">
+                  {nextConditionShift ? `${nextConditionShift.label} by ${formatInsightHour(nextConditionShift)}` : 'Steady conditions through the next few hours'}
+                </p>
+                <p className="weather-ws-hero-brief-text">
+                  {formatRainBriefText(peakRainHour)}
+                </p>
+                <div className="weather-ws-hero-brief-meta">
+                  <span>{today ? `Daylight ${formatDaylight(today.sunrise, today.sunset)}` : 'Daylight unavailable'}</span>
+                  <span>{warmestDay ? `Warmest ${formatDate(warmestDay.date)} at ${formatTemperature(warmestDay.max)}` : 'No weekly high yet'}</span>
+                </div>
+              </div>
+            </aside>
           </div>
 
           <div className="weather-ws-stats">
@@ -216,91 +310,97 @@ export function WeatherWorkspace({
         </div>
       </article>
 
-      {/* Hourly Forecast */}
-      {weather.hourly.length > 0 && (
-        <article className="weather-ws-section">
-          <header className="weather-ws-section-header">
-            <p className="weather-ws-section-kicker">Today</p>
-            <h2>Hourly</h2>
-          </header>
-          <div className="weather-ws-hourly-track" tabIndex={0} aria-label="Hourly forecast">
-            {weather.hourly.map((hour, index) => {
-              const chance = hour.precipitationChance
-              return (
-                <div className={`weather-ws-hour-item${index === 0 ? ' weather-ws-hour-item--now' : ''}`} key={hour.time}>
-                  <span className="weather-ws-hour-label">{formatWeatherHour(hour.time, index)}</span>
-                  <span className="weather-ws-hour-emoji">{weatherIcon(hour.label)}</span>
-                  <span className="weather-ws-hour-degrees">{formatTemperature(hour.temperature)}</span>
-                  <div className="weather-ws-hour-rain-bar" title={chance !== null ? `${formatNumber(chance)}% rain chance` : 'No rain data'}>
-                    <div
-                      className="weather-ws-hour-rain-fill"
-                      style={{ '--rain': `${chance ?? 0}%` } as CSSProperties}
-                    />
-                  </div>
-                  <span className="weather-ws-hour-rain-label">
-                    {chance !== null ? `${formatNumber(chance)}%` : '--'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </article>
-      )}
-
-      {/* Daily Forecast */}
-      {nextDays.length > 0 && (
-        <article className="weather-ws-section">
-          <header className="weather-ws-section-header">
-            <p className="weather-ws-section-kicker">Next days</p>
-            <h2>Forecast</h2>
-          </header>
-          <div className="weather-ws-daily-list">
-            {nextDays.map((day) => {
-              const precip = day.precipitationChance === null ? null : Math.max(0, Math.min(100, day.precipitationChance))
-              return (
-                <div className="weather-ws-daily-row" key={day.date}>
-                  <span className="weather-ws-daily-date">{formatDate(day.date)}</span>
-                  <span className="weather-ws-daily-icon">{weatherIcon(day.label)}</span>
-                  <span className="weather-ws-daily-label">{day.label}</span>
-                  <span className="weather-ws-daily-temps">
-                    <span className="weather-ws-daily-max">{formatTemperature(day.max)}</span>
-                    <span className="weather-ws-daily-min">{formatTemperature(day.min)}</span>
-                  </span>
-                  <span className="weather-ws-daily-uv">UV {day.uvIndexMax != null ? formatNumber(day.uvIndexMax) : '--'}</span>
-                  <div className="weather-ws-daily-rain">
-                    <div className="weather-ws-daily-rain-bar">
-                      <div
-                        className="weather-ws-daily-rain-fill"
-                        style={{ '--rain': `${precip ?? 0}%` } as CSSProperties}
-                      />
+      {(weather.hourly.length > 0 || nextDays.length > 0) && (
+        <div className="weather-ws-detail-grid">
+          {weather.hourly.length > 0 && (
+            <article className="weather-ws-section weather-ws-section--hourly">
+              <header className="weather-ws-section-header">
+                <p className="weather-ws-section-kicker">Today</p>
+                <h2>Hourly</h2>
+              </header>
+              <div className="weather-ws-hourly-track" tabIndex={0} aria-label="Hourly forecast">
+                {weather.hourly.map((hour, index) => {
+                  const chance = hour.precipitationChance
+                  return (
+                    <div className={`weather-ws-hour-item${index === 0 ? ' weather-ws-hour-item--now' : ''}`} key={hour.time}>
+                      <span className="weather-ws-hour-label">{formatWeatherHour(hour.time, index)}</span>
+                      <span className="weather-ws-hour-emoji">{weatherIcon(hour.label)}</span>
+                      <span className="weather-ws-hour-degrees">{formatTemperature(hour.temperature)}</span>
+                      <div className="weather-ws-hour-rain-bar" title={chance !== null ? `${formatNumber(chance)}% rain chance` : 'No rain data'}>
+                        <div
+                          className="weather-ws-hour-rain-fill"
+                          style={{ '--rain': `${chance ?? 0}%` } as CSSProperties}
+                        />
+                      </div>
+                      <span className="weather-ws-hour-rain-label">
+                        {chance !== null ? `${formatNumber(chance)}%` : '--'}
+                      </span>
                     </div>
-                    <span>{precip !== null ? `${formatNumber(precip)}%` : '--'}</span>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </article>
+                  )
+                })}
+              </div>
+            </article>
+          )}
+
+          {nextDays.length > 0 && (
+            <article className="weather-ws-section weather-ws-section--daily">
+              <header className="weather-ws-section-header">
+                <p className="weather-ws-section-kicker">Next days</p>
+                <h2>Forecast</h2>
+              </header>
+              <div className="weather-ws-daily-list">
+                {nextDays.map((day) => {
+                  const precip = day.precipitationChance === null ? null : Math.max(0, Math.min(100, day.precipitationChance))
+                  return (
+                    <div className="weather-ws-daily-row" key={day.date}>
+                      <span className="weather-ws-daily-date">{formatDate(day.date)}</span>
+                      <span className="weather-ws-daily-icon">{weatherIcon(day.label)}</span>
+                      <span className="weather-ws-daily-label">{day.label}</span>
+                      <span className="weather-ws-daily-temps">
+                        <span className="weather-ws-daily-max">{formatTemperature(day.max)}</span>
+                        <span className="weather-ws-daily-min">{formatTemperature(day.min)}</span>
+                      </span>
+                      <span className="weather-ws-daily-uv">UV {day.uvIndexMax != null ? formatNumber(day.uvIndexMax) : '--'}</span>
+                      <div className="weather-ws-daily-rain">
+                        <div className="weather-ws-daily-rain-bar">
+                          <div
+                            className="weather-ws-daily-rain-fill"
+                            style={{ '--rain': `${precip ?? 0}%` } as CSSProperties}
+                          />
+                        </div>
+                        <span>{precip !== null ? `${formatNumber(precip)}%` : '--'}</span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </article>
+          )}
+        </div>
       )}
 
       {/* Today summary strip */}
       {today && (
-        <div className="weather-ws-summary">
+        <div className="weather-ws-summary" aria-label="Weather field notes">
+          <div className="weather-ws-summary-item">
+            <span className="weather-ws-summary-label">Rain watch</span>
+            <strong>{peakRainHour ? `${formatNumber(peakRainHour.precipitationChance)}%` : '--'}</strong>
+            <p>{peakRainHour ? (peakRainHour.index === 0 ? 'Highest risk is right now.' : `Peaks around ${formatInsightHour(peakRainHour)}.`) : 'No clear precipitation peak is showing yet.'}</p>
+          </div>
+          <div className="weather-ws-summary-item">
+            <span className="weather-ws-summary-label">Best gap</span>
+            <strong>{driestHour ? formatInsightHour(driestHour) : '--'}</strong>
+            <p>{driestHour ? `${formatNumber(driestHour.precipitationChance)}% rain chance.` : 'No drier window available.'}</p>
+          </div>
           <div className="weather-ws-summary-item">
             <span className="weather-ws-summary-label">Daylight</span>
-            <strong>{formatDaylight(today.sunrise, today.sunset)}</strong>
+            <strong>{daylightRemaining ?? formatDaylight(today.sunrise, today.sunset)}</strong>
+            <p>{daylightRemaining ? `Sunset at ${formatSunriseSunset(today.sunset)}.` : `Full daylight span today.`}</p>
           </div>
           <div className="weather-ws-summary-item">
-            <span className="weather-ws-summary-label">Today high</span>
-            <strong>{formatTemperature(today.max)}</strong>
-          </div>
-          <div className="weather-ws-summary-item">
-            <span className="weather-ws-summary-label">Today low</span>
-            <strong>{formatTemperature(today.min)}</strong>
-          </div>
-          <div className="weather-ws-summary-item">
-            <span className="weather-ws-summary-label">Rain chance</span>
-            <strong>{today.precipitationChance != null ? `${formatNumber(today.precipitationChance)}%` : '--'}</strong>
+            <span className="weather-ws-summary-label">Week high</span>
+            <strong>{warmestDay ? formatTemperature(warmestDay.max) : '--'}</strong>
+            <p>{warmestDay ? `${formatDate(warmestDay.date)} looks warmest.` : 'Weekly high unavailable.'}</p>
           </div>
         </div>
       )}
