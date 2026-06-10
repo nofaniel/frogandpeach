@@ -10,6 +10,7 @@ import { NetworkWorkspace } from './features/network/NetworkWorkspace'
 import { NotesWorkspace } from './features/notes/NotesWorkspace'
 import { PagesWorkspace } from './features/pages/PagesWorkspace'
 import { WhiteboardWorkspace } from './features/whiteboard/WhiteboardWorkspace'
+import { WeatherWorkspace } from './features/weather/WeatherWorkspace'
 
 
 function App() {
@@ -181,6 +182,16 @@ function App() {
           networkSummary={home?.network ?? null}
           fullNetwork={networkGroup.network}
           deployment={home?.deployment ?? null}
+        />
+      )}
+
+      {!viewedPage && !adminOpen && activeTab === 'weather' && (
+        <WeatherWorkspace
+          weather={home?.weather ?? null}
+          locationConfigured={homeGroup.locationConfigured}
+          publicSettings={publicSettings}
+          module={dashboardModules.find((m) => m.id === 'weather')}
+          onOpenAdmin={() => void navigation.openAdmin()}
         />
       )}
     </AppShellLayout>

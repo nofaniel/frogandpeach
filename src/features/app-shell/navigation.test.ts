@@ -42,6 +42,12 @@ describe('buildNavigationEntries', () => {
     expect(entries.some((e) => e.id === 'notes')).toBe(false)
   })
 
+  it('keeps weather reachable when its nav option is disabled', () => {
+    const weather = makeModule('weather', { options: { navigationBar: { enabled: false, mode: 'default' } } })
+    const entries = buildNavigationEntries([weather])
+    expect(entries.some((e) => e.id === 'weather')).toBe(true)
+  })
+
   it('excludes a core tab entry when module is not installed', () => {
     const pages = makeModule('pages', { installed: false, options: { navigationBar: { enabled: true, mode: 'default' } } })
     const entries = buildNavigationEntries([pages])
@@ -55,16 +61,16 @@ describe('buildNavigationEntries', () => {
   })
 
   it('adds extra module entries with module- prefix for non-core modules', () => {
-    const custom = makeModule('weather', { title: 'Weather', options: { navigationBar: { enabled: true, mode: 'default' } } })
+    const custom = makeModule('tides', { title: 'Tides', options: { navigationBar: { enabled: true, mode: 'default' } } })
     const entries = buildNavigationEntries([custom])
-    expect(entries.some((e) => e.id === 'module-weather')).toBe(true)
+    expect(entries.some((e) => e.id === 'module-tides')).toBe(true)
   })
 
   it('uses known moduleNavigationTarget for extra modules that have one', () => {
-    const weather = makeModule('weather', { title: 'Weather', options: { navigationBar: { enabled: true, mode: 'default' } } })
-    const entries = buildNavigationEntries([weather])
-    const entry = entries.find((e) => e.id === 'module-weather')
-    expect(entry?.target).toEqual(moduleNavigationTargets['weather'])
+    const tides = makeModule('tides', { title: 'Tides', options: { navigationBar: { enabled: true, mode: 'default' } } })
+    const entries = buildNavigationEntries([tides])
+    const entry = entries.find((e) => e.id === 'module-tides')
+    expect(entry?.target).toEqual(moduleNavigationTargets['tides'])
   })
 
   it('falls back to home target for unknown extra module ids', () => {

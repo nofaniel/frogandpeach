@@ -4,6 +4,7 @@ import { buildMarineCacheKey, getDashboard, getMarine, getNetworkSummary, getSet
 type FakeDbState = {
   settings: Map<string, string>
   cache: Array<{ cache_key: string; payload: string; expires_at: string; updated_at: string }>
+  moduleSettings: Map<string, Record<string, unknown>>
   users: Array<{ id: string; display_name: string }>
   whiteboardStrokes: Array<{
     id: string
@@ -47,6 +48,7 @@ function createFakeEnv(
   options: {
     users?: FakeDbState['users']
     whiteboardStrokes?: FakeDbState['whiteboardStrokes']
+    moduleSettings?: FakeDbState['moduleSettings']
   } = {},
 ) {
   const state: FakeDbState = {
@@ -57,6 +59,7 @@ function createFakeEnv(
       expires_at: '2999-01-01T00:00:00.000Z',
       updated_at: '2999-01-01T00:00:00.000Z',
     })),
+    moduleSettings: options.moduleSettings ?? new Map(),
     users: [...(options.users ?? [])],
     whiteboardStrokes: [...(options.whiteboardStrokes ?? [])],
     lists: initialLists.map((list) => ({
@@ -121,6 +124,11 @@ function createFakeEnv(
           if (sql === 'SELECT * FROM list_items WHERE id = ?') {
             const [id] = statement.params as [string]
             return state.listItems.find((item) => item.id === id) ?? null
+          }
+          if (sql === 'SELECT options_json FROM module_settings WHERE id = ?') {
+            const [id] = statement.params as [string]
+            const stored = state.moduleSettings.get(id)
+            return stored ? { options_json: JSON.stringify(stored) } : null
           }
           return null
         },
@@ -431,6 +439,89 @@ describe('weather hourly forecast mapping', () => {
     const weather = await getWeather(env)
 
     expect(weather?.hourly).toEqual([])
+  })
+})
+
+describe('weather environment data', () => {
+  const locationSettings = {
+    locationName: 'Berlin',
+    locationRegion: 'Germany',
+    latitude: '52.5200',
+    longitude: '13.4050',
+    timezone: 'Europe/Berlin',
+  }
+
+  it('fetches environment data when module options enable extras', async () => {
+    const moduleSettings = new Map<string, Record<string, unknown>>()
+    moduleSettings.set('weather', { showUvIndex: true, showAirQuality: true, showPollen: true })
+
+    const env = createFakeEnv(locationSettings, [], [], { moduleSettings })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          current: { temperature_2m: 15, apparent_temperature: 14, wind_speed_10m: 10, wind_gusts_10m: 15, precipitation: 0, weather_code: 3, time: '2026-06-10T12:00:00Z' },
+          daily: { time: ['2026-06-10'], weather_code: [3], temperature_2m_max: [20], temperature_2m_min: [10], precipitation_probability_max: [10], uv_index_max: [6.5], sunrise: ['2026-06-10T04:45:00Z'], sunset: ['2026-06-10T21:30:00Z'] },
+          hourly: { time: [], precipitation_probability: [], temperature_2m: [], weather_code: [] },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          current: {
+            time: '2026-06-10T12:00:00Z',
+            uv_index: 4.2,
+            european_aqi: 35,
+            pm2_5: 8.2,
+            pm10: 15.4,
+            grass_pollen: 25,
+            birch_pollen: 55,
+            alder_pollen: null,
+            mugwort_pollen: null,
+            olive_pollen: null,
+            ragweed_pollen: 10,
+          },
+        }),
+      } as Response)
+
+    const weather = await getWeather(env)
+
+    expect(weather?.environment).toBeDefined()
+    expect(weather?.environment?.uvIndex).toBe(4.2)
+    expect(weather?.environment?.uvIndexMax).toBe(6.5)
+    expect(weather?.environment?.airQuality?.europeanAqi).toBe(35)
+    expect(weather?.environment?.airQuality?.pm2_5).toBe(8.2)
+    expect(weather?.environment?.pollen?.grass).toBe(25)
+    expect(weather?.environment?.pollen?.birch).toBe(55)
+    expect(weather?.daily[0]?.uvIndexMax).toBe(6.5)
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
+    const airQualityUrl = fetchSpy.mock.calls[1]?.[0] as URL
+    expect(airQualityUrl.searchParams.get('current')).toContain('uv_index')
+  })
+
+  it('does not call air-quality endpoint when all extras are off', async () => {
+    const moduleSettings = new Map<string, Record<string, unknown>>()
+    moduleSettings.set('weather', { showUvIndex: false, showAirQuality: false, showPollen: false })
+
+    const env = createFakeEnv(locationSettings, [], [], { moduleSettings })
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        current: { temperature_2m: 15, apparent_temperature: 14, wind_speed_10m: 10, wind_gusts_10m: 15, precipitation: 0, weather_code: 3, time: '2026-06-10T12:00:00Z' },
+        daily: { time: ['2026-06-10'], weather_code: [3], temperature_2m_max: [20], temperature_2m_min: [10], precipitation_probability_max: [10], uv_index_max: [6.5], sunrise: ['2026-06-10T04:45:00Z'], sunset: ['2026-06-10T21:30:00Z'] },
+        hourly: { time: [], precipitation_probability: [], temperature_2m: [], weather_code: [] },
+      }),
+    } as Response)
+
+    const weather = await getWeather(env)
+
+    expect(weather).toBeDefined()
+    expect(weather?.environment).toBeNull()
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 })
 

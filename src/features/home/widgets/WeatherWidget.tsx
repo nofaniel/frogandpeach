@@ -1,9 +1,10 @@
-import { useId, useState, type CSSProperties, type ReactNode } from 'react'
+import { type CSSProperties } from 'react'
 import type { HomeData, Module, Settings } from '../../../shared/api-types'
 import { formatDate, formatNumber, formatTemperature, weatherIcon } from '../../../shared/format'
 import { formatLocationLabel } from '../../../shared/location'
-import { formatCurrentPrecipitationMm } from '../../../shared/weather'
+import { airQualityLevel, formatCurrentPrecipitationMm, overallPollenLevel, pollenAvailable, uvLevel } from '../../../shared/weather'
 import { resolveHomeWidgetState } from '../../app-shell/homeWidgets'
+import { InfoTooltip } from './InfoTooltip'
 
 type WeatherMetricName = 'temperature' | 'wind' | 'precipitationChance' | 'precipitation'
 
@@ -19,39 +20,6 @@ const weatherMetricTooltip: Record<WeatherMetricName, string> = {
   wind: 'Current wind speed',
   precipitationChance: 'Chance of rain today',
   precipitation: 'Rainfall measured now',
-}
-
-function InfoTooltip({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
-  const id = useId()
-  const [open, setOpen] = useState(false)
-
-  return (
-    <span
-      className={`info-tooltip${className ? ' ' + className : ''}${open ? ' info-tooltip--open' : ''}`}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-      onClick={() => setOpen((prev) => !prev)}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') setOpen(false)
-      }}
-    >
-      <span
-        className="info-tooltip-trigger"
-        tabIndex={0}
-        role="button"
-        aria-describedby={open ? id : undefined}
-      >
-        {children}
-      </span>
-      {open && (
-        <span className="info-tooltip-bubble" id={id} role="tooltip">
-          {label}
-        </span>
-      )}
-    </span>
-  )
 }
 
 function WeatherMetricSymbol({ name, style }: { name: WeatherMetricName; style: 'emoji' | 'icons' }) {
@@ -154,6 +122,14 @@ export function WeatherWidget({
   const showForecast = widget.mode === 'forecast' || module.options.showExtendedForecast === true
   const weatherIconStyle = module.options.iconStyle === 'icons' ? 'icons' : 'emoji'
   const hourlyForecast = home.weather.hourly ?? []
+  const env = home.weather.environment
+  const showEnvUv = module.options.showUvIndex === true
+  const showEnvAir = module.options.showAirQuality === true
+  const showEnvPollen = module.options.showPollen === true
+  const envUvLevel = showEnvUv && env ? uvLevel(env.uvIndex) : null
+  const envAirLevel = showEnvAir && env?.airQuality ? airQualityLevel(env.airQuality.europeanAqi) : null
+  const envPollenAvailable = showEnvPollen && env?.pollen ? pollenAvailable(env.pollen) : false
+  const envPollenLevel = showEnvPollen && env?.pollen ? overallPollenLevel(env.pollen) : null
 
   return (
     <article id={module.id} className={className + ' weather-panel'}>
@@ -199,6 +175,38 @@ export function WeatherWidget({
           <span>Feels {formatTemperature(home.weather.current.feelsLike)}</span>
         </InfoTooltip>
       </div>
+      {(showEnvUv || showEnvAir || showEnvPollen) && env && (
+        <section className="weather-environment" aria-label="Environment data">
+          {showEnvUv && envUvLevel && (
+            <span className={`weather-env-pill weather-env-pill--uv weather-env-pill--${envUvLevel.toLowerCase().replace(' ', '-')}`}>
+              ☀️ UV {formatNumber(env.uvIndex)} · {envUvLevel}
+            </span>
+          )}
+          {showEnvUv && !envUvLevel && (
+            <span className="weather-env-pill weather-env-pill--uv">☀️ UV {env.uvIndex !== null ? formatNumber(env.uvIndex) : '--'}</span>
+          )}
+          {showEnvAir && envAirLevel && (
+            <span className={`weather-env-pill weather-env-pill--air weather-env-pill--${envAirLevel.toLowerCase().replace(' ', '-')}`}>
+              🍃 AQI {formatNumber(env.airQuality?.europeanAqi)} · {envAirLevel}
+            </span>
+          )}
+          {showEnvAir && !envAirLevel && (
+            <span className="weather-env-pill weather-env-pill--air">🍃 AQI {env.airQuality?.europeanAqi !== null ? formatNumber(env.airQuality?.europeanAqi) : '--'}</span>
+          )}
+          {showEnvPollen && envPollenAvailable && envPollenLevel && (
+            <InfoTooltip label={`Grass: ${formatNumber(env.pollen?.grass)} · Birch: ${formatNumber(env.pollen?.birch)} · Alder: ${formatNumber(env.pollen?.alder)} · Mugwort: ${formatNumber(env.pollen?.mugwort)} · Olive: ${formatNumber(env.pollen?.olive)} · Ragweed: ${formatNumber(env.pollen?.ragweed)}`}>
+              <span className={`weather-env-pill weather-env-pill--pollen weather-env-pill--${envPollenLevel.toLowerCase()}`}>
+                🌾 Pollen · {envPollenLevel}
+              </span>
+            </InfoTooltip>
+          )}
+          {showEnvPollen && !envPollenAvailable && (
+            <InfoTooltip label="Open-Meteo pollen data is available for European locations only.">
+              <span className="weather-env-pill weather-env-pill--pollen weather-env-pill--unavailable">🌾 Pollen unavailable in this region</span>
+            </InfoTooltip>
+          )}
+        </section>
+      )}
       {hourlyForecast.length > 0 && (
         <section className="weather-hourly" aria-label="Hourly forecast for today">
           <div className="weather-hourly-heading">

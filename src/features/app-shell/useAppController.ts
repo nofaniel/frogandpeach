@@ -73,7 +73,7 @@ function clearAdminState(
 export function useAppController() {
   const [setupNeeded, setSetupNeeded] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
-  const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard' | 'weather'>('home')
   const [adminOpen, setAdminOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)

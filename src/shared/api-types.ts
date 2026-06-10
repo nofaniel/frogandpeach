@@ -1,4 +1,4 @@
-export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard'
+export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard' | 'weather'
 
 export type ModuleSettingDefinition = {
   key: string
@@ -169,6 +169,9 @@ export type WeatherSummary = {
     max: number | null
     min: number | null
     precipitationChance: number | null
+    uvIndexMax: number | null
+    sunrise: string | null
+    sunset: string | null
   }>
   hourly: Array<{
     time: string
@@ -176,6 +179,13 @@ export type WeatherSummary = {
     precipitationChance: number | null
     label: string
   }>
+  environment?: {
+    time: string | null
+    uvIndex: number | null
+    uvIndexMax: number | null
+    airQuality: { europeanAqi: number | null; pm2_5: number | null; pm10: number | null; level: string | null } | null
+    pollen: { available: boolean; overallLevel: string | null; grass: number | null; birch: number | null; alder: number | null; mugwort: number | null; olive: number | null; ragweed: number | null } | null
+  } | null
 }
 
 export type TideSummary = {

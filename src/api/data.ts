@@ -517,14 +517,21 @@ export async function getWeather(env: Env) {
   const settings = await getSettings(env)
   if (!isLocationConfigured(settings)) return null
 
-  return cached(env, 'weather-v6', 45 * 60, async () => {
+  const options = await getWeatherModuleOptions(env)
+  const showUv = Boolean(options.showUvIndex)
+  const showAir = Boolean(options.showAirQuality)
+  const showPollen = Boolean(options.showPollen)
+  const flags = `weather-v8-${showUv ? 1 : 0}${showAir ? 1 : 0}${showPollen ? 1 : 0}`
+  const fetchEnv = showUv || showAir || showPollen
+
+  return cached(env, flags, 45 * 60, async () => {
     const url = new URL('https://api.open-meteo.com/v1/forecast')
     url.searchParams.set('latitude', settings.latitude)
     url.searchParams.set('longitude', settings.longitude)
     url.searchParams.set('temperature_unit', 'celsius')
     url.searchParams.set('wind_speed_unit', 'kmh')
     url.searchParams.set('current', 'temperature_2m,apparent_temperature,weather_code,wind_speed_10m,wind_gusts_10m,precipitation')
-    url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset')
+    url.searchParams.set('daily', 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max')
     url.searchParams.set('hourly', 'precipitation_probability,temperature_2m,weather_code')
     url.searchParams.set('timezone', settings.timezone)
     url.searchParams.set('forecast_days', '7')
@@ -534,6 +541,40 @@ export async function getWeather(env: Env) {
     const daily = raw.daily ?? {}
     const hourly = raw.hourly ?? {}
     const now = Date.now()
+
+    let environment: Record<string, any> | null = null
+    if (fetchEnv) {
+      try {
+        const aqUrl = new URL('https://air-quality-api.open-meteo.com/v1/air-quality')
+        aqUrl.searchParams.set('latitude', settings.latitude)
+        aqUrl.searchParams.set('longitude', settings.longitude)
+        aqUrl.searchParams.set('timezone', settings.timezone)
+        aqUrl.searchParams.set('current', 'uv_index,european_aqi,pm2_5,pm10,grass_pollen,birch_pollen,alder_pollen,mugwort_pollen,olive_pollen,ragweed_pollen')
+        const aqRaw = await fetchJson<Record<string, any>>(aqUrl)
+        const aqCurrent = aqRaw.current ?? {}
+        environment = {
+          time: typeof aqCurrent.time === 'string' ? aqCurrent.time : null,
+          uvIndex: numericOrNull(aqCurrent.uv_index),
+          uvIndexMax: numericOrNull(daily.uv_index_max?.[0]),
+          airQuality: {
+            europeanAqi: numericOrNull(aqCurrent.european_aqi),
+            pm2_5: numericOrNull(aqCurrent.pm2_5),
+            pm10: numericOrNull(aqCurrent.pm10),
+            level: null,
+          },
+          pollen: {
+            grass: numericOrNull(aqCurrent.grass_pollen),
+            birch: numericOrNull(aqCurrent.birch_pollen),
+            alder: numericOrNull(aqCurrent.alder_pollen),
+            mugwort: numericOrNull(aqCurrent.mugwort_pollen),
+            olive: numericOrNull(aqCurrent.olive_pollen),
+            ragweed: numericOrNull(aqCurrent.ragweed_pollen),
+          },
+        }
+      } catch {
+        environment = null
+      }
+    }
 
     return {
       location: formatLocationLabel(settings),
@@ -554,6 +595,7 @@ export async function getWeather(env: Env) {
         max: numericOrNull(daily.temperature_2m_max?.[index]),
         min: numericOrNull(daily.temperature_2m_min?.[index]),
         precipitationChance: numericOrNull(daily.precipitation_probability_max?.[index]),
+        uvIndexMax: numericOrNull(daily.uv_index_max?.[index]),
         sunrise: typeof daily.sunrise?.[index] === 'string' ? daily.sunrise[index] : null,
         sunset: typeof daily.sunset?.[index] === 'string' ? daily.sunset[index] : null,
       })),
@@ -567,6 +609,27 @@ export async function getWeather(env: Env) {
           precipitationChance: numericOrNull(hourly.precipitation_probability?.[entry.index]),
           label: weatherLabel(hourly.weather_code?.[entry.index]),
         })),
+      environment: environment ? {
+        time: environment.time as string | null,
+        uvIndex: environment.uvIndex as number | null,
+        uvIndexMax: environment.uvIndexMax as number | null,
+        airQuality: environment.airQuality ? {
+          europeanAqi: (environment.airQuality as Record<string, unknown>).europeanAqi as number | null,
+          pm2_5: (environment.airQuality as Record<string, unknown>).pm2_5 as number | null,
+          pm10: (environment.airQuality as Record<string, unknown>).pm10 as number | null,
+          level: null,
+        } : null,
+        pollen: environment.pollen ? {
+          available: false,
+          overallLevel: null,
+          grass: (environment.pollen as Record<string, unknown>).grass as number | null,
+          birch: (environment.pollen as Record<string, unknown>).birch as number | null,
+          alder: (environment.pollen as Record<string, unknown>).alder as number | null,
+          mugwort: (environment.pollen as Record<string, unknown>).mugwort as number | null,
+          olive: (environment.pollen as Record<string, unknown>).olive as number | null,
+          ragweed: (environment.pollen as Record<string, unknown>).ragweed as number | null,
+        } : null,
+      } : null,
     }
   })
 }
@@ -679,6 +742,22 @@ async function getTidesModuleOptions(env: Env): Promise<{ source: unknown; apiKe
     }
   } catch {
     return { source: 'model', apiKey: '' }
+  }
+}
+
+async function getWeatherModuleOptions(env: Env): Promise<{ showUvIndex: boolean; showAirQuality: boolean; showPollen: boolean }> {
+  try {
+    const row = await env.DB.prepare('SELECT options_json FROM module_settings WHERE id = ?').bind('weather').first<DbRow>()
+    const parsed = row ? JSON.parse(rowString(row, 'options_json') || '{}') : {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { showUvIndex: false, showAirQuality: false, showPollen: false }
+    const record = parsed as Record<string, unknown>
+    return {
+      showUvIndex: Boolean(record.showUvIndex),
+      showAirQuality: Boolean(record.showAirQuality),
+      showPollen: Boolean(record.showPollen),
+    }
+  } catch {
+    return { showUvIndex: false, showAirQuality: false, showPollen: false }
   }
 }
 

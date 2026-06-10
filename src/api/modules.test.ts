@@ -40,7 +40,7 @@ describe('module registry normalisation', () => {
     const modules = normaliseModules(new Map())
 
     expect(modules.find((module) => module.id === 'lists')?.options.navigationBar).toMatchObject({ enabled: true, mode: 'default' })
-    expect(modules.find((module) => module.id === 'weather')?.options.navigationBar).toMatchObject({ enabled: false, mode: 'default' })
+    expect(modules.find((module) => module.id === 'weather')?.options.navigationBar).toMatchObject({ enabled: true, mode: 'default' })
   })
 
   it('disables modules when uninstalled regardless of enabled flag', () => {
@@ -194,8 +194,8 @@ describe('module registry normalisation', () => {
     const modules = normaliseModules(new Map())
     const weather = modules.find((m) => m.id === 'weather')
     expect(weather?.settings).toBeDefined()
-    expect(weather?.settings?.length).toBe(2)
-    expect(weather?.settings?.map((s) => s.key)).toEqual(['iconStyle', 'showExtendedForecast'])
+    expect(weather?.settings?.length).toBe(5)
+    expect(weather?.settings?.map((s) => s.key)).toEqual(['iconStyle', 'showExtendedForecast', 'showUvIndex', 'showAirQuality', 'showPollen'])
 
     const tides = modules.find((m) => m.id === 'tides')
     expect(tides?.settings).toBeDefined()

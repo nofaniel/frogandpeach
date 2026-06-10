@@ -14,6 +14,7 @@ export type NavigationEntry = {
 
 export const coreNavigation: NavigationEntry[] = [
   { id: 'home', label: 'Home', icon: '🏠', target: { kind: 'tab', tab: 'home' } },
+  { id: 'weather', label: 'Weather', icon: '🌦️', target: { kind: 'tab', tab: 'weather' } },
   { id: 'lists', label: 'Lists', icon: '🛒', target: { kind: 'tab', tab: 'lists' } },
   { id: 'notes', label: 'Notes', icon: '📝', target: { kind: 'tab', tab: 'notes' } },
   { id: 'whiteboard', label: 'Whiteboard', icon: '🎨', target: { kind: 'tab', tab: 'whiteboard' } },
@@ -27,7 +28,7 @@ export const moduleNavigationTargets: Record<string, NavigationTarget> = {
   pages: { kind: 'tab', tab: 'pages' },
   network: { kind: 'tab', tab: 'network' },
   whiteboard: { kind: 'tab', tab: 'whiteboard' },
-  weather: { kind: 'home', moduleId: 'weather' },
+  weather: { kind: 'tab', tab: 'weather' },
   tides: { kind: 'home', moduleId: 'tides' },
   settings: { kind: 'admin' },
 }
@@ -45,6 +46,7 @@ export function buildNavigationEntries(modules: Module[]): NavigationEntry[] {
   const coreEntries = coreNavigation.filter((entry) => {
     if (entry.id === 'home') return true
     const module = byId.get(entry.id)
+    if (entry.id === 'weather') return Boolean(module?.installed && module.enabled)
     return Boolean(module?.installed && module.enabled && module.options.navigationBar?.enabled)
   })
   const extraEntries = modules
