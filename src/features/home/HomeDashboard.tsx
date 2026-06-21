@@ -8,6 +8,7 @@ import { PagesWidget } from './widgets/PagesWidget'
 import { TidesWidget } from './widgets/TidesWidget'
 import { WeatherWidget } from './widgets/WeatherWidget'
 import { WhiteboardWidget } from './widgets/WhiteboardWidget'
+import { GalleryWidget } from './widgets/GalleryWidget'
 
 
 export function HomeDashboard({
@@ -131,6 +132,8 @@ function renderWidget(
       return <PagesWidget key={module.id} module={module} pages={home.pages} />
     case 'network':
       return <NetworkWidget key={module.id} module={module} network={home.network} deployment={home.deployment} />
+    case 'gallery':
+      return <GalleryWidget key={module.id} module={module} images={home.galleryImages} onSetActiveTab={onSetActiveTab} />
     default:
       return null
   }

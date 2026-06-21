@@ -21,6 +21,7 @@ import type {
   UserRecord,
   WhiteboardStroke,
   WhiteboardStrokeInput,
+  GalleryStatus,
 } from '../../shared/api-types'
 import { formatDuration } from '../../shared/format'
 import { isLocationConfigured, resolveBrowserTimeZone } from '../../shared/location'
@@ -73,7 +74,7 @@ function clearAdminState(
 export function useAppController() {
   const [setupNeeded, setSetupNeeded] = useState(false)
   const [session, setSession] = useState<Session | null>(null)
-  const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard' | 'weather'>('home')
+  const [activeTab, setActiveTab] = useState<'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard' | 'weather' | 'gallery'>('home')
   const [adminOpen, setAdminOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [unlockOpen, setUnlockOpen] = useState(false)
@@ -92,6 +93,7 @@ export function useAppController() {
   const [adminModules, setAdminModules] = useState<Module[]>([])
   const [users, setUsers] = useState<UserRecord[]>([])
   const [cacheEntries, setCacheEntries] = useState<CacheEntry[]>([])
+  const [galleryStatus, setGalleryStatus] = useState<GalleryStatus>({ connected: false, email: '', folderId: '', folderName: '', configured: false })
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([])
   const [customPages, setCustomPages] = useState<PageLink[]>([])
   const [pageManifestWarnings, setPageManifestWarnings] = useState<Array<{ path: string; message: string }>>([])
@@ -223,13 +225,14 @@ export function useAppController() {
   }
 
   async function refreshAdmin() {
-    const [settingsData, usersData, modulesData, cacheData, manifestData, activityData] = await Promise.all([
+    const [settingsData, usersData, modulesData, cacheData, manifestData, activityData, galleryStatusData] = await Promise.all([
       api<Settings>('/api/settings'),
       api<UserRecord[]>('/api/users'),
       api<Module[]>('/api/modules'),
       api<CacheEntry[]>('/api/cache'),
       api<{ pages: PageLink[]; warnings: Array<{ path: string; message: string }> }>('/api/page-manifest-report'),
       api<ActivityEntry[]>('/api/activity'),
+      api<GalleryStatus>('/api/gallery/status'),
     ])
     setAdminSettingsDraft(settingsData)
     setUsers(usersData)
@@ -238,6 +241,7 @@ export function useAppController() {
     setCustomPages(manifestData.pages)
     setPageManifestWarnings(manifestData.warnings)
     setActivityEntries(activityData)
+    setGalleryStatus(galleryStatusData)
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
@@ -536,6 +540,27 @@ export function useAppController() {
     })
   }
 
+  async function connectGallery() {
+    window.location.href = '/api/gallery/connect'
+  }
+
+  async function setGalleryFolder(folderId: string, folderName: string) {
+    await run(async () => {
+      await api('/api/gallery/folder', { method: 'POST', body: { folderId, folderName } })
+      const status = await api<GalleryStatus>('/api/gallery/status')
+      setGalleryStatus(status)
+      await refreshAll()
+    })
+  }
+
+  async function disconnectGallery() {
+    await run(async () => {
+      await api('/api/gallery/disconnect', { method: 'POST' })
+      setGalleryStatus({ connected: false, email: '', folderId: '', folderName: '', configured: true })
+      await refreshAll()
+    })
+  }
+
   function addToast(message: string, kind: Toast['kind'] = 'info') {
     const id = String(++toastSeqRef.current)
     setToasts((current) => [...current, { id, message, kind }])
@@ -759,6 +784,10 @@ export function useAppController() {
       patchModule,
       batchPatchModules,
       clearCache,
+      galleryStatus,
+      connectGallery,
+      setGalleryFolder,
+      disconnectGallery,
     },
     toasts: {
       toasts,

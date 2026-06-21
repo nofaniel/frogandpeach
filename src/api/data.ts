@@ -1,7 +1,7 @@
 import { listTypes, normaliseListType, resetKeyForListType, shouldRefreshList, type ListTypeId } from '../shared/lists'
 import { deriveTideEvents, extractTideSeries, numericOrNull } from '../shared/tide'
 import { formatLocationLabel, isLocationConfigured } from '../shared/location'
-import { sha256Hex } from './crypto'
+import { sha256Hex, encryptToken, decryptToken } from './crypto'
 import { id, normaliseTags, nowIso, rowNumber, rowString, slugify } from './http'
 import type { DbRow, Env } from './types'
 
@@ -117,7 +117,7 @@ const LOCATION_SETTING_KEYS: Array<keyof Settings> = ['locationName', 'locationR
 const LEGACY_THEME_KEY = 'colourTheme'
 
 export async function getDashboard(env: Env, request: Request) {
-  const [weather, tides, notes, lists, pages, network, settings, modules, appearance, whiteboardStrokes] = await Promise.all([
+  const [weather, tides, notes, lists, pages, network, settings, modules, appearance, whiteboardStrokes, galleryImages] = await Promise.all([
     optionalData('weather', () => getWeather(env)),
     optionalData('marine', () => getMarine(env)),
     listNotes(env, {}),
@@ -128,6 +128,7 @@ export async function getDashboard(env: Env, request: Request) {
     import('./modules').then(({ listModules }) => listModules(env)),
     getAppearance(env),
     listWhiteboardStrokes(env),
+    optionalData('gallery', () => fetchGalleryImages(env)),
   ])
 
   return {
@@ -138,6 +139,7 @@ export async function getDashboard(env: Env, request: Request) {
     pages: pages.slice(0, 12),
     whiteboardStrokes: getWhiteboardPreviewStrokes(whiteboardStrokes, 12),
     whiteboardStrokeCount: whiteboardStrokes.length,
+    galleryImages: galleryImages ?? [],
     network,
     settings,
     modules,
@@ -778,6 +780,9 @@ export async function deleteModuleData(env: Env, moduleId: string) {
     await env.DB.prepare("DELETE FROM cache WHERE cache_key LIKE 'weather-%' OR cache_key LIKE 'marine-%' OR cache_key LIKE 'weather-v%' OR cache_key LIKE 'marine-v%'").run()
   } else if (moduleId === 'whiteboard') {
     await env.DB.prepare('DELETE FROM whiteboard_strokes').run()
+  } else if (moduleId === 'gallery') {
+    await env.DB.prepare('DELETE FROM google_tokens').run()
+    await env.DB.prepare("DELETE FROM cache WHERE cache_key LIKE 'gallery-%'").run()
   }
 }
 
@@ -1258,6 +1263,125 @@ export async function clearWhiteboardStrokes(env: Env): Promise<void> {
   await env.DB.prepare('DELETE FROM whiteboard_strokes').run()
 }
 
-import type { WhiteboardStroke } from '../shared/api-types'
+// ── Google Drive Gallery ──────────────────────────────────────────────────────
+
+import type { GalleryImage, GalleryStatus, WhiteboardStroke } from '../shared/api-types'
 import type { WhiteboardStrokeInput } from '../shared/api-types'
 import { getWhiteboardPreviewStrokes, normaliseWhiteboardStrokeInput } from '../shared/whiteboard'
+
+type GoogleTokenRow = {
+  id: string
+  access_token_enc: string
+  refresh_token_enc: string
+  expires_at: string
+  email: string
+  folder_id: string
+  folder_name: string
+  created_at: string
+  updated_at: string
+}
+
+function isGoogleConfigured(env: Env): boolean {
+  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.TOKEN_ENC_KEY)
+}
+
+export async function getGalleryStatus(env: Env): Promise<GalleryStatus> {
+  if (!isGoogleConfigured(env)) return { connected: false, email: '', folderId: '', folderName: '', configured: false }
+  try {
+    const row = await env.DB.prepare('SELECT * FROM google_tokens WHERE id = ?').bind('default').first<GoogleTokenRow>()
+    if (!row) return { connected: false, email: '', folderId: '', folderName: '', configured: true }
+    return { connected: true, email: row.email, folderId: row.folder_id, folderName: row.folder_name, configured: true }
+  } catch {
+    return { connected: false, email: '', folderId: '', folderName: '', configured: true }
+  }
+}
+
+export async function saveGoogleTokens(env: Env, tokens: { accessToken: string; refreshToken: string; expiresIn: number; email: string }) {
+  if (!env.TOKEN_ENC_KEY) throw new Error('TOKEN_ENC_KEY not configured')
+  const stamp = nowIso()
+  const accessEnc = await encryptToken(tokens.accessToken, env.TOKEN_ENC_KEY)
+  const refreshEnc = await encryptToken(tokens.refreshToken, env.TOKEN_ENC_KEY)
+  const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000).toISOString()
+  await env.DB.prepare(
+    'INSERT INTO google_tokens (id, access_token_enc, refresh_token_enc, expires_at, email, folder_id, folder_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET access_token_enc = excluded.access_token_enc, refresh_token_enc = excluded.refresh_token_enc, expires_at = excluded.expires_at, email = excluded.email, updated_at = excluded.updated_at',
+  ).bind('default', accessEnc, refreshEnc, expiresAt, tokens.email, '', '', stamp, stamp).run()
+}
+
+export async function setGalleryFolder(env: Env, folderId: string, folderName: string) {
+  await env.DB.prepare('UPDATE google_tokens SET folder_id = ?, folder_name = ?, updated_at = ? WHERE id = ?').bind(folderId, folderName, nowIso(), 'default').run()
+}
+
+export async function disconnectGoogle(env: Env) {
+  await env.DB.prepare('DELETE FROM google_tokens WHERE id = ?').bind('default').run()
+  await env.DB.prepare("DELETE FROM cache WHERE cache_key LIKE 'gallery-%'").run()
+}
+
+async function getValidAccessToken(env: Env): Promise<string | null> {
+  if (!env.TOKEN_ENC_KEY) return null
+  const row = await env.DB.prepare('SELECT * FROM google_tokens WHERE id = ?').bind('default').first<GoogleTokenRow>()
+  if (!row) return null
+
+  const expiresAt = new Date(row.expires_at).getTime()
+  if (Date.now() < expiresAt - 60_000) {
+    return decryptToken(row.access_token_enc, env.TOKEN_ENC_KEY)
+  }
+
+  if (!row.refresh_token_enc || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null
+
+  try {
+    const refreshToken = await decryptToken(row.refresh_token_enc, env.TOKEN_ENC_KEY)
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    })
+    if (!response.ok) return null
+    const data = (await response.json()) as { access_token: string; expires_in: number }
+    const newAccessEnc = await encryptToken(data.access_token, env.TOKEN_ENC_KEY)
+    const newExpiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
+    await env.DB.prepare('UPDATE google_tokens SET access_token_enc = ?, expires_at = ?, updated_at = ? WHERE id = ?').bind(newAccessEnc, newExpiresAt, nowIso(), 'default').run()
+    return data.access_token
+  } catch {
+    return null
+  }
+}
+
+export async function fetchGalleryImages(env: Env): Promise<GalleryImage[]> {
+  const cacheTtl = 30 * 60
+  return cached(env, 'gallery-images', cacheTtl, async () => {
+    const token = await getValidAccessToken(env)
+    if (!token) return []
+
+    const row = await env.DB.prepare('SELECT folder_id FROM google_tokens WHERE id = ?').bind('default').first<GoogleTokenRow>()
+    const folderId = row?.folder_id
+    if (!folderId) return []
+
+    const query = `'${folderId}' in parents and mimeType contains 'image/' and trashed = false`
+    const url = new URL('https://www.googleapis.com/drive/v3/files')
+    url.searchParams.set('q', query)
+    url.searchParams.set('fields', 'files(id,name,mimeType,thumbnailLink,webContentLink,imageMediaMetadata(createdTime,width,height),size)')
+    url.searchParams.set('orderBy', 'createdTime desc')
+    url.searchParams.set('pageSize', '50')
+
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!response.ok) return []
+
+    const data = (await response.json()) as { files?: Array<Record<string, unknown>> }
+    return (data.files ?? []).map((file) => ({
+      id: String(file.id ?? ''),
+      name: String(file.name ?? ''),
+      mimeType: String(file.mimeType ?? ''),
+      thumbnailLink: String(file.thumbnailLink ?? ''),
+      webContentLink: String(file.webContentLink ?? ''),
+      width: typeof file.imageMediaMetadata === 'object' && file.imageMediaMetadata ? Number((file.imageMediaMetadata as Record<string, unknown>).width ?? null) : null,
+      height: typeof file.imageMediaMetadata === 'object' && file.imageMediaMetadata ? Number((file.imageMediaMetadata as Record<string, unknown>).height ?? null) : null,
+      createdTime: typeof file.imageMediaMetadata === 'object' && file.imageMediaMetadata ? String((file.imageMediaMetadata as Record<string, unknown>).createdTime ?? '') : String(file.createdTime ?? ''),
+      size: String(file.size ?? ''),
+    }))
+  })
+}

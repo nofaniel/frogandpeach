@@ -45,3 +45,35 @@ function timingSafeEqual(left: Uint8Array, right: Uint8Array) {
   }
   return diff === 0
 }
+
+export async function encryptToken(plaintext: string, keyHex: string): Promise<string> {
+  const key = await importAesKey(keyHex)
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encrypted = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoder.encode(plaintext))
+  return `${bytesToBase64(iv)}:${bytesToBase64(new Uint8Array(encrypted))}`
+}
+
+export async function decryptToken(ciphertext: string, keyHex: string): Promise<string> {
+  const [ivB64, dataB64] = ciphertext.split(':')
+  if (!ivB64 || !dataB64) throw new Error('Invalid ciphertext format')
+  const key = await importAesKey(keyHex)
+  const iv = base64ToBytes(ivB64)
+  const data = base64ToBytes(dataB64)
+  const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, data)
+  return new TextDecoder().decode(decrypted)
+}
+
+async function importAesKey(hex: string) {
+  const bytes = hexToBytes(hex)
+  return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
+}
+
+function hexToBytes(hex: string) {
+  const clean = hex.replace(/\s+/g, '')
+  if (clean.length % 2 !== 0) throw new Error('Invalid hex string')
+  const bytes = new Uint8Array(clean.length / 2)
+  for (let i = 0; i < clean.length; i += 2) {
+    bytes[i / 2] = parseInt(clean.substring(i, i + 2), 16)
+  }
+  return bytes
+}

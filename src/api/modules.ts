@@ -371,6 +371,58 @@ export const moduleDefinitions: ModuleDefinition[] = [
     },
   },
   { id: 'settings', title: 'Admin tools', description: 'Users, modules, appearance, household settings, cache, and review tools.', category: 'admin', defaultPosition: 70, defaultEnabled: false, defaultInstalled: true, defaultSize: 'wide', navigationBar: { defaultEnabled: false } },
+  {
+    id: 'gallery',
+    title: 'Gallery',
+    description: 'Photo gallery from a connected Google Drive folder.',
+    category: 'content',
+    defaultPosition: 45,
+    defaultEnabled: true,
+    defaultInstalled: true,
+    defaultSize: 'wide',
+    navigationBar: { defaultEnabled: true },
+    homeWidget: {
+      label: 'Homepage gallery widget',
+      description: 'Controls whether photos appear on the home screen and which display style is used.',
+      defaultEnabled: true,
+      defaultMode: 'grid',
+      modes: [
+        { id: 'grid', label: 'Grid', description: 'Compact image grid with thumbnails.' },
+        { id: 'slideshow', label: 'Slideshow', description: 'Auto-rotating photo slideshow.' },
+        { id: 'polaroid', label: 'Polaroid', description: 'Scattered polaroid-style photo cards.' },
+      ],
+    },
+    settings: [
+      {
+        key: 'defaultMode',
+        type: 'select',
+        label: 'Default gallery view',
+        description: 'How the full gallery page is displayed.',
+        defaultValue: 'grid',
+        options: [
+          { value: 'grid', label: 'Grid', description: 'Thumbnail grid layout.' },
+          { value: 'slideshow', label: 'Slideshow', description: 'Auto-rotating slideshow.' },
+          { value: 'polaroid', label: 'Polaroid', description: 'Scattered polaroid cards.' },
+        ],
+      },
+      {
+        key: 'slideshowInterval',
+        type: 'number',
+        label: 'Slideshow interval (seconds)',
+        description: 'Time between slides in slideshow mode.',
+        defaultValue: 5,
+        min: 3,
+        max: 30,
+      },
+      {
+        key: 'showMetadata',
+        type: 'boolean',
+        label: 'Show photo details',
+        description: 'Display file name and date in the lightbox view.',
+        defaultValue: true,
+      },
+    ],
+  },
 ]
 
 const validSizes: ModuleSize[] = ['small', 'medium', 'wide', 'full']

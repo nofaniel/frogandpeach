@@ -1,4 +1,4 @@
-export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard' | 'weather'
+export type Tab = 'home' | 'lists' | 'notes' | 'pages' | 'network' | 'whiteboard' | 'weather' | 'gallery'
 
 export type ModuleSettingDefinition = {
   key: string
@@ -212,6 +212,7 @@ export type HomeData = {
   pages: PageLink[]
   whiteboardStrokes: WhiteboardStroke[]
   whiteboardStrokeCount: number
+  galleryImages: GalleryImage[]
   network: NetworkSummary | null
   settings: Partial<Settings>
   modules: Module[]
@@ -292,7 +293,7 @@ export type WhiteboardPoint = {
   y: number
 }
 
-export type WhiteboardTool = 'pen' | 'eraser'
+export type WhiteboardTool = 'pen' | 'eraser' | 'pan'
 
 export type WhiteboardStrokeInput = {
   points: WhiteboardPoint[]
@@ -324,4 +325,24 @@ export type Toast = {
   id: string
   message: string
   kind: 'info' | 'warn'
+}
+
+export type GalleryImage = {
+  id: string
+  name: string
+  mimeType: string
+  thumbnailLink: string
+  webContentLink: string
+  width: number | null
+  height: number | null
+  createdTime: string
+  size: string
+}
+
+export type GalleryStatus = {
+  connected: boolean
+  email: string
+  folderId: string
+  folderName: string
+  configured: boolean
 }

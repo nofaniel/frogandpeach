@@ -1,4 +1,4 @@
-import type { Appearance, ActivityEntry, CacheEntry, HomeData, Module, PageLink, Settings, UserPatch, UserRecord } from '../../shared/api-types'
+import type { Appearance, ActivityEntry, CacheEntry, HomeData, GalleryStatus, Module, PageLink, Settings, UserPatch, UserRecord } from '../../shared/api-types'
 import type { FormEvent } from 'react'
 import { isLocationConfigured } from '../../shared/location'
 import { ActivitySection } from './sections/ActivitySection'
@@ -8,6 +8,7 @@ import { ModulesSection } from './sections/ModulesSection'
 import { PageInventorySection } from './sections/PageInventorySection'
 import { SettingsSection } from './sections/SettingsSection'
 import { UsersSection } from './sections/UsersSection'
+import { GallerySection } from './sections/GallerySection'
 
 export function AdminPanel({
   settings,
@@ -31,6 +32,10 @@ export function AdminPanel({
   onPatchModule,
   onBatchPatchModules,
   onClearCache,
+  galleryStatus,
+  onConnectGallery,
+  onSetGalleryFolder,
+  onDisconnectGallery,
 }: {
   settings: Settings
   users: UserRecord[]
@@ -53,6 +58,10 @@ export function AdminPanel({
   onPatchModule: (module: Module, patch: Partial<Module> & { deleteData?: boolean }) => void
   onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
   onClearCache: (key?: string) => void
+  galleryStatus: GalleryStatus
+  onConnectGallery: () => void
+  onSetGalleryFolder: (folderId: string, folderName: string) => void
+  onDisconnectGallery: () => void
 }) {
   const deploymentChecks = [
     { label: 'D1 binding', ok: true, detail: 'DB is reachable through the worker API.' },
@@ -85,6 +94,13 @@ export function AdminPanel({
         modules={modules}
         onPatchModule={onPatchModule}
         onBatchPatchModules={onBatchPatchModules}
+      />
+
+      <GallerySection
+        status={galleryStatus}
+        onConnect={onConnectGallery}
+        onSetFolder={onSetGalleryFolder}
+        onDisconnect={onDisconnectGallery}
       />
 
       <AppearanceSection onAppearanceChange={onAppearanceChange} />

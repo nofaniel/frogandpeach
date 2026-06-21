@@ -5,6 +5,9 @@ export type Env = {
   APP_ORIGIN?: string
   SETUP_TOKEN?: string
   SESSION_TTL_DAYS?: string
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
+  TOKEN_ENC_KEY?: string
 }
 
 export type ApiContext = EventContext<Env, string, Record<string, unknown>>

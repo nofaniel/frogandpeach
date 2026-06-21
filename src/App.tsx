@@ -11,6 +11,7 @@ import { NotesWorkspace } from './features/notes/NotesWorkspace'
 import { PagesWorkspace } from './features/pages/PagesWorkspace'
 import { WhiteboardWorkspace } from './features/whiteboard/WhiteboardWorkspace'
 import { WeatherWorkspace } from './features/weather/WeatherWorkspace'
+import { GalleryWorkspace } from './features/gallery/GalleryWorkspace'
 
 
 function App() {
@@ -98,6 +99,10 @@ function App() {
           onPatchModule={admin.patchModule}
           onBatchPatchModules={admin.batchPatchModules}
           onClearCache={admin.clearCache}
+          galleryStatus={admin.galleryStatus}
+          onConnectGallery={admin.connectGallery}
+          onSetGalleryFolder={admin.setGalleryFolder}
+          onDisconnectGallery={admin.disconnectGallery}
         />
       )}
 
@@ -192,6 +197,13 @@ function App() {
           publicSettings={publicSettings}
           module={dashboardModules.find((m) => m.id === 'weather')}
           onOpenAdmin={() => void navigation.openAdmin()}
+        />
+      )}
+
+      {!viewedPage && !adminOpen && activeTab === 'gallery' && (
+        <GalleryWorkspace
+          images={home?.galleryImages ?? []}
+          module={dashboardModules.find((m) => m.id === 'gallery')}
         />
       )}
     </AppShellLayout>

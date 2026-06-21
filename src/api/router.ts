@@ -12,12 +12,14 @@ import {
   deleteNote,
   deletePage,
   deletePageLink,
+  disconnectGoogle,
   getAppearance,
   getList,
   getListItem,
   getNote,
   getCustomPageManifestReport,
   getDashboard,
+  getGalleryStatus,
   getMarine,
   getNetworkOverview,
   getPage,
@@ -32,6 +34,8 @@ import {
   listPageLinks,
   listPages,
   logActivity,
+  saveGoogleTokens,
+  setGalleryFolder,
   updateAppearance,
   updateList,
   updateListItem,
@@ -84,6 +88,7 @@ export async function handleApi(context: ApiContext): Promise<Response> {
     if (resource === 'pages') return await routePages(context, parts.slice(1), session)
     if (resource === 'page-links') return await routePageLinks(context, parts.slice(1), session)
     if (resource === 'whiteboard') return await routeWhiteboard(context, parts.slice(1), session)
+    if (resource === 'gallery') return await routeGallery(context, parts.slice(1), session)
     if (resource === 'settings') return await routeSettings(context)
 
     return notFound()
@@ -330,6 +335,93 @@ async function routeSettings(context: ApiContext) {
     return json(settings)
   }
   return methodNotAllowed()
+}
+
+async function routeGallery(context: ApiContext, parts: string[], session: Session) {
+  const sub = parts[0] || ''
+
+  if (sub === 'status' && context.request.method === 'GET') {
+    return json(await getGalleryStatus(context.env))
+  }
+
+  if (sub === 'connect') {
+    const session = await requireAdminUnlock(context.request, context.env)
+    const env = context.env
+    if (!env.GOOGLE_CLIENT_ID || !env.APP_ORIGIN) throw new ApiError(500, 'Google OAuth not configured')
+    const redirectUri = `${env.APP_ORIGIN}/api/gallery/callback`
+    const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+    url.searchParams.set('client_id', env.GOOGLE_CLIENT_ID)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('response_type', 'code')
+    url.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email')
+    url.searchParams.set('access_type', 'offline')
+    url.searchParams.set('prompt', 'consent')
+    url.searchParams.set('state', session.userId)
+    return new Response(null, { status: 302, headers: { Location: url.toString() } })
+  }
+
+  if (sub === 'callback' && context.request.method === 'GET') {
+    const url = new URL(context.request.url)
+    const code = url.searchParams.get('code')
+    if (!code) throw new ApiError(400, 'Missing authorization code')
+    const env = context.env
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.APP_ORIGIN || !env.TOKEN_ENC_KEY) {
+      throw new ApiError(500, 'Google OAuth not configured')
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code,
+        client_id: env.GOOGLE_CLIENT_ID,
+        client_secret: env.GOOGLE_CLIENT_SECRET,
+        redirect_uri: `${env.APP_ORIGIN}/api/gallery/callback`,
+        grant_type: 'authorization_code',
+      }),
+    })
+    if (!tokenResponse.ok) throw new ApiError(502, 'Token exchange failed')
+    const tokens = (await tokenResponse.json()) as { access_token: string; refresh_token?: string; expires_in: number }
+
+    let email = ''
+    try {
+      const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      })
+      if (userResponse.ok) {
+        const user = (await userResponse.json()) as { email?: string }
+        email = user.email ?? ''
+      }
+    } catch { /* noop */ }
+
+    await saveGoogleTokens(context.env, {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? '',
+      expiresIn: tokens.expires_in,
+      email,
+    })
+
+    await recordActivity(context, session, 'connected', 'gallery', 'google', `Connected Google Drive${email ? ` (${email})` : ''}`)
+    return new Response(null, { status: 302, headers: { Location: '/' } })
+  }
+
+  if (sub === 'folder' && context.request.method === 'POST') {
+    await requireAdminUnlock(context.request, context.env)
+    const body = await readJson<{ folderId?: string; folderName?: string }>(context.request)
+    if (!body.folderId) throw new ApiError(400, 'folderId is required')
+    await setGalleryFolder(context.env, String(body.folderId), String(body.folderName ?? ''))
+    await recordActivity(context, session, 'updated', 'gallery', 'folder', `Set gallery folder to ${body.folderName ?? body.folderId}`)
+    return json({ ok: true })
+  }
+
+  if (sub === 'disconnect' && context.request.method === 'POST') {
+    await requireAdminUnlock(context.request, context.env)
+    await disconnectGoogle(context.env)
+    await recordActivity(context, session, 'disconnected', 'gallery', 'google', 'Disconnected Google Drive')
+    return json({ ok: true })
+  }
+
+  return notFound()
 }
 
 async function routeWhiteboard(context: ApiContext, parts: string[], session: Session) {
