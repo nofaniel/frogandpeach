@@ -100,6 +100,7 @@ function App() {
           onBatchPatchModules={admin.batchPatchModules}
           onClearCache={admin.clearCache}
           galleryStatus={admin.galleryStatus}
+          onSaveGalleryConfig={admin.saveGalleryConfig}
           onConnectGallery={admin.connectGallery}
           onSetGalleryFolder={admin.setGalleryFolder}
           onDisconnectGallery={admin.disconnectGallery}

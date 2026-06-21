@@ -33,6 +33,7 @@ export function AdminPanel({
   onBatchPatchModules,
   onClearCache,
   galleryStatus,
+  onSaveGalleryConfig,
   onConnectGallery,
   onSetGalleryFolder,
   onDisconnectGallery,
@@ -59,6 +60,7 @@ export function AdminPanel({
   onBatchPatchModules: (patches: Array<{ id: string; position: number }>) => void
   onClearCache: (key?: string) => void
   galleryStatus: GalleryStatus
+  onSaveGalleryConfig: (clientId: string, clientSecret: string) => void
   onConnectGallery: () => void
   onSetGalleryFolder: (folderId: string, folderName: string) => void
   onDisconnectGallery: () => void
@@ -98,6 +100,7 @@ export function AdminPanel({
 
       <GallerySection
         status={galleryStatus}
+        onSaveConfig={onSaveGalleryConfig}
         onConnect={onConnectGallery}
         onSetFolder={onSetGalleryFolder}
         onDisconnect={onDisconnectGallery}

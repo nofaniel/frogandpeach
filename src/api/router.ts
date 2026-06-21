@@ -14,14 +14,15 @@ import {
   deletePageLink,
   disconnectGoogle,
   getAppearance,
-  getList,
-  getListItem,
-  getNote,
-  getCustomPageManifestReport,
   getDashboard,
   getGalleryStatus,
+  getGoogleConfig,
+  getList,
+  getListItem,
   getMarine,
   getNetworkOverview,
+  getNote,
+  getCustomPageManifestReport,
   getPage,
   getSettings,
   getWeather,
@@ -34,6 +35,7 @@ import {
   listPageLinks,
   listPages,
   logActivity,
+  saveGoogleConfig,
   saveGoogleTokens,
   setGalleryFolder,
   updateAppearance,
@@ -344,13 +346,22 @@ async function routeGallery(context: ApiContext, parts: string[], session: Sessi
     return json(await getGalleryStatus(context.env))
   }
 
+  if (sub === 'config' && context.request.method === 'POST') {
+    await requireAdminUnlock(context.request, context.env)
+    const body = await readJson<{ clientId?: string; clientSecret?: string }>(context.request)
+    if (!body.clientId?.trim() || !body.clientSecret?.trim()) throw new ApiError(400, 'clientId and clientSecret are required')
+    await saveGoogleConfig(context.env, body.clientId.trim(), body.clientSecret.trim())
+    await recordActivity(context, session, 'updated', 'gallery', 'config', 'Updated Google OAuth credentials')
+    return json({ ok: true })
+  }
+
   if (sub === 'connect') {
     const session = await requireAdminUnlock(context.request, context.env)
-    const env = context.env
-    if (!env.GOOGLE_CLIENT_ID || !env.APP_ORIGIN) throw new ApiError(500, 'Google OAuth not configured')
-    const redirectUri = `${env.APP_ORIGIN}/api/gallery/callback`
+    const config = await getGoogleConfig(context.env)
+    if (!config || !context.env.APP_ORIGIN) throw new ApiError(500, 'Google OAuth not configured — add your Client ID and Client Secret in the Gallery admin section.')
+    const redirectUri = `${context.env.APP_ORIGIN}/api/gallery/callback`
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
-    url.searchParams.set('client_id', env.GOOGLE_CLIENT_ID)
+    url.searchParams.set('client_id', config.clientId)
     url.searchParams.set('redirect_uri', redirectUri)
     url.searchParams.set('response_type', 'code')
     url.searchParams.set('scope', 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/userinfo.email')
@@ -364,8 +375,8 @@ async function routeGallery(context: ApiContext, parts: string[], session: Sessi
     const url = new URL(context.request.url)
     const code = url.searchParams.get('code')
     if (!code) throw new ApiError(400, 'Missing authorization code')
-    const env = context.env
-    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.APP_ORIGIN || !env.TOKEN_ENC_KEY) {
+    const config = await getGoogleConfig(context.env)
+    if (!config || !context.env.APP_ORIGIN) {
       throw new ApiError(500, 'Google OAuth not configured')
     }
 
@@ -374,9 +385,9 @@ async function routeGallery(context: ApiContext, parts: string[], session: Sessi
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         code,
-        client_id: env.GOOGLE_CLIENT_ID,
-        client_secret: env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: `${env.APP_ORIGIN}/api/gallery/callback`,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
+        redirect_uri: `${context.env.APP_ORIGIN}/api/gallery/callback`,
         grant_type: 'authorization_code',
       }),
     })

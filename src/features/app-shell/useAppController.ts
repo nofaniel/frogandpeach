@@ -540,6 +540,14 @@ export function useAppController() {
     })
   }
 
+  async function saveGalleryConfig(clientId: string, clientSecret: string) {
+    await run(async () => {
+      await api('/api/gallery/config', { method: 'POST', body: { clientId, clientSecret } })
+      const status = await api<GalleryStatus>('/api/gallery/status')
+      setGalleryStatus(status)
+    })
+  }
+
   async function connectGallery() {
     window.location.href = '/api/gallery/connect'
   }
@@ -785,6 +793,7 @@ export function useAppController() {
       batchPatchModules,
       clearCache,
       galleryStatus,
+      saveGalleryConfig,
       connectGallery,
       setGalleryFolder,
       disconnectGallery,

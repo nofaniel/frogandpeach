@@ -3,11 +3,13 @@ import type { GalleryStatus } from '../../../shared/api-types'
 
 export function GallerySection({
   status,
+  onSaveConfig,
   onConnect,
   onSetFolder,
   onDisconnect,
 }: {
   status: GalleryStatus
+  onSaveConfig: (clientId: string, clientSecret: string) => void
   onConnect: () => void
   onSetFolder: (folderId: string, folderName: string) => void
   onDisconnect: () => void
@@ -17,7 +19,11 @@ export function GallerySection({
       <article className="panel">
         <p className="kicker">Gallery</p>
         <h2>Google Drive</h2>
-        <p className="gallery-admin-note">Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and TOKEN_ENC_KEY in your environment to enable the gallery module.</p>
+        <p className="gallery-admin-note">
+          Connect a Google account to display photos from Google Drive. First, enter your OAuth credentials.
+          You can get these from the <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer">Google Cloud Console</a>.
+        </p>
+        <GallerySetupForm onSave={onSaveConfig} />
       </article>
     )
   }
@@ -27,7 +33,7 @@ export function GallerySection({
       <article className="panel">
         <p className="kicker">Gallery</p>
         <h2>Google Drive</h2>
-        <p>Connect a Google account to display photos from Google Drive.</p>
+        <p>OAuth credentials saved. Connect a Google account to display photos.</p>
         <button type="button" className="primary" onClick={onConnect}>Connect Google Drive</button>
       </article>
     )
@@ -50,6 +56,41 @@ export function GallerySection({
       <GalleryFolderPicker currentFolderId={status.folderId} onSetFolder={onSetFolder} />
       <button type="button" className="ghost gallery-disconnect" onClick={onDisconnect}>Disconnect</button>
     </article>
+  )
+}
+
+function GallerySetupForm({ onSave }: { onSave: (clientId: string, clientSecret: string) => void }) {
+  const [draft, setDraft] = useState({ clientId: '', clientSecret: '' })
+
+  return (
+    <div className="gallery-folder-picker">
+      <label>
+        <span>Client ID</span>
+        <input
+          type="text"
+          value={draft.clientId}
+          placeholder="xxx.apps.googleusercontent.com"
+          onChange={(e) => setDraft((d) => ({ ...d, clientId: e.target.value }))}
+        />
+      </label>
+      <label>
+        <span>Client Secret</span>
+        <input
+          type="password"
+          value={draft.clientSecret}
+          placeholder="GOCSPX-..."
+          onChange={(e) => setDraft((d) => ({ ...d, clientSecret: e.target.value }))}
+        />
+      </label>
+      <button
+        type="button"
+        className="ghost"
+        disabled={!draft.clientId.trim() || !draft.clientSecret.trim()}
+        onClick={() => onSave(draft.clientId.trim(), draft.clientSecret.trim())}
+      >
+        Save credentials
+      </button>
+    </div>
   )
 }
 

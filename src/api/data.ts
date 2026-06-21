@@ -1281,12 +1281,44 @@ type GoogleTokenRow = {
   updated_at: string
 }
 
-function isGoogleConfigured(env: Env): boolean {
-  return Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.TOKEN_ENC_KEY)
+type GoogleConfig = {
+  clientId: string
+  clientSecret: string
+  encKey: string
+}
+
+export async function getGoogleConfig(env: Env): Promise<GoogleConfig | null> {
+  const settings = await env.DB.prepare("SELECT key, value FROM settings WHERE key IN ('gallery_client_id', 'gallery_client_secret', 'gallery_enc_key')").all<{ key: string; value: string }>()
+  const map = new Map(settings.results?.map((r) => [r.key, r.value]) ?? [])
+
+  const clientId = map.get('gallery_client_id') || env.GOOGLE_CLIENT_ID || ''
+  const clientSecret = map.get('gallery_client_secret') || env.GOOGLE_CLIENT_SECRET || ''
+  let encKey = map.get('gallery_enc_key') || env.TOKEN_ENC_KEY || ''
+
+  if (!clientId || !clientSecret || !encKey) return null
+  return { clientId, clientSecret, encKey }
+}
+
+async function ensureGalleryEncKey(env: Env): Promise<string> {
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'gallery_enc_key'").first<{ value: string }>()
+  if (row?.value) return row.value
+
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
+  const stamp = nowIso()
+  await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('gallery_enc_key', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(hex).run()
+  return hex
+}
+
+export async function saveGoogleConfig(env: Env, clientId: string, clientSecret: string) {
+  await ensureGalleryEncKey(env)
+  await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('gallery_client_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(clientId).run()
+  await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('gallery_client_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(clientSecret).run()
 }
 
 export async function getGalleryStatus(env: Env): Promise<GalleryStatus> {
-  if (!isGoogleConfigured(env)) return { connected: false, email: '', folderId: '', folderName: '', configured: false }
+  const config = await getGoogleConfig(env)
+  if (!config) return { connected: false, email: '', folderId: '', folderName: '', configured: false }
   try {
     const row = await env.DB.prepare('SELECT * FROM google_tokens WHERE id = ?').bind('default').first<GoogleTokenRow>()
     if (!row) return { connected: false, email: '', folderId: '', folderName: '', configured: true }
@@ -1297,10 +1329,11 @@ export async function getGalleryStatus(env: Env): Promise<GalleryStatus> {
 }
 
 export async function saveGoogleTokens(env: Env, tokens: { accessToken: string; refreshToken: string; expiresIn: number; email: string }) {
-  if (!env.TOKEN_ENC_KEY) throw new Error('TOKEN_ENC_KEY not configured')
+  const config = await getGoogleConfig(env)
+  if (!config) throw new Error('Google OAuth not configured')
   const stamp = nowIso()
-  const accessEnc = await encryptToken(tokens.accessToken, env.TOKEN_ENC_KEY)
-  const refreshEnc = await encryptToken(tokens.refreshToken, env.TOKEN_ENC_KEY)
+  const accessEnc = await encryptToken(tokens.accessToken, config.encKey)
+  const refreshEnc = await encryptToken(tokens.refreshToken, config.encKey)
   const expiresAt = new Date(Date.now() + tokens.expiresIn * 1000).toISOString()
   await env.DB.prepare(
     'INSERT INTO google_tokens (id, access_token_enc, refresh_token_enc, expires_at, email, folder_id, folder_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET access_token_enc = excluded.access_token_enc, refresh_token_enc = excluded.refresh_token_enc, expires_at = excluded.expires_at, email = excluded.email, updated_at = excluded.updated_at',
@@ -1317,32 +1350,33 @@ export async function disconnectGoogle(env: Env) {
 }
 
 async function getValidAccessToken(env: Env): Promise<string | null> {
-  if (!env.TOKEN_ENC_KEY) return null
+  const config = await getGoogleConfig(env)
+  if (!config) return null
   const row = await env.DB.prepare('SELECT * FROM google_tokens WHERE id = ?').bind('default').first<GoogleTokenRow>()
   if (!row) return null
 
   const expiresAt = new Date(row.expires_at).getTime()
   if (Date.now() < expiresAt - 60_000) {
-    return decryptToken(row.access_token_enc, env.TOKEN_ENC_KEY)
+    return decryptToken(row.access_token_enc, config.encKey)
   }
 
-  if (!row.refresh_token_enc || !env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null
+  if (!row.refresh_token_enc) return null
 
   try {
-    const refreshToken = await decryptToken(row.refresh_token_enc, env.TOKEN_ENC_KEY)
+    const refreshToken = await decryptToken(row.refresh_token_enc, config.encKey)
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: env.GOOGLE_CLIENT_ID,
-        client_secret: env.GOOGLE_CLIENT_SECRET,
+        client_id: config.clientId,
+        client_secret: config.clientSecret,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
     })
     if (!response.ok) return null
     const data = (await response.json()) as { access_token: string; expires_in: number }
-    const newAccessEnc = await encryptToken(data.access_token, env.TOKEN_ENC_KEY)
+    const newAccessEnc = await encryptToken(data.access_token, config.encKey)
     const newExpiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString()
     await env.DB.prepare('UPDATE google_tokens SET access_token_enc = ?, expires_at = ?, updated_at = ? WHERE id = ?').bind(newAccessEnc, newExpiresAt, nowIso(), 'default').run()
     return data.access_token
