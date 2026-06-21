@@ -194,8 +194,8 @@ describe('module registry normalisation', () => {
     const modules = normaliseModules(new Map())
     const weather = modules.find((m) => m.id === 'weather')
     expect(weather?.settings).toBeDefined()
-    expect(weather?.settings?.length).toBe(6)
-    expect(weather?.settings?.map((s) => s.key)).toEqual(['iconStyle', 'showExtendedForecast', 'showUvIndex', 'showAirQuality', 'showPollen', 'enhancedAnimations'])
+    expect(weather?.settings?.length).toBe(7)
+    expect(weather?.settings?.map((s) => s.key)).toEqual(['iconStyle', 'showExtendedForecast', 'collapsibleExtendedForecast', 'showUvIndex', 'showAirQuality', 'showPollen', 'enhancedAnimations'])
 
     const tides = modules.find((m) => m.id === 'tides')
     expect(tides?.settings).toBeDefined()
@@ -207,9 +207,20 @@ describe('module registry normalisation', () => {
     const modules = normaliseModules(new Map())
     const weather = modules.find((m) => m.id === 'weather')
     expect(weather?.options['showExtendedForecast']).toBe(false)
+    expect(weather?.options['collapsibleExtendedForecast']).toBe(true)
 
     const tides = modules.find((m) => m.id === 'tides')
     expect(tides?.options['showCurrentTide']).toBe(true)
+  })
+
+  it('preserves the explicit extended forecast collapsibility setting', () => {
+    const modules = normaliseModules(
+      new Map([
+        ['weather', { id: 'weather', installed: 1, enabled: 1, position: 10, size: 'wide', options_json: '{"collapsibleExtendedForecast":false}' }],
+      ]),
+    )
+
+    expect(modules.find((module) => module.id === 'weather')?.options['collapsibleExtendedForecast']).toBe(false)
   })
 
   it('normalises number setting with min/max clamping', () => {

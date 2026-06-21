@@ -154,8 +154,8 @@ function EditSettingControl({ module, setting, onPatchModule }: { module: Module
           value={module.options[setting.key] === true ? 'on' : 'off'}
           onChange={(e) => onPatchModule(module, { options: { ...module.options, [setting.key]: e.target.value === 'on' } })}
         >
-          <option value="on">Show</option>
-          <option value="off">Hidden</option>
+          <option value="on">On</option>
+          <option value="off">Off</option>
         </select>
       </label>
     )

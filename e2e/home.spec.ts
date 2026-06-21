@@ -30,6 +30,11 @@ async function setModuleMode(page: Page, title: string, mode: string) {
   await row.getByRole('combobox', { name: 'Homepage mode' }).selectOption(mode)
 }
 
+async function setModuleBooleanOption(page: Page, title: string, label: string, enabled: boolean) {
+  const row = moduleRow(page, title)
+  await row.getByRole('combobox', { name: label, exact: true }).selectOption(enabled ? 'on' : 'off')
+}
+
 async function createPinnedNote(page: Page, title: string, body: string) {
   await page.getByRole('button', { name: 'Notes' }).click()
   await page.getByRole('textbox', { name: 'Title' }).fill(title)
@@ -195,6 +200,105 @@ test.describe('weather widget', () => {
       await expect(hourlySection).toHaveAttribute('aria-label', 'Hourly forecast for today')
       const cards = hourlySection.locator('.weather-hour-card')
       expect(await cards.count()).toBeGreaterThan(0)
+    }
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+
+  test('keeps the extended forecast collapsed until it is expanded accessibly', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+    await openAdmin(page)
+
+    const weatherRow = moduleRow(page, 'Weather')
+    const modeSelect = weatherRow.getByRole('combobox', { name: 'Homepage mode' })
+    const collapsibleSelect = weatherRow.getByRole('combobox', { name: 'Collapsible extended forecast', exact: true })
+    const previousMode = await modeSelect.inputValue()
+    const previousCollapsible = await collapsibleSelect.inputValue()
+
+    try {
+      await setModuleMode(page, 'Weather', 'forecast')
+      await setModuleBooleanOption(page, 'Weather', 'Collapsible extended forecast', true)
+      await page.getByRole('button', { name: 'Close' }).click()
+      await page.getByRole('button', { name: 'Home' }).click()
+
+      const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+      const forecastSection = weatherPanel.locator('.weather-extended-forecast')
+      if (await forecastSection.count()) {
+        const toggle = forecastSection.getByRole('button', { name: /Next 5 days Show forecast/ })
+        const disclosure = forecastSection.locator('.weather-forecast-disclosure')
+        const forecastCards = disclosure.locator('.weather-forecast-card')
+
+        await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+        await expect(toggle).toHaveAttribute('aria-controls', 'weather-extended-forecast')
+        await expect(disclosure).toHaveAttribute('id', 'weather-extended-forecast')
+        await expect(disclosure).toHaveAttribute('aria-hidden', 'true')
+        await expect(disclosure).toHaveAttribute('inert', '')
+        await expect(forecastCards.first()).toBeHidden()
+
+        await toggle.click()
+
+        await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+        await expect(toggle).toHaveAccessibleName(/Next 5 days Hide forecast/)
+        await expect(disclosure).toHaveAttribute('aria-hidden', 'false')
+        await expect(disclosure).not.toHaveAttribute('inert', '')
+        await expect(forecastCards.first()).toBeVisible()
+      }
+    } finally {
+      if (await page.getByRole('button', { name: 'Admin settings' }).count()) {
+        await openAdmin(page)
+      }
+      await setModuleMode(page, 'Weather', previousMode)
+      await setModuleBooleanOption(page, 'Weather', 'Collapsible extended forecast', previousCollapsible === 'on')
+      await page.getByRole('button', { name: 'Close' }).click()
+    }
+
+    await expectNoConsoleErrors(page, consoleErrors)
+  })
+
+  test('shows the extended forecast permanently when collapsing is disabled', async ({ page }) => {
+    const consoleErrors: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text())
+    })
+
+    await signIn(page)
+    await openAdmin(page)
+
+    const weatherRow = moduleRow(page, 'Weather')
+    const modeSelect = weatherRow.getByRole('combobox', { name: 'Homepage mode' })
+    const collapsibleSelect = weatherRow.getByRole('combobox', { name: 'Collapsible extended forecast', exact: true })
+    const previousMode = await modeSelect.inputValue()
+    const previousCollapsible = await collapsibleSelect.inputValue()
+
+    try {
+      await setModuleMode(page, 'Weather', 'forecast')
+      await setModuleBooleanOption(page, 'Weather', 'Collapsible extended forecast', false)
+      await page.getByRole('button', { name: 'Close' }).click()
+      await page.getByRole('button', { name: 'Home' }).click()
+
+      const weatherPanel = page.locator('.home-dashboard .weather-panel').first()
+      const forecastSection = weatherPanel.locator('.weather-extended-forecast')
+      if (await forecastSection.count()) {
+        const disclosure = forecastSection.locator('.weather-forecast-disclosure')
+
+        await expect(forecastSection.getByRole('button', { name: /forecast/i })).toHaveCount(0)
+        await expect(forecastSection.getByText('Rain outlook', { exact: true })).toBeVisible()
+        await expect(disclosure).toHaveClass(/weather-forecast-disclosure--expanded/)
+        await expect(disclosure).toHaveAttribute('aria-hidden', 'false')
+        await expect(disclosure.locator('.weather-forecast-card').first()).toBeVisible()
+      }
+    } finally {
+      if (await page.getByRole('button', { name: 'Admin settings' }).count()) {
+        await openAdmin(page)
+      }
+      await setModuleMode(page, 'Weather', previousMode)
+      await setModuleBooleanOption(page, 'Weather', 'Collapsible extended forecast', previousCollapsible === 'on')
+      await page.getByRole('button', { name: 'Close' }).click()
     }
 
     await expectNoConsoleErrors(page, consoleErrors)

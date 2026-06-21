@@ -150,6 +150,13 @@ export const moduleDefinitions: ModuleDefinition[] = [
         defaultValue: false,
       },
       {
+        key: 'collapsibleExtendedForecast',
+        type: 'boolean',
+        label: 'Collapsible extended forecast',
+        description: 'Keep the extended forecast collapsed by default, with a control to expand it when needed.',
+        defaultValue: true,
+      },
+      {
         key: 'showUvIndex',
         type: 'boolean',
         label: 'UV index',

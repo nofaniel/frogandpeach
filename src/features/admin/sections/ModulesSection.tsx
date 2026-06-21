@@ -46,8 +46,8 @@ function SettingControl({
       <label className="compact-field">
         {setting.label}
         <select value={value === true ? 'on' : 'off'} onChange={(e) => onChange(setting.key, e.target.value === 'on')}>
-          <option value="on">Show</option>
-          <option value="off">Hidden</option>
+          <option value="on">On</option>
+          <option value="off">Off</option>
         </select>
       </label>
     )

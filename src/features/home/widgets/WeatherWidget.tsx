@@ -1,4 +1,4 @@
-import { type CSSProperties } from 'react'
+import { useState, type CSSProperties } from 'react'
 import type { HomeData, Module, Settings } from '../../../shared/api-types'
 import { formatDate, formatNumber, formatTemperature, weatherIcon } from '../../../shared/format'
 import { formatLocationLabel } from '../../../shared/location'
@@ -89,6 +89,7 @@ export function WeatherWidget({
   publicSettings: Settings
   onOpenAdmin: () => void
 }) {
+  const [isForecastExpanded, setIsForecastExpanded] = useState(false)
   const widget = resolveHomeWidgetState(module)
   if (!widget) return null
 
@@ -120,6 +121,7 @@ export function WeatherWidget({
   const weatherLocation = home.weather.location?.trim() || formatLocationLabel(publicSettings)
   const forecastDays = home.weather.daily.slice(1, 6)
   const showForecast = widget.mode === 'forecast' || module.options.showExtendedForecast === true
+  const collapsibleExtendedForecast = module.options.collapsibleExtendedForecast !== false
   const weatherIconStyle = module.options.iconStyle === 'icons' ? 'icons' : 'emoji'
   const hourlyForecast = home.weather.hourly ?? []
   const env = home.weather.environment
@@ -231,37 +233,64 @@ export function WeatherWidget({
       )}
       {showForecast && (
         <section className="weather-extended-forecast" aria-label="5-day forecast">
-          <div className="weather-forecast-heading">
-            <p className="kicker">Next 5 days</p>
-            <span>Rain outlook</span>
-          </div>
-          <div className="weather-forecast-grid">
-            {forecastDays.map((day) => {
-              const precip = day.precipitationChance === null ? null : Math.max(0, Math.min(100, day.precipitationChance))
-              return (
-                <div
-                  key={day.date}
-                  className="weather-forecast-card"
-                  style={{ '--precip': `${precip ?? 0}%` } as CSSProperties}
-                >
-                  <div className="weather-forecast-date">{formatDate(day.date)}</div>
-                  <div className="weather-extended-icon" aria-hidden="true">{weatherIcon(day.label)}</div>
-                  <strong>{day.label}</strong>
-                  <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
-                  <InfoTooltip label={precip !== null ? `Chance of rain: ${formatNumber(precip)}%` : 'No rain data'} className="weather-precip-tooltip">
-                    <div className="weather-precip-track" aria-label={precip !== null ? `Chance of rain: ${formatNumber(precip)}%` : undefined}>
-                      <span />
+          {collapsibleExtendedForecast ? (
+            <button
+              type="button"
+              className="weather-forecast-toggle"
+              aria-expanded={isForecastExpanded}
+              aria-controls={`${module.id}-extended-forecast`}
+              onClick={() => setIsForecastExpanded((expanded) => !expanded)}
+            >
+              <span className="weather-forecast-toggle-title">Next 5 days</span>
+              <span className="weather-forecast-toggle-action">
+                <span>{isForecastExpanded ? 'Hide forecast' : 'Show forecast'}</span>
+                <svg className="weather-forecast-toggle-chevron" viewBox="0 0 20 20" aria-hidden="true">
+                  <path d="m5 7.5 5 5 5-5" />
+                </svg>
+              </span>
+            </button>
+          ) : (
+            <div className="weather-forecast-heading">
+              <p className="kicker">Next 5 days</p>
+              <span>Rain outlook</span>
+            </div>
+          )}
+          <div
+            id={`${module.id}-extended-forecast`}
+            className={`weather-forecast-disclosure${!collapsibleExtendedForecast || isForecastExpanded ? ' weather-forecast-disclosure--expanded' : ''}`}
+            aria-hidden={collapsibleExtendedForecast && !isForecastExpanded}
+            inert={collapsibleExtendedForecast && !isForecastExpanded}
+          >
+            <div className="weather-forecast-disclosure-inner">
+              <div className="weather-forecast-grid">
+                {forecastDays.map((day) => {
+                  const precip = day.precipitationChance === null ? null : Math.max(0, Math.min(100, day.precipitationChance))
+                  return (
+                    <div
+                      key={day.date}
+                      className="weather-forecast-card"
+                      style={{ '--precip': `${precip ?? 0}%` } as CSSProperties}
+                    >
+                      <div className="weather-forecast-date">{formatDate(day.date)}</div>
+                      <div className="weather-extended-icon" aria-hidden="true">{weatherIcon(day.label)}</div>
+                      <strong>{day.label}</strong>
+                      <small>{formatTemperature(day.max)} / {formatTemperature(day.min)}</small>
+                      <InfoTooltip label={precip !== null ? `Chance of rain: ${formatNumber(precip)}%` : 'No rain data'} className="weather-precip-tooltip">
+                        <div className="weather-precip-track" aria-label={precip !== null ? `Chance of rain: ${formatNumber(precip)}%` : undefined}>
+                          <span />
+                        </div>
+                      </InfoTooltip>
+                      {precip !== null && (
+                        <span className="weather-extended-precip">
+                          <WeatherMetricSymbol name="precipitationChance" style={weatherIconStyle} />
+                          {formatNumber(precip)}%
+                        </span>
+                      )}
                     </div>
-                  </InfoTooltip>
-                  {precip !== null && (
-                    <span className="weather-extended-precip">
-                      <WeatherMetricSymbol name="precipitationChance" style={weatherIconStyle} />
-                      {formatNumber(precip)}%
-                    </span>
-                  )}
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </section>
       )}
