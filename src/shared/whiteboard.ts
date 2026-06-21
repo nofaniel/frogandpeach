@@ -14,7 +14,7 @@ export const WHITEBOARD_MAX_OPACITY = 1
 const HEX_COLOR_PATTERN = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 
 export function isWhiteboardTool(value: unknown): value is WhiteboardTool {
-  return value === 'pen' || value === 'eraser'
+  return value === 'pen' || value === 'eraser' || value === 'pan'
 }
 
 export function normaliseWhiteboardStrokeInput(value: unknown): WhiteboardStrokeInput {
@@ -79,7 +79,7 @@ function normaliseWhiteboardWidth(value: unknown): number {
 
 function normaliseWhiteboardTool(value: unknown): WhiteboardTool {
   if (value === undefined) return 'pen'
-  if (!isWhiteboardTool(value)) throw new Error('Whiteboard tool must be pen or eraser.')
+  if (!isWhiteboardTool(value)) throw new Error('Whiteboard tool must be pen, eraser, or pan.')
   return value
 }
 
